@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # verify-s05.sh — Structural verification for S05 deliverables
-# Checks: spoke-generate.md, ai-generation-guide.md, anti-patterns.md completeness,
-#          content quality, cross-file consistency, and SKILL.md routing
+# Checks: spoke-doctor.md completeness, dimension coverage, scoring logic,
+#          CI graceful skip, remediation, content quality, cross-file consistency,
+#          SKILL.md routing, and config schema state.last_doctor field
 
 set -euo pipefail
 
@@ -21,134 +22,148 @@ check() {
   fi
 }
 
-echo "=== S05 Structural Verification ==="
+echo "=== S05 Structural Verification (Doctor Command) ==="
 echo ""
 
-# ── a. File Existence (4 checks) ──
+SPOKE="$SKILL_DIR/references/spoke-doctor.md"
+
+# ── a. File Existence (2 checks) ──
 echo "--- File Existence ---"
 
-check "spoke-generate.md exists" test -f "$SKILL_DIR/references/spoke-generate.md"
-check "ai-generation-guide.md exists" test -f "$SKILL_DIR/references/ai-generation-guide.md"
-check "anti-patterns.md exists" test -f "$SKILL_DIR/references/anti-patterns.md"
+check "spoke-doctor.md exists" test -f "$SPOKE"
 check "verify-s05.sh exists (self-check)" test -f "scripts/verify-s05.sh"
 
 echo ""
 
-# ── b. Anti-pattern Catalog Completeness (3 checks) ──
-echo "--- Anti-pattern Catalog Completeness ---"
+# ── b. Spoke Structural Completeness (7 checks) ──
+echo "--- Spoke Structural Completeness ---"
 
-AP="$SKILL_DIR/references/anti-patterns.md"
+check "spoke-doctor.md has Pre-Flight Checks section" grep -q "Pre-Flight" "$SPOKE"
 
-AP_NUMBERED=$(grep -c "^## [0-9]" "$AP")
-check "anti-patterns.md has 20+ numbered categories (found $AP_NUMBERED)" [ "$AP_NUMBERED" -ge 20 ]
+PHASES_FOUND=$(grep -cE "^## Phase [0-9]+" "$SPOKE")
+check "spoke-doctor.md has 10+ phases (found $PHASES_FOUND)" [ "$PHASES_FOUND" -ge 10 ]
 
-AP_PATTERNS=$(grep -c "Grep pattern\|Grep patterns\|grep pattern\|grep_pattern\|Evaluation criteria\|Detection method" "$AP")
-check "anti-patterns.md has detection methods/patterns (found $AP_PATTERNS)" [ "$AP_PATTERNS" -ge 10 ]
+check "spoke-doctor.md has Error Handling section" grep -q "Error Handling" "$SPOKE"
 
-AP_SEVERITY=0
-for level in critical high medium low; do
-  if grep -q "$level" "$AP"; then
-    AP_SEVERITY=$((AP_SEVERITY + 1))
-  fi
-done
-check "anti-patterns.md has all 4 severity levels (found $AP_SEVERITY/4)" [ "$AP_SEVERITY" -ge 4 ]
+check "spoke-doctor.md has Downstream Reference section" grep -q "Downstream Reference" "$SPOKE"
 
-echo ""
+check "spoke-doctor.md has Output section" grep -qE "^## Output" "$SPOKE"
 
-# ── c. AI Generation Guide Completeness (3 checks) ──
-echo "--- AI Generation Guide Completeness ---"
+check "spoke-doctor.md has Composite Scoring section" grep -q "Composite Scoring" "$SPOKE"
 
-GUIDE="$SKILL_DIR/references/ai-generation-guide.md"
-
-GUIDE_HEADINGS=$(grep -c "^## " "$GUIDE")
-check "ai-generation-guide.md has 7+ ## headings (found $GUIDE_HEADINGS)" [ "$GUIDE_HEADINGS" -ge 7 ]
-
-GUIDE_RUBRIC=$(grep -c "rubric\|scoring\|quality.*score\|Score.*dimension" "$GUIDE")
-check "ai-generation-guide.md has quality rubric/scoring (found $GUIDE_RUBRIC refs)" [ "$GUIDE_RUBRIC" -ge 3 ]
-
-GUIDE_STRATEGIES=0
-for strat in "pure function\|pure-function" "component" "API\|api" "state" "async"; do
-  if grep -q "$strat" "$GUIDE"; then
-    GUIDE_STRATEGIES=$((GUIDE_STRATEGIES + 1))
-  fi
-done
-check "ai-generation-guide.md has code type strategies (found $GUIDE_STRATEGIES/5)" [ "$GUIDE_STRATEGIES" -ge 4 ]
+check "spoke-doctor.md has Prerequisites section" grep -q "Prerequisites" "$SPOKE"
 
 echo ""
 
-# ── d. Spoke Completeness (10 checks) ──
-echo "--- Spoke Completeness ---"
+# ── c. Dimension Coverage (9 checks — one per dimension) ──
+echo "--- Dimension Coverage ---"
 
-SPOKE="$SKILL_DIR/references/spoke-generate.md"
-
-check "spoke-generate.md has Pre-Flight Checks section" grep -q "Pre-Flight" "$SPOKE"
-
-PHASES_FOUND=0
-for i in 1 2 3 4 5 6 7; do
-  if grep -q "Phase $i" "$SPOKE"; then
-    PHASES_FOUND=$((PHASES_FOUND + 1))
-  fi
-done
-check "spoke-generate.md has all 7 phases (found $PHASES_FOUND/7)" [ "$PHASES_FOUND" -ge 7 ]
-
-check "spoke-generate.md has HITL Gate section" grep -q "HITL" "$SPOKE"
-
-check "spoke-generate.md has Error Handling section" grep -q "Error Handling" "$SPOKE"
-
-check "spoke-generate.md has Downstream Reference section" grep -q "Downstream" "$SPOKE"
-
-check "spoke-generate.md has Output section" grep -q "## Output\|## Report Output\|Output Specification" "$SPOKE"
-
-check "spoke-generate.md references ai-generation-guide.md" grep -q "ai-generation-guide" "$SPOKE"
-
-check "spoke-generate.md references anti-patterns.md" grep -q "anti-patterns" "$SPOKE"
-
-check "spoke-generate.md references config schema or config.yaml" grep -q "config" "$SPOKE"
-
-check "spoke-generate.md references scan-report-schema or gaps/testInventory" grep -q "scan-report-schema\|gaps\|testInventory" "$SPOKE"
+check "dimension: Framework Version present" grep -qE "framework.version|framework-version|Framework Version" "$SPOKE"
+check "dimension: Config Validity present" grep -qE "config.validity|config-validity|Config Validity" "$SPOKE"
+check "dimension: Coverage Trend present" grep -qE "coverage.trend|coverage-trend|Coverage Trend" "$SPOKE"
+check "dimension: Flaky Test Budget present" grep -qE "flaky.test|flaky-tests|Flaky Test Budget" "$SPOKE"
+check "dimension: CI Health present" grep -qE "ci.health|ci-health|CI Health" "$SPOKE"
+check "dimension: Execution Time present" grep -qE "execution.time|execution-time|Execution Time" "$SPOKE"
+check "dimension: Anti-Pattern Summary present" grep -qE "anti.pattern|anti-patterns|Anti-Pattern Summary" "$SPOKE"
+check "dimension: Dead Test Detection present" grep -qE "dead.test|dead-tests|Dead Test" "$SPOKE"
+check "dimension: Duplicate Coverage present" grep -qE "duplicate.coverage|duplicate-coverage|Duplicate Coverage" "$SPOKE"
 
 echo ""
 
-# ── e. Content Quality (4 checks) ──
+# ── d. Scoring Logic (5 checks) ──
+echo "--- Scoring Logic ---"
+
+check "scoring: weighted average mentioned" grep -qE "weighted.*average|sum.*weight.*score" "$SPOKE"
+
+check "scoring: score bands defined (Excellent/Good/Fair/Critical)" grep -qE "Excellent.*Good|Good.*Fair|Fair.*Critical|90.*100.*Excellent|0.*39.*Critical" "$SPOKE"
+
+check "scoring: graceful skip logic described" grep -qE "skip|skipped|graceful" "$SPOKE"
+
+check "scoring: 0-100 score range mentioned" grep -qE "0.?100|0–100" "$SPOKE"
+
+check "scoring: minimum dimensions threshold" grep -qE "minimum.*dimension|3.*scorable|at least 3" "$SPOKE"
+
+echo ""
+
+# ── e. CI Graceful Skip (3 checks) ──
+echo "--- CI Graceful Skip ---"
+
+check "CI: not_configured status documented" grep -qE "not_configured" "$SPOKE"
+
+check "CI: skip/no-penalize logic documented" grep -qE "does not affect|not.*penalize|excluded.*composite|weight.*0" "$SPOKE"
+
+check "CI: weight set to 0 when not configured" grep -qE "weight.*0|weight.*=.*0|weight:\s*0" "$SPOKE"
+
+echo ""
+
+# ── f. Remediation (3 checks) ──
+echo "--- Remediation ---"
+
+check "remediation: prioritized remediation list mentioned" grep -qE "prioritized.*remediation|remediation.*priorit" "$SPOKE"
+
+check "remediation: remediation entries in dimension output" grep -qE '"remediation"' "$SPOKE"
+
+check "remediation: suggested commands for each dimension" grep -qE "bestest fix|bestest coverage|bestest generate|bestest run" "$SPOKE"
+
+echo ""
+
+# ── g. Content Quality (4 checks) ──
 echo "--- Content Quality ---"
 
-TODO_COUNT=$(grep -c "^-\s*TODO\|^-\s*TBD\|^\s*TODO\s*$\|^\s*TBD\s*$\|^- TODO\|^- TBD" "$SPOKE" 2>/dev/null || true)
+TODO_COUNT=$(grep -cE "^\s*-\s*(TODO|TBD)\b|^\s*(TODO|TBD)\s*$" "$SPOKE" 2>/dev/null || true)
 if [ "$TODO_COUNT" = "" ]; then TODO_COUNT=0; fi
-check "No standalone TODO/TBD placeholders in spoke-generate.md (found $TODO_COUNT)" [ "$TODO_COUNT" -eq 0 ]
+check "No standalone TODO/TBD placeholders in spoke-doctor.md (found $TODO_COUNT)" [ "$TODO_COUNT" -eq 0 ]
 
 SPOKE_LINES=$(wc -l < "$SPOKE" | tr -d ' ')
-check "spoke-generate.md is 600+ lines (found $SPOKE_LINES)" [ "$SPOKE_LINES" -ge 600 ]
+check "spoke-doctor.md is 600+ lines (found $SPOKE_LINES)" [ "$SPOKE_LINES" -ge 600 ]
 
-VITEST_REFS=$(grep -ci "vitest" "$SPOKE")
-check "spoke-generate.md has 5+ Vitest references (found $VITEST_REFS)" [ "$VITEST_REFS" -ge 5 ]
+check "spoke-doctor.md references config schema or config.yaml" grep -qE "config.schema|config.yaml|config-schema" "$SPOKE"
 
-JEST_REFS=$(grep -ci "jest" "$SPOKE")
-check "spoke-generate.md has 5+ Jest references (found $JEST_REFS)" [ "$JEST_REFS" -ge 5 ]
+check "spoke-doctor.md references anti-patterns" grep -qE "anti-pattern|antiPattern" "$SPOKE"
 
 echo ""
 
-# ── f. Cross-file Consistency (3 checks) ──
+# ── h. Cross-file Consistency (3 checks) ──
 echo "--- Cross-file Consistency ---"
 
-check "spoke-generate.md references Context7" grep -q "Context7\|context7" "$SPOKE"
+check "spoke-doctor.md references spoke-run.md or run-results" grep -qE "spoke-run|run-results|run-\*\.json" "$SPOKE"
 
-GEN_CONFIG=0
-for field in quality_threshold max_retries verify_compilation verify_pass; do
-  if grep -q "$field" "$SPOKE"; then
-    GEN_CONFIG=$((GEN_CONFIG + 1))
-  fi
-done
-check "spoke-generate.md respects generation config fields (found $GEN_CONFIG/4)" [ "$GEN_CONFIG" -ge 3 ]
+check "spoke-doctor.md references spoke-scan.md or scan reports" grep -qE "spoke-scan|scan-report|scan-\*\.json" "$SPOKE"
 
-GUIDE_XREF=$(grep -c "anti-pattern\|spoke-generate\|spoke_generate" "$GUIDE")
-check "ai-generation-guide.md cross-references anti-patterns or spoke-generate (found $GUIDE_XREF refs)" [ "$GUIDE_XREF" -ge 1 ]
+check "spoke-doctor.md references config-schema.md" grep -qE "config-schema" "$SPOKE"
 
 echo ""
 
-# ── g. SKILL.md Routing (1 check) ──
+# ── i. SKILL.md Routing (3 checks) ──
 echo "--- SKILL.md Routing ---"
 
-check "SKILL.md routes generate command to spoke-generate.md" grep -q "spoke-generate.md" "$SKILL_DIR/SKILL.md"
+SKILL="$SKILL_DIR/SKILL.md"
+
+check "SKILL.md has doctor entry in routing table" grep -qE "doctor.*spoke-doctor|spoke-doctor.*doctor" "$SKILL"
+
+check "SKILL.md has doctor entry in quick_reference table" grep -qE "^\|\s*\`?doctor\`?" "$SKILL"
+
+check "SKILL.md has spoke-doctor.md in reference_index" grep -qE "spoke-doctor\.md.*doctor|doctor.*spoke-doctor\.md" "$SKILL"
+
+echo ""
+
+# ── j. Config Schema (2 checks) ──
+echo "--- Config Schema ---"
+
+CONFIG_SCHEMA="$SKILL_DIR/references/config-schema.md"
+
+check "config-schema.md exists" test -f "$CONFIG_SCHEMA"
+
+check "config-schema.md has state.last_doctor field" grep -qE "state\.last_doctor|last_doctor" "$CONFIG_SCHEMA"
+
+echo ""
+
+# ── k. JSON Report Structure (2 checks) ──
+echo "--- JSON Report Structure ---"
+
+check "spoke-doctor.md defines health report JSON schema" grep -qE "healthScore|health.*report.*JSON|JSON.*schema" "$SPOKE"
+
+check "spoke-doctor.md defines console output format" grep -qE "Console.*Output|console.*summary|print.*summary" "$SPOKE"
 
 echo ""
 
