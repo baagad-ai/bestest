@@ -493,7 +493,8 @@ If brownfield AND no handling mode was selected in Phase 3:
 ├── adrs/
 │   └── ADR-001-test-framework.md   # Framework decision record (generated in Phase 2)
 ├── state/
-│   └── stack-profile.json   # Detected stack profile (from Phase 1)
+│   ├── stack-profile.json   # Detected stack profile (from Phase 1)
+│   └── metrics.json         # Continuous test health metrics (baseline defaults)
 └── reports/                  # Empty directory for scan/generate output
 ```
 
@@ -715,6 +716,31 @@ Use `references/templates/testing-md.md`. Fill placeholders:
 #### `.bestest/.gitignore`
 
 Copy `references/templates/bestest-gitignore` verbatim. No placeholder substitution needed.
+
+#### `.bestest/state/metrics.json`
+
+Create the initial metrics store with baseline zero values. Use the **Default Values (Initial State)** from `references/metrics-schema.md` — copy that JSON shape verbatim, substituting only the `lastUpdated` field with the current ISO 8601 timestamp.
+
+```
+1. Read the "Default Values (Initial State)" section from references/metrics-schema.md.
+2. Create .bestest/state/metrics.json with those defaults.
+3. Set lastUpdated to the current ISO 8601 timestamp.
+4. Set coverage.target to the same value used in config.yaml (default 80).
+5. Write the file to .bestest/state/metrics.json.
+```
+
+The initial file establishes the schema and baseline for all future spoke updates. Every state-changing spoke will merge its data into this file following the **Update Protocol** defined in `references/metrics-schema.md`.
+
+**Key defaults:**
+- `healthScore.overall`: 0.0 (no data yet)
+- `healthScore.breakdown.flakiness`: 1.0 (no flaky tests = perfect score)
+- `healthScore.breakdown.freshness`: 1.0 (just created)
+- `healthScore.breakdown.mutation`: null (mutation testing not enabled by default)
+- `tests.*`: all 0 (no tests discovered yet)
+- `coverage.current.*`: 0.0 or "n/a" (no coverage measured yet)
+- All bounded arrays (`trend`, `history`, `activity`, etc.): empty `[]`
+
+This file is **safe to delete** — any state-changing spoke will recreate it with defaults on next invocation. Historical trend data will be lost, but the file will be functional.
 
 ### Context7 Integration
 
@@ -1109,6 +1135,7 @@ Verify every expected file exists:
 .bestest/.gitignore           — exists
 .bestest/adrs/ADR-001-test-framework.md — exists and contains Status, Context, Decision, Rationale sections
 .bestest/state/stack-profile.json — exists and is valid JSON matching references/stack-profile-schema.md
+.bestest/state/metrics.json      — exists and is valid JSON matching references/metrics-schema.md (schemaVersion "1.0")
 .bestest/reports/             — directory exists (empty)
 TESTING.md                    — exists at repo root (NOT inside .bestest/)
 vitest.config.ts OR jest.config.ts — exists at repo root
@@ -1120,6 +1147,7 @@ vitest.config.ts OR jest.config.ts — exists at repo root
 .bestest/.gitignore           — exists
 .bestest/adrs/ADR-001-test-framework.md — exists and contains Status, Context, Decision, Rationale sections
 .bestest/state/stack-profile.json — exists and is valid JSON matching references/stack-profile-schema.md
+.bestest/state/metrics.json      — exists and is valid JSON matching references/metrics-schema.md (schemaVersion "1.0")
 .bestest/reports/             — directory exists (empty)
 TESTING.md                    — exists at repo root (NOT inside .bestest/)
 pyproject.toml                — exists with [tool.pytest.ini_options] section (or pytest.ini)
@@ -1132,6 +1160,7 @@ tests/                        — directory exists with conftest.py
 .bestest/.gitignore           — exists
 .bestest/adrs/ADR-001-test-framework.md — exists and contains Status, Context, Decision, Rationale sections
 .bestest/state/stack-profile.json — exists and is valid JSON matching references/stack-profile-schema.md
+.bestest/state/metrics.json      — exists and is valid JSON matching references/metrics-schema.md (schemaVersion "1.0")
 .bestest/reports/             — directory exists (empty)
 TESTING.md                    — exists at repo root (NOT inside .bestest/)
 build.gradle or pom.xml       — exists with JUnit 5 dependencies added
@@ -1144,6 +1173,7 @@ src/test/java/                — test source directory exists
 .bestest/.gitignore           — exists
 .bestest/adrs/ADR-001-test-framework.md — exists and contains Status, Context, Decision, Rationale sections
 .bestest/state/stack-profile.json — exists and is valid JSON matching references/stack-profile-schema.md
+.bestest/state/metrics.json      — exists and is valid JSON matching references/metrics-schema.md (schemaVersion "1.0")
 .bestest/reports/             — directory exists (empty)
 TESTING.md                    — exists at repo root (NOT inside .bestest/)
 go.mod                        — exists with testify dependency added
@@ -1186,6 +1216,7 @@ Print a completion summary:
 | .bestest/.gitignore | Ignores state, reports, and cache |
 | .bestest/adrs/ADR-001-test-framework.md | Framework selection decision record |
 | .bestest/state/stack-profile.json | Detected stack profile |
+| .bestest/state/metrics.json | Continuous test health metrics (baseline defaults) |
 | .bestest/reports/ | Directory for scan and coverage reports |
 | TESTING.md | Living test documentation (repo root) |
 | [vitest.config.ts or jest.config.ts] | Framework configuration (repo root) |
@@ -1404,6 +1435,7 @@ After successful completion, the following files exist:
 | `config.yaml` | `.bestest/` | Test framework, coverage, paths, and generation settings |
 | `.gitignore` | `.bestest/` | Ignore state/, reports/, cache/ |
 | `stack-profile.json` | `.bestest/state/` | Detected technology stack with confidence scores |
+| `metrics.json` | `.bestest/state/` | Continuous test health metrics (baseline defaults, per metrics-schema.md) |
 | `ADR-001-test-framework.md` | `.bestest/adrs/` | Framework selection decision record |
 | — (empty directory) | `.bestest/reports/` | Future home for scan and coverage reports |
 | `TESTING.md` | **Repo root** | Living test documentation |
@@ -1416,6 +1448,7 @@ After successful completion, the following files exist:
 | `config.yaml` | `.bestest/` | Test framework (pytest), coverage, paths, and generation settings |
 | `.gitignore` | `.bestest/` | Ignore state/, reports/, cache/ |
 | `stack-profile.json` | `.bestest/state/` | Detected technology stack with confidence scores |
+| `metrics.json` | `.bestest/state/` | Continuous test health metrics (baseline defaults, per metrics-schema.md) |
 | `ADR-001-test-framework.md` | `.bestest/adrs/` | Framework selection decision record |
 | — (empty directory) | `.bestest/reports/` | Future home for scan and coverage reports |
 | `TESTING.md` | **Repo root** | Living test documentation |
@@ -1430,6 +1463,7 @@ After successful completion, the following files exist:
 | `config.yaml` | `.bestest/` | Test framework (junit5), coverage (JaCoCo), paths, and generation settings |
 | `.gitignore` | `.bestest/` | Ignore state/, reports/, cache/ |
 | `stack-profile.json` | `.bestest/state/` | Detected technology stack with confidence scores |
+| `metrics.json` | `.bestest/state/` | Continuous test health metrics (baseline defaults, per metrics-schema.md) |
 | `ADR-001-test-framework.md` | `.bestest/adrs/` | Framework selection decision record |
 | — (empty directory) | `.bestest/reports/` | Future home for scan and coverage reports |
 | `TESTING.md` | **Repo root** | Living test documentation |
@@ -1443,6 +1477,7 @@ After successful completion, the following files exist:
 | `config.yaml` | `.bestest/` | Test framework (go_testing), coverage (go test -cover), paths, and generation settings |
 | `.gitignore` | `.bestest/` | Ignore state/, reports/, cache/ |
 | `stack-profile.json` | `.bestest/state/` | Detected technology stack with confidence scores |
+| `metrics.json` | `.bestest/state/` | Continuous test health metrics (baseline defaults, per metrics-schema.md) |
 | `ADR-001-test-framework.md` | `.bestest/adrs/` | Framework selection decision record |
 | — (empty directory) | `.bestest/reports/` | Future home for scan and coverage reports |
 | `TESTING.md` | **Repo root** | Living test documentation |

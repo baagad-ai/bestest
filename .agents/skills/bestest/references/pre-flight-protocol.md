@@ -42,6 +42,31 @@ If .bestest/config.yaml exists but is invalid YAML:
 
 If all three pass, parse config.yaml into a structured object and extract the fields the spoke needs.
 
+### Step 4 — `metrics.json` pre-read validation (optional)
+
+Spokes that read `.bestest/state/metrics.json` (scan, run, fix, generate, migrate, doctor, coverage, report, config) must validate it before parsing. This step is optional — spokes that do not read metrics.json can skip it.
+
+```
+If the spoke reads metrics.json:
+  Attempt to parse .bestest/state/metrics.json.
+  If the file does not exist:
+    Treated as first-time creation. Spoke writes its section with defaults for all others.
+    Continue — do NOT exit.
+  If parsing fails (SyntaxError, unexpected token, etc.):
+    Log warning: "metrics.json corrupted — recreating with defaults"
+    Initialize fresh metrics with schemaVersion "1.0" and default values from references/metrics-schema.md
+    Continue with the spoke's own section merge (step 5 of the Update Protocol)
+    Do NOT abort the spoke — metrics are observability, not a gate.
+  If schemaVersion MAJOR differs:
+    Log warning: "metrics.json schema version mismatch: expected 1.x, found {version}"
+    Attempt to read known fields, write back with current schema version.
+    Continue.
+  If schemaVersion MINOR differs or is missing:
+    Proceed normally. Unrecognized fields are preserved (pass-through).
+```
+
+This graceful degradation ensures that metrics corruption never blocks a spoke from completing its primary work. See `references/metrics-schema.md` → "Graceful Degradation" for the full protocol.
+
 ---
 
 ## Init-Specific Pattern (Inverse)
@@ -251,7 +276,7 @@ When creating a new spoke, choose the appropriate pre-flight pattern:
 
 | If the spoke... | Use pattern | Why |
 |-----------------|-------------|-----|
-| Reads config.yaml and requires `.bestest/` to exist | Standard 3-step | Baseline for all operational spokes |
+| Reads config.yaml and requires `.bestest/` to exist | Standard 3-step (+ Step 4 if reading metrics) | Baseline for all operational spokes |
 | Creates `.bestest/` | Init-specific (inverse) | Must not overwrite existing setup |
 | Only reads/modifies config.yaml | Config-specific (lightweight) | No StackProfile or scan report needed |
 | Generates test files | Generate-specific | Needs confidence gate, schema version, scan report |
