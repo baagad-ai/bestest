@@ -6,7 +6,7 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/prajwalmishra/bestest/actions/workflows/validate-plugin.yml/badge.svg)](https://github.com/prajwalmishra/bestest/actions/workflows/validate-plugin.yml)
-[![Version](https://img.shields.io/badge/version-1.3.0-brightgreen.svg)](https://github.com/prajwalmishra/bestest/blob/main/.agents/skills/bestest/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.0-brightgreen.svg)](https://github.com/prajwalmishra/bestest/blob/main/.agents/skills/bestest/CHANGELOG.md)
 
 Detects your stack · Recommends frameworks · Generates production-quality tests · Manages CI pipelines · Maintains living documentation
 

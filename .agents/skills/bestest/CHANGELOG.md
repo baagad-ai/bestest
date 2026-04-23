@@ -6,6 +6,33 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conv
 
 ---
 
+## [1.4.0] — 2026-04-23
+
+### Added
+
+- Brownfield init: 3-mode model (coexist/migrate/replace) for existing test infrastructure (S02).
+- Metrics store: `.bestest/state/metrics.json` with continuous updates from 11 spokes (S03).
+- Three-tier HITL gate model (auto/provisional/manual) replaces binary gates (S04).
+- Structured extraction protocol hardens generation pipeline against injection (S04).
+- Self-contained HTML health dashboard with Lucide icons, 9 widgets, dark/light mode (S05).
+- JUnit XML emission for CI integration via spoke-run (S05).
+- Mocha + Jasmine generation/fix/run support for JS/TS (S06).
+- TestNG generation/fix/run/detection support for Java (S06).
+- `validate-plugin.sh` with 275 structural checks (S01+S06).
+
+### Changed
+
+- Plugin terminology: prose 'skill' → 'plugin' across all files (S06).
+- Reference index externalized to dedicated file (S04).
+- Pre-flight checks consolidated (S04).
+
+### Fixed
+
+- CI workflow fixed and passing with validate-plugin.yml (S01).
+- 6 stale references cleaned up (S07).
+
+---
+
 ## [1.3.0] — 2026-04-23
 
 ### Added
