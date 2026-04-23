@@ -1029,6 +1029,8 @@ After Phase 8 completes and all artifacts are written, update `.bestest/state/me
 
 All arrays use FIFO eviction: append new entry to end, then remove from beginning if length exceeds `*maxLength`. See `metrics-schema.md` → Bounded Array Eviction for the canonical algorithm.
 
+> **Dashboard refresh:** The health dashboard at `.bestest/dashboard.html` reads `state/metrics.json` on each page load — the metrics update above is all that's needed to refresh the dashboard. No separate dashboard rebuild step is required.
+
 ---
 
 ## Error Handling

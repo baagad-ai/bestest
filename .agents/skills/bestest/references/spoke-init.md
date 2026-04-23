@@ -469,7 +469,8 @@ If brownfield AND no handling mode was selected in Phase 3:
 ├── state/
 │   ├── stack-profile.json   # Detected stack profile (from Phase 1)
 │   └── metrics.json         # Continuous test health metrics (baseline defaults)
-└── reports/                  # Empty directory for scan/generate output
+├── reports/                  # Empty directory for scan/generate output
+└── dashboard.html            # Self-contained health dashboard (copied from references/templates/dashboard.html)
 ```
 
 Additionally, create at the **repo root** (NOT inside `.bestest/`):
@@ -715,6 +716,18 @@ The initial file establishes the schema and baseline for all future spoke update
 - All bounded arrays (`trend`, `history`, `activity`, etc.): empty `[]`
 
 This file is **safe to delete** — any state-changing spoke will recreate it with defaults on next invocation. Historical trend data will be lost, but the file will be functional.
+
+#### `.bestest/dashboard.html`
+
+Copy `references/templates/dashboard.html` to `.bestest/dashboard.html`. This is a self-contained HTML file that reads `.bestest/state/metrics.json` via `fetch('./state/metrics.json')` and renders a visual health dashboard with 9 widgets (health gauge, coverage trend, test results, flaky alerts, run history, module map, slowest tests, failure hotspots, activity feed). It uses inline SVG Lucide icons, dark/light mode, and responsive layout — zero dependencies, no server, no build step.
+
+```
+1. Read references/templates/dashboard.html.
+2. Copy it verbatim to .bestest/dashboard.html (no placeholder substitution needed).
+3. The dashboard reads metrics.json at runtime — no data is baked in.
+```
+
+If the template file does not exist, skip this step with a warning: "Dashboard template not found — skipping dashboard.html creation."
 
 ### Context7 Integration
 
@@ -1110,6 +1123,7 @@ Verify every expected file exists:
 .bestest/adrs/ADR-001-test-framework.md — exists and contains Status, Context, Decision, Rationale sections
 .bestest/state/stack-profile.json — exists and is valid JSON matching references/stack-profile-schema.md
 .bestest/state/metrics.json      — exists and is valid JSON matching references/metrics-schema.md (schemaVersion "1.0")
+.bestest/dashboard.html           — exists (self-contained health dashboard)
 .bestest/reports/             — directory exists (empty)
 TESTING.md                    — exists at repo root (NOT inside .bestest/)
 vitest.config.ts OR jest.config.ts — exists at repo root
@@ -1122,6 +1136,7 @@ vitest.config.ts OR jest.config.ts — exists at repo root
 .bestest/adrs/ADR-001-test-framework.md — exists and contains Status, Context, Decision, Rationale sections
 .bestest/state/stack-profile.json — exists and is valid JSON matching references/stack-profile-schema.md
 .bestest/state/metrics.json      — exists and is valid JSON matching references/metrics-schema.md (schemaVersion "1.0")
+.bestest/dashboard.html           — exists (self-contained health dashboard)
 .bestest/reports/             — directory exists (empty)
 TESTING.md                    — exists at repo root (NOT inside .bestest/)
 pyproject.toml                — exists with [tool.pytest.ini_options] section (or pytest.ini)
@@ -1135,6 +1150,7 @@ tests/                        — directory exists with conftest.py
 .bestest/adrs/ADR-001-test-framework.md — exists and contains Status, Context, Decision, Rationale sections
 .bestest/state/stack-profile.json — exists and is valid JSON matching references/stack-profile-schema.md
 .bestest/state/metrics.json      — exists and is valid JSON matching references/metrics-schema.md (schemaVersion "1.0")
+.bestest/dashboard.html           — exists (self-contained health dashboard)
 .bestest/reports/             — directory exists (empty)
 TESTING.md                    — exists at repo root (NOT inside .bestest/)
 build.gradle or pom.xml       — exists with JUnit 5 dependencies added
@@ -1148,6 +1164,7 @@ src/test/java/                — test source directory exists
 .bestest/adrs/ADR-001-test-framework.md — exists and contains Status, Context, Decision, Rationale sections
 .bestest/state/stack-profile.json — exists and is valid JSON matching references/stack-profile-schema.md
 .bestest/state/metrics.json      — exists and is valid JSON matching references/metrics-schema.md (schemaVersion "1.0")
+.bestest/dashboard.html           — exists (self-contained health dashboard)
 .bestest/reports/             — directory exists (empty)
 TESTING.md                    — exists at repo root (NOT inside .bestest/)
 go.mod                        — exists with testify dependency added
@@ -1191,6 +1208,7 @@ Print a completion summary:
 | .bestest/adrs/ADR-001-test-framework.md | Framework selection decision record |
 | .bestest/state/stack-profile.json | Detected stack profile |
 | .bestest/state/metrics.json | Continuous test health metrics (baseline defaults) |
+| .bestest/dashboard.html | Self-contained health dashboard (reads state/metrics.json) |
 | .bestest/reports/ | Directory for scan and coverage reports |
 | TESTING.md | Living test documentation (repo root) |
 | [vitest.config.ts or jest.config.ts] | Framework configuration (repo root) |

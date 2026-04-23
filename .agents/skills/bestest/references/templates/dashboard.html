@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bestest — Test Health Dashboard</title>
+<style>
+/* ── Theme Variables ── */
+:root {
+  --bg: #0f1117;
+  --bg-card: #181b25;
+  --bg-hover: #1e2230;
+  --border: #2a2e3e;
+  --text: #e4e6ed;
+  --text-dim: #8b8fa3;
+  --text-muted: #5a5e72;
+  --accent: #6366f1;
+  --accent-soft: rgba(99,102,241,0.15);
+  --green: #22c55e;
+  --green-soft: rgba(34,197,94,0.15);
+  --red: #ef4444;
+  --red-soft: rgba(239,68,68,0.15);
+  --yellow: #f59e0b;
+  --yellow-soft: rgba(245,158,11,0.15);
+  --blue: #3b82f6;
+  --blue-soft: rgba(59,130,246,0.15);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --gap: 20px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+[data-theme="light"] {
+  --bg: #f5f6fa;
+  --bg-card: #ffffff;
+  --bg-hover: #f0f1f5;
+  --border: #e2e4ea;
+  --text: #1a1c24;
+  --text-dim: #5a5e72;
+  --text-muted: #8b8fa3;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--border);
+}
+.dashboard-header h1 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.dashboard-header h1 svg { color: var(--accent); }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.theme-toggle {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  transition: background 0.2s;
+}
+.theme-toggle:hover { background: var(--bg-hover); }
+.last-updated { font-size: 13px; color: var(--text-muted); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap);
+  padding: 24px 32px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+@media (max-width: 1024px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .grid { grid-template-columns: 1fr; padding: 16px; } .dashboard-header { padding: 16px; } }
+
+/* ── Card ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-title svg { width: 16px; height: 16px; }
+.card.span-2 { grid-column: span 2; }
+.card.span-3 { grid-column: span 3; }
+@media (max-width: 640px) { .card.span-2, .card.span-3 { grid-column: span 1; } }
+
+/* ── Health Gauge ── */
+.gauge-container { display: flex; align-items: center; gap: 24px; }
+.gauge-svg { width: 140px; height: 140px; flex-shrink: 0; }
+.gauge-track { fill: none; stroke: var(--border); stroke-width: 10; }
+.gauge-fill { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+.gauge-text { font-size: 28px; font-weight: 700; fill: var(--text); }
+.gauge-label { font-size: 11px; fill: var(--text-muted); }
+.breakdown-list { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.breakdown-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.breakdown-row .label { width: 80px; color: var(--text-dim); }
+.breakdown-row .bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.breakdown-row .bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+.breakdown-row .value { width: 36px; text-align: right; font-weight: 600; font-size: 12px; }
+
+/* ── Stat Cards ── */
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.stat-card {
+  background: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  text-align: center;
+}
+.stat-icon { margin-bottom: 8px; }
+.stat-icon svg { width: 24px; height: 24px; }
+.stat-value { font-size: 28px; font-weight: 700; line-height: 1; }
+.stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+@media (max-width: 640px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* ── Coverage Trend ── */
+.trend-chart { width: 100%; height: 180px; }
+.trend-chart text { font-family: var(--font); font-size: 10px; fill: var(--text-muted); }
+
+/* ── Tables ── */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid var(--border); }
+td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: none; }
+.coverage-bar { height: 6px; background: var(--border); border-radius: 3px; width: 80px; display: inline-block; vertical-align: middle; overflow: hidden; }
+.coverage-bar-fill { height: 100%; border-radius: 3px; }
+.mono { font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace; font-size: 12px; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-green { background: var(--green-soft); color: var(--green); }
+.badge-red { background: var(--red-soft); color: var(--red); }
+.badge-yellow { background: var(--yellow-soft); color: var(--yellow); }
+.badge-blue { background: var(--blue-soft); color: var(--blue); }
+
+/* ── Heatmap ── */
+.heat-cell { padding: 2px 6px; border-radius: 3px; font-weight: 600; font-size: 12px; }
+
+/* ── Activity Feed ── */
+.activity-list { max-height: 320px; overflow-y: auto; }
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-icon { flex-shrink: 0; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+.activity-icon svg { width: 14px; height: 14px; }
+.activity-body { flex: 1; min-width: 0; }
+.activity-action { font-size: 13px; font-weight: 600; }
+.activity-summary { font-size: 12px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.activity-time { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── Empty / Error States ── */
+.empty-state { text-align: center; padding: 40px 20px; }
+.empty-state svg { width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 12px; }
+.empty-state h3 { font-size: 16px; margin-bottom: 8px; }
+.empty-state p { font-size: 13px; color: var(--text-dim); max-width: 360px; margin: 0 auto; line-height: 1.5; }
+.empty-state code { background: var(--bg-hover); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+
+/* ── Slowest bars ── */
+.slowest-bar-container { display: flex; align-items: center; gap: 8px; }
+.slowest-bar { height: 8px; border-radius: 4px; background: var(--accent); min-width: 4px; }
+.slowest-time { font-size: 12px; color: var(--text-dim); white-space: nowrap; font-family: 'SF Mono','Cascadia Code', monospace; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- SVG Sprite -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="icon-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></symbol>
+  <symbol id="icon-alert-triangle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="icon-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="icon-bar-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h8"/><path d="M7 11h12"/><path d="M7 6h3"/></symbol>
+  <symbol id="icon-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="icon-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="icon-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="icon-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></symbol>
+  <symbol id="icon-file-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+  <symbol id="icon-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+  <symbol id="icon-git-branch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6a9 9 0 0 0-9 9V3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/></symbol>
+  <symbol id="icon-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/></symbol>
+  <symbol id="icon-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></symbol>
+  <symbol id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
+  <symbol id="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+  <symbol id="icon-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="icon-skip-forward" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4v16"/><path d="M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z"/></symbol>
+  <symbol id="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+  <symbol id="icon-trending-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></symbol>
+  <symbol id="icon-trending-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></symbol>
+  <symbol id="icon-x-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+  <symbol id="icon-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+  <symbol id="icon-brain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18V5"/><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"/><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"/><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"/><path d="M18 18a4 4 0 0 0 2-7.464"/><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"/><path d="M6 18a4 4 0 0 1-2-7.464"/><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"/></symbol>
+  <symbol id="icon-bug" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-9"/><path d="M14 7a4 4 0 0 1 4 4v3a6 6 0 0 1-12 0v-3a4 4 0 0 1 4-4z"/><path d="M14.12 3.88 16 2"/><path d="M21 21a4 4 0 0 0-3.81-4"/><path d="M21 5a4 4 0 0 1-3.55 3.97"/><path d="M22 13h-4"/><path d="M3 21a4 4 0 0 1 3.81-4"/><path d="M3 5a4 4 0 0 0 3.55 3.97"/><path d="M6 13H2"/><path d="m8 2 1.88 1.88"/><path d="M9 7.13V6a3 3 0 1 1 6 0v1.13"/></symbol>
+  <symbol id="icon-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></symbol>
+  <symbol id="icon-cpu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v2"/><path d="M12 2v2"/><path d="M17 20v2"/><path d="M17 2v2"/><path d="M2 12h2"/><path d="M2 17h2"/><path d="M2 7h2"/><path d="M20 12h2"/><path d="M20 17h2"/><path d="M20 7h2"/><path d="M7 20v2"/><path d="M7 2v2"/><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></symbol>
+  <symbol id="icon-flame" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></symbol>
+  <symbol id="icon-git-commit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/></symbol>
+  <symbol id="icon-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></symbol>
+  <symbol id="icon-refresh-cw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+  <symbol id="icon-rocket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></symbol>
+  <symbol id="icon-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="icon-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="icon-terminal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></symbol>
+  <symbol id="icon-flask" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></symbol>
+  <symbol id="icon-timer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></symbol>
+  <symbol id="icon-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978"/><path d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978"/><path d="M18 9h1.5a1 1 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6 9H4.5a1 1 0 0 1 0-5H6"/></symbol>
+  <symbol id="icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="icon-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></symbol>
+  <symbol id="icon-wrench" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/></symbol>
+</svg>
+
+<!-- Header -->
+<header class="dashboard-header">
+  <h1>
+    <svg width="24" height="24"><use href="#icon-zap"/></svg>
+    bestest
+    <span style="font-weight:400;color:var(--text-dim);font-size:14px;">Test Health Dashboard</span>
+  </h1>
+  <div class="header-actions">
+    <span class="last-updated" id="lastUpdated"></span>
+    <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode">
+      <svg width="18" height="18" id="themeIcon"><use href="#icon-moon"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- Dashboard Grid -->
+<div class="grid" id="dashboardGrid">
+  <!-- Populated by JS -->
+</div>
+
+<!-- No Data State -->
+<div id="noDataState" style="display:none">
+  <div class="empty-state" style="padding-top:80px">
+    <svg width="48" height="48"><use href="#icon-search"/></svg>
+    <h3>No data yet</h3>
+    <p>
+      The dashboard reads <code>.bestest/state/metrics.json</code> which is generated by bestest commands.<br><br>
+      Get started:
+    </p>
+    <p style="margin-top:8px">
+      <code>/bestest init</code> then <code>/bestest scan</code> to populate initial metrics.<br>
+      After that, run <code>/bestest run</code> to see live test results here.
+    </p>
+    <p style="margin-top:12px;font-size:12px;color:var(--text-muted)">
+      Tip: Open this file via a local server if fetch fails from file://. Try: <code>python3 -m http.server</code> in the <code>.bestest/</code> directory.
+    </p>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── Theme ──
+  const savedTheme = localStorage.getItem('bestest-dashboard-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  updateThemeIcon(savedTheme);
+
+  document.getElementById('themeToggle').addEventListener('click', function() {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('bestest-dashboard-theme', next);
+    updateThemeIcon(next);
+  });
+
+  function updateThemeIcon(theme) {
+    const icon = document.getElementById('themeIcon');
+    icon.innerHTML = theme === 'dark'
+      ? '<use href="#icon-sun"/>'
+      : '<use href="#icon-moon"/>';
+  }
+
+  // ── Helpers ──
+  function pct(v) { return v == null ? '—' : Math.round(v * 100) + '%'; }
+  function pctRaw(v) { return v == null ? 0 : Math.round(v * 100); }
+  function fmtTime(ms) {
+    if (ms == null) return '—';
+    if (ms < 1000) return ms + 'ms';
+    return (ms / 1000).toFixed(1) + 's';
+  }
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = now - d;
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+    if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  function scoreColor(pct) {
+    if (pct >= 80) return 'var(--green)';
+    if (pct >= 50) return 'var(--yellow)';
+    return 'var(--red)';
+  }
+  function icon(name, size) {
+    size = size || 16;
+    return '<svg width="'+size+'" height="'+size+'"><use href="#icon-'+name+'"/></svg>';
+  }
+
+  // ── Fetch Data ──
+  fetch('./state/metrics.json')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data || (data.tests && data.tests.total === 0 && data.runs && data.runs.total === 0 && (!data.healthScore || data.healthScore.overall === 0))) {
+        // Show empty state only for truly uninitialized data
+        if (!data.healthScore || (data.healthScore.overall === 0 && data.tests.total === 0 && data.runs.total === 0)) {
+          showEmpty();
+          return;
+        }
+      }
+      render(data);
+    })
+    .catch(function() {
+      showEmpty();
+    });
+
+  function showEmpty() {
+    document.getElementById('dashboardGrid').style.display = 'none';
+    document.getElementById('noDataState').style.display = 'block';
+  }
+
+  function render(m) {
+    // Last updated
+    document.getElementById('lastUpdated').textContent = m.lastUpdated ? 'Updated ' + fmtDate(m.lastUpdated) : '';
+
+    var grid = document.getElementById('dashboardGrid');
+    grid.innerHTML =
+      renderHealthGauge(m) +
+      renderTestResults(m) +
+      renderFlakyAlerts(m) +
+      renderCoverageTrend(m) +
+      renderRunHistory(m) +
+      renderSlowestTests(m) +
+      renderModuleMap(m) +
+      renderFailureHotspots(m) +
+      renderActivityFeed(m);
+  }
+
+  // ── 1. Health Gauge ──
+  function renderHealthGauge(m) {
+    var score = m.healthScore ? m.healthScore.overall : 0;
+    var pctVal = Math.round(score * 100);
+    var color = scoreColor(pctVal);
+    var bd = (m.healthScore && m.healthScore.breakdown) || {};
+    var circumference = 2 * Math.PI * 52;
+    var offset = circumference - (circumference * score);
+
+    var rows = [
+      { label: 'Coverage', value: bd.coverage, color: 'var(--blue)' },
+      { label: 'Pass Rate', value: bd.passRate, color: 'var(--green)' },
+      { label: 'Flakiness', value: bd.flakiness, color: 'var(--yellow)' },
+      { label: 'Freshness', value: bd.freshness, color: 'var(--accent)' },
+      { label: 'Mutation', value: bd.mutation, color: 'var(--red)' }
+    ].filter(function(r) { return r.value != null; });
+
+    var breakdownHtml = rows.map(function(r) {
+      var v = pctRaw(r.value);
+      return '<div class="breakdown-row">' +
+        '<span class="label">' + r.label + '</span>' +
+        '<div class="bar"><div class="bar-fill" style="width:'+v+'%;background:'+r.color+'"></div></div>' +
+        '<span class="value" style="color:'+r.color+'">' + v + '%</span>' +
+      '</div>';
+    }).join('');
+
+    return '<div class="card span-2">' +
+      '<div class="card-title">' + icon('gauge') + ' Health Score</div>' +
+      '<div class="gauge-container">' +
+        '<svg class="gauge-svg" viewBox="0 0 120 120">' +
+          '<circle class="gauge-track" cx="60" cy="60" r="52"/>' +
+          '<circle class="gauge-fill" cx="60" cy="60" r="52" stroke="'+color+'" stroke-dasharray="'+circumference+'" stroke-dashoffset="'+offset+'" transform="rotate(-90 60 60)"/>' +
+          '<text class="gauge-text" x="60" y="56" text-anchor="middle" dominant-baseline="middle">' + pctVal + '</text>' +
+          '<text class="gauge-label" x="60" y="72" text-anchor="middle">/ 100</text>' +
+        '</svg>' +
+        '<div class="breakdown-list">' + breakdownHtml + '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  // ── 2. Test Results Summary ──
+  function renderTestResults(m) {
+    var t = m.tests || {};
+    return '<div class="card">' +
+      '<div class="card-title">' + icon('check-circle') + ' Test Results</div>' +
+      '<div class="stat-grid">' +
+        '<div class="stat-card"><div class="stat-icon" style="color:var(--accent)">' + icon('layers',24) + '</div><div class="stat-value">' + (t.total||0) + '</div><div class="stat-label">Total</div></div>' +
+        '<div class="stat-card"><div class="stat-icon" style="color:var(--green)">' + icon('check-circle',24) + '</div><div class="stat-value" style="color:var(--green)">' + (t.passing||0) + '</div><div class="stat-label">Passed</div></div>' +
+        '<div class="stat-card"><div class="stat-icon" style="color:var(--red)">' + icon('x-circle',24) + '</div><div class="stat-value" style="color:var(--red)">' + (t.failing||0) + '</div><div class="stat-label">Failed</div></div>' +
+        '<div class="stat-card"><div class="stat-icon" style="color:var(--yellow)">' + icon('skip-forward',24) + '</div><div class="stat-value" style="color:var(--yellow)">' + (t.skipped||0) + '</div><div class="stat-label">Skipped</div></div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  // ── 3. Flaky Test Alerts ──
+  function renderFlakyAlerts(m) {
+    var flaky = (m.flakiness && m.flakiness.flakyTests) || [];
+    if (flaky.length === 0) {
+      return '<div class="card">' +
+        '<div class="card-title">' + icon('shield') + ' Flaky Tests</div>' +
+        '<div style="text-align:center;padding:20px;color:var(--text-dim);font-size:13px">' +
+          icon('check-circle',32) + '<br><span style="margin-top:8px;display:inline-block">No flaky tests detected</span>' +
+        '</div>' +
+      '</div>';
+    }
+    var items = flaky.slice(0, 5).map(function(f) {
+      var ratio = Math.round((f.failPassRatio || 0) * 100);
+      var severity = ratio >= 50 ? 'badge-red' : 'badge-yellow';
+      return '<tr><td class="mono" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(f.name || f.file) + '</td>' +
+        '<td><span class="badge ' + severity + '">' + ratio + '% fail</span></td>' +
+        '<td style="font-size:12px;color:var(--text-muted)">' + fmtDate(f.lastSeen) + '</td></tr>';
+    }).join('');
+    return '<div class="card">' +
+      '<div class="card-title">' + icon('alert-triangle') + ' Flaky Tests <span class="badge badge-yellow" style="margin-left:auto">' + flaky.length + '</span></div>' +
+      '<table><thead><tr><th>Test</th><th>Ratio</th><th>Last Seen</th></tr></thead><tbody>' + items + '</tbody></table>' +
+    '</div>';
+  }
+
+  // ── 4. Coverage Trend ──
+  function renderCoverageTrend(m) {
+    var trend = (m.coverage && m.coverage.trend) || [];
+    var target = (m.coverage && m.coverage.target) || 80;
+    if (trend.length < 2) {
+      var current = m.coverage ? (m.coverage.current ? m.coverage.current.lines : 0) : 0;
+      return '<div class="card span-2">' +
+        '<div class="card-title">' + icon('trending-up') + ' Coverage Trend</div>' +
+        '<div style="text-align:center;padding:20px;color:var(--text-dim);font-size:13px">' +
+          '<div style="font-size:36px;font-weight:700;color:' + scoreColor(pctRaw(current)) + '">' + pct(current) + '</div>' +
+          '<div style="margin-top:4px">Line coverage (target: ' + target + '%)</div>' +
+          '<div style="margin-top:8px;font-size:12px;color:var(--text-muted)">Run more tests to build a trend chart</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    var w = 600, h = 180, pad = 30, padR = 10, padT = 10, padB = 24;
+    var chartW = w - pad - padR, chartH = h - padT - padB;
+    var maxVal = 100;
+    var points = trend.map(function(t) { return t.lines != null ? t.lines * 100 : 0; });
+    var stepX = chartW / Math.max(points.length - 1, 1);
+
+    var pathD = points.map(function(v, i) {
+      var x = pad + i * stepX;
+      var y = padT + chartH - (v / maxVal) * chartH;
+      return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+
+    // Target line
+    var targetY = padT + chartH - (target / maxVal) * chartH;
+    var targetLine = '<line x1="'+pad+'" y1="'+targetY+'" x2="'+(w-padR)+'" y2="'+targetY+'" stroke="var(--yellow)" stroke-width="1" stroke-dasharray="4,4" opacity="0.6"/>';
+    var targetLabel = '<text x="'+(w-padR)+'" y="'+(targetY-4)+'" text-anchor="end" fill="var(--yellow)" font-size="9">'+target+'%</text>';
+
+    // X axis labels (first, middle, last)
+    var xLabels = '';
+    if (trend.length > 0) {
+      xLabels = '<text x="'+pad+'" y="'+(h-2)+'" text-anchor="start">' + shortDate(trend[0].timestamp) + '</text>';
+    }
+    if (trend.length > 2) {
+      xLabels += '<text x="'+(pad + (points.length-1)*stepX)+'" y="'+(h-2)+'" text-anchor="end">' + shortDate(trend[trend.length-1].timestamp) + '</text>';
+    }
+
+    return '<div class="card span-2">' +
+      '<div class="card-title">' + icon('trending-up') + ' Coverage Trend <span style="margin-left:auto;font-size:12px;font-weight:400">Target: '+target+'%</span></div>' +
+      '<svg class="trend-chart" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">' +
+        targetLine + targetLabel + xLabels +
+        '<path d="'+pathD+'" fill="none" stroke="var(--accent)" stroke-width="2"/>' +
+      '</svg>' +
+    '</div>';
+  }
+
+  // ── 5. Run History ──
+  function renderRunHistory(m) {
+    var history = (m.runs && m.runs.history) || [];
+    var runs = history.slice(-10).reverse();
+    if (runs.length === 0) {
+      return '<div class="card">' +
+        '<div class="card-title">' + icon('clock') + ' Run History</div>' +
+        '<div style="text-align:center;padding:20px;color:var(--text-dim);font-size:13px">No runs recorded yet</div>' +
+      '</div>';
+    }
+    var rows = runs.map(function(r) {
+      var status = r.failed > 0 ? '<span class="badge badge-red">' + r.failed + ' failed</span>' : '<span class="badge badge-green">passed</span>';
+      return '<tr>' +
+        '<td style="font-size:12px;color:var(--text-muted)">' + fmtDate(r.timestamp) + '</td>' +
+        '<td>' + (r.total || 0) + '</td>' +
+        '<td>' + status + '</td>' +
+        '<td class="mono" style="font-size:12px">' + fmtTime(r.duration_ms) + '</td>' +
+      '</tr>';
+    }).join('');
+    return '<div class="card">' +
+      '<div class="card-title">' + icon('clock') + ' Run History <span style="margin-left:auto;font-size:12px;font-weight:400;color:var(--text-muted)">' + (m.runs.total||0) + ' total</span></div>' +
+      '<table><thead><tr><th>When</th><th>Tests</th><th>Status</th><th>Time</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '</div>';
+  }
+
+  // ── 6. Module Coverage ──
+  function renderModuleMap(m) {
+    var entries = (m.modules && m.modules.entries) || [];
+    if (entries.length === 0) {
+      return '<div class="card">' +
+        '<div class="card-title">' + icon('package') + ' Module Coverage</div>' +
+        '<div style="text-align:center;padding:20px;color:var(--text-dim);font-size:13px">No module data yet</div>' +
+      '</div>';
+    }
+    var rows = entries.slice(0, 8).map(function(e) {
+      var cov = e.coverage ? (e.coverage.lines != null ? e.coverage.lines : 0) : 0;
+      var covPct = pctRaw(cov);
+      var color = scoreColor(covPct);
+      return '<tr>' +
+        '<td class="mono" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.path) + '</td>' +
+        '<td>' + (e.tests||0) + '</td>' +
+        '<td><span class="coverage-bar"><span class="coverage-bar-fill" style="width:'+covPct+'%;background:'+color+'"></span></span> <span style="font-size:12px;color:'+color+'">'+covPct+'%</span></td>' +
+      '</tr>';
+    }).join('');
+    return '<div class="card">' +
+      '<div class="card-title">' + icon('package') + ' Module Coverage</div>' +
+      '<table><thead><tr><th>Module</th><th>Tests</th><th>Coverage</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '</div>';
+  }
+
+  // ── 7. Slowest Tests ──
+  function renderSlowestTests(m) {
+    var tests = (m.slowest && m.slowest.tests) || [];
+    if (tests.length === 0) {
+      return '<div class="card">' +
+        '<div class="card-title">' + icon('timer') + ' Slowest Tests</div>' +
+        '<div style="text-align:center;padding:20px;color:var(--text-dim);font-size:13px">No timing data yet</div>' +
+      '</div>';
+    }
+    var maxDur = Math.max.apply(null, tests.map(function(t) { return t.duration_ms || 0; })) || 1;
+    var rows = tests.slice(0, 8).map(function(t) {
+      var w = Math.max(4, ((t.duration_ms || 0) / maxDur) * 120);
+      return '<tr>' +
+        '<td class="mono" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t.name || t.file) + '</td>' +
+        '<td><div class="slowest-bar-container"><div class="slowest-bar" style="width:'+w+'px"></div><span class="slowest-time">' + fmtTime(t.duration_ms) + '</span></div></td>' +
+      '</tr>';
+    }).join('');
+    return '<div class="card">' +
+      '<div class="card-title">' + icon('timer') + ' Slowest Tests</div>' +
+      '<table><thead><tr><th>Test</th><th>Duration</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '</div>';
+  }
+
+  // ── 8. Failure Hotspots ──
+  function renderFailureHotspots(m) {
+    var heat = (m.failures && m.failures.heatMap) || [];
+    if (heat.length === 0) {
+      return '<div class="card">' +
+        '<div class="card-title">' + icon('flame') + ' Failure Hotspots</div>' +
+        '<div style="text-align:center;padding:20px;color:var(--text-dim);font-size:13px">' +
+          icon('check-circle',32) + '<br><span style="margin-top:8px;display:inline-block">No failures recorded</span>' +
+        '</div>' +
+      '</div>';
+    }
+    var maxCount = Math.max.apply(null, heat.map(function(h) { return h.count || 0; })) || 1;
+    var rows = heat.slice(0, 8).map(function(h) {
+      var intensity = Math.round(((h.count || 0) / maxCount) * 100);
+      var bg = intensity > 66 ? 'var(--red-soft)' : intensity > 33 ? 'var(--yellow-soft)' : 'var(--blue-soft)';
+      var fg = intensity > 66 ? 'var(--red)' : intensity > 33 ? 'var(--yellow)' : 'var(--blue)';
+      return '<tr>' +
+        '<td class="mono" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(h.file) + '</td>' +
+        '<td><span class="heat-cell" style="background:'+bg+';color:'+fg+'">' + (h.count||0) + '</span></td>' +
+        '<td style="font-size:12px;color:var(--text-muted)">' + fmtDate(h.lastFailed) + '</td>' +
+      '</tr>';
+    }).join('');
+    return '<div class="card">' +
+      '<div class="card-title">' + icon('flame') + ' Failure Hotspots</div>' +
+      '<table><thead><tr><th>File</th><th>Failures</th><th>Last</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '</div>';
+  }
+
+  // ── 9. Activity Feed ──
+  function renderActivityFeed(m) {
+    var acts = (m.activity || []).slice().reverse().slice(0, 15);
+    if (acts.length === 0) {
+      return '<div class="card">' +
+        '<div class="card-title">' + icon('activity') + ' Activity Feed</div>' +
+        '<div style="text-align:center;padding:20px;color:var(--text-dim);font-size:13px">No activity yet</div>' +
+      '</div>';
+    }
+    var spokeIcons = {
+      'spoke-scan': 'search',
+      'spoke-run': 'zap',
+      'spoke-fix': 'wrench',
+      'spoke-generate': 'flask',
+      'spoke-migrate': 'arrow-right',
+      'spoke-doctor': 'heart',
+      'spoke-coverage': 'target',
+      'spoke-report': 'file-text',
+      'spoke-config': 'settings',
+      'spoke-init': 'rocket'
+    };
+    var spokeColors = {
+      'spoke-scan': 'var(--blue-soft)',
+      'spoke-run': 'var(--green-soft)',
+      'spoke-fix': 'var(--red-soft)',
+      'spoke-generate': 'var(--accent-soft)',
+      'spoke-migrate': 'var(--yellow-soft)',
+      'spoke-doctor': 'var(--green-soft)',
+      'spoke-coverage': 'var(--blue-soft)',
+      'spoke-report': 'var(--accent-soft)',
+      'spoke-config': 'var(--yellow-soft)',
+      'spoke-init': 'var(--green-soft)'
+    };
+    var spokeIconColors = {
+      'spoke-scan': 'var(--blue)',
+      'spoke-run': 'var(--green)',
+      'spoke-fix': 'var(--red)',
+      'spoke-generate': 'var(--accent)',
+      'spoke-migrate': 'var(--yellow)',
+      'spoke-doctor': 'var(--green)',
+      'spoke-coverage': 'var(--blue)',
+      'spoke-report': 'var(--accent)',
+      'spoke-config': 'var(--yellow)',
+      'spoke-init': 'var(--green)'
+    };
+    var items = acts.map(function(a) {
+      var si = spokeIcons[a.spoke] || 'git-commit';
+      var sb = spokeColors[a.spoke] || 'var(--accent-soft)';
+      var sc = spokeIconColors[a.spoke] || 'var(--accent)';
+      return '<div class="activity-item">' +
+        '<div class="activity-icon" style="background:'+sb+';color:'+sc+'">' + icon(si, 14) + '</div>' +
+        '<div class="activity-body">' +
+          '<div class="activity-action">' + esc(a.action || a.spoke || 'unknown') + '</div>' +
+          '<div class="activity-summary">' + esc(a.summary || '') + '</div>' +
+          '<div class="activity-time">' + fmtDate(a.timestamp) + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    return '<div class="card">' +
+      '<div class="card-title">' + icon('activity') + ' Activity Feed</div>' +
+      '<div class="activity-list">' + items + '</div>' +
+    '</div>';
+  }
+
+  // ── Utility ──
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+  }
+
+  function shortDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+})();
+</script>
+</body>
+</html>
