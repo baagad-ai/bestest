@@ -284,6 +284,8 @@ For each file:
 
 ### 1.4 HITL Gate 1 — Migration Plan Approval
 
+<!-- gate_tier: manual — Full human approval required. Migration transforms are destructive AST changes that are difficult to reverse without git. -->
+
 Present the migration plan to the user for approval before transformation:
 
 ```

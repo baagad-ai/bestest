@@ -270,6 +270,8 @@ Generate an Architecture Decision Record at `.bestest/adrs/ADR-001-test-framewor
 
 ## Phase 3 — HITL Gate: Framework Selection
 
+<!-- gate_tier: manual — Full human approval required. Framework selection is an irreversible architectural decision. -->
+
 This is the critical human-in-the-loop gate. Present the detection results and recommendation clearly, then wait for the user's decision before creating any files.
 
 ### What to Present

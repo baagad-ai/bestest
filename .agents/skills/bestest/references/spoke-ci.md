@@ -582,6 +582,8 @@ Select the base template for the detected provider, inject language-specific com
 
 ## Phase 5 — HITL Gate (Human-in-the-Loop Review)
 
+<!-- gate_tier: manual — Full human approval required. CI pipeline generation affects repository infrastructure and deployment workflows. -->
+
 Present the generated pipeline to the user for review before writing to disk. This is a mandatory gate — the user must approve, modify, or cancel.
 
 ### Execution Steps

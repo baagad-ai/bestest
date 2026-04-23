@@ -346,9 +346,11 @@ Score each test file on the 0-100 rubric (Assertion Quality 30, Test Structure 2
 
 ## HITL Gate
 
+<!-- gate_tier: provisional — Proceed when quality criteria met (score ≥threshold, all pass, no races, no critical anti-patterns). Escalate to manual for scores <50 or compilation failures. Log auto-proceed decisions for audit trail. -->
+
 Present the generation results to the user for review before committing. Summary sections: **Files Generated** (test count + quality score per file), **Coverage Delta** (before → after per source), **Quality Scores** (avg/highest/lowest), **Race Detection** results, **Flagged Items** (below threshold, missing scenarios, anti-patterns), **Source Behavior Notes** (source bugs discovered).
 
-**Write-to-disk criteria:** Write when all conditions met: (1) score ≥ threshold for every file, (2) all tests pass, (3) no critical/high anti-patterns, (4) 5/5 stability, (5) no races. Score 50-69: write but flag. Score <50: do not write, present for review. Compilation/execution failures: do not write, present failure details.
+**Write-to-disk criteria:** Write when all conditions met: (1) score ≥ threshold for every file, (2) all tests pass, (3) no critical/high anti-patterns, (4) 5/5 stability, (5) no races. Score 50-69: write but flag. Score <50: do not write, present for review. Compilation/execution failures: do not write, present failure details. Log the auto-proceed decision and quality metrics for audit trail.
 
 **User approval actions:** Approve all, approve specific files, request regeneration, or request manual edit.
 

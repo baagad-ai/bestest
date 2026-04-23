@@ -264,11 +264,13 @@ Bad:  test('works'), test('handles error'), test('test1')
 
 ## HITL Gate
 
+<!-- gate_tier: provisional — Proceed when quality criteria met (score ≥70, all pass, no critical anti-patterns). Escalate to manual for scores <50 or compilation failures. Log auto-proceed decisions for audit trail. -->
+
 Present the generation results to the user for review before committing.
 
 **Summary sections:** Files Generated (test count + quality score per file), Coverage Delta (before → after per source), Quality Scores (average/high/low), Flagged Items (below threshold, anti-patterns), Source Behavior Notes (source bugs discovered).
 
-**Auto-commit criteria** (write to disk when ALL met): Score ≥ 70 for every file, all tests pass, no critical/high anti-patterns, all flakiness tests stable (5/5). Files scoring 50-69: write but flag. Files scoring < 50 or with compilation/execution failures: do not commit, present for manual review.
+**Auto-commit criteria** (write to disk when ALL met): Score ≥ 70 for every file, all tests pass, no critical/high anti-patterns, all flakiness tests stable (5/5). Files scoring 50-69: write but flag. Files scoring < 50 or with compilation/execution failures: do not commit, present for manual review. Log the auto-proceed decision and quality metrics for audit trail.
 
 > **Clarification:** "Auto-commit" means writing generated test files to the filesystem. **Git commits are never made automatically.** All file writes pass through the HITL gate where the user explicitly approves.
 

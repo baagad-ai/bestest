@@ -1772,6 +1772,8 @@ Re-examine the race condition stack traces. If the race is in source code gorout
 
 ## HITL Gate
 
+<!-- gate_tier: provisional — Proceed when fix confidence ≥0.8 and fix category is test_bug or timing. Escalate to manual for source_bug, environment, or low-confidence fixes. Log auto-proceed decisions for audit trail. -->
+
 Before applying any fixes to test files, present the proposed changes to the user for review and approval. This gate ensures the user maintains control over all test file modifications.
 
 ### Gate Presentation Format

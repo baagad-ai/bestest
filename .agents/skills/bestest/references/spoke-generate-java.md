@@ -288,9 +288,11 @@ Score each generated test file against the 0-100 rubric (Assertion Quality 30, T
 
 ## HITL Gate
 
+<!-- gate_tier: provisional — Proceed when quality criteria met (score ≥70, all pass, no critical anti-patterns). Escalate to manual for scores <50 or compilation failures. Log auto-proceed decisions for audit trail. -->
+
 Present generation results for user review: files generated with test count and quality score, coverage delta (JaCoCo before→after), quality scores (average/highest/lowest), flagged items (below threshold, anti-patterns), source behavior notes.
 
-**Write-to-disk criteria:** Write all tests when every file scores ≥70, all tests pass, no critical/high anti-patterns, and all stability tests pass. Files scoring 50-69: write but flag. Files scoring <50: hold for manual review. Compilation/execution failures after max retries: hold for manual resolution.
+**Write-to-disk criteria:** Write all tests when every file scores ≥70, all tests pass, no critical/high anti-patterns, and all stability tests pass. Files scoring 50-69: write but flag. Files scoring <50: hold for manual review. Compilation/execution failures after max retries: hold for manual resolution. Log the auto-proceed decision and quality metrics for audit trail.
 
 User may: approve all, approve specific files, request regeneration, or request manual edit.
 

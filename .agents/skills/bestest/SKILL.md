@@ -19,7 +19,13 @@ Core principles govern every action:
 
 3. **Progressive complexity** — Init gives you a production-grade foundation. Each subsequent command adds capability. Meet the user where they are.
 
-4. **Strategic human-in-the-loop (mutating commands only)** — HITL gates apply exclusively to commands that modify files or state: `init`, `generate`, `fix`, `migrate`, and `ci`. Read-only commands (`scan`, `run`, `config show`, `coverage`, `report`, `doctor`) execute without confirmation gates. For mutating commands, pause for human judgment at decision gates: framework selection, coverage targets, CI pipeline design, and before committing generated tests. The pattern: `scan → propose → approve → execute → verify → report`.
+4. **Three-tier human-in-the-loop (HITL) gate model** — Commands that modify files or state use one of three HITL tiers, calibrated by risk and reversibility. Read-only commands (`scan`, `run`, `config show`, `coverage`, `report`, `doctor`) execute without confirmation gates. The three tiers for mutating commands:
+
+   - **auto** — Proceed immediately. Log the decision and rationale for audit trail. Used when the action is trivially reversible or carries negligible risk. No spoke currently uses this tier; it is reserved for future low-risk operations.
+   - **provisional** — Proceed when quality criteria are met; flag results for review. If criteria fail, escalate to manual tier. Log auto-proceed decisions for audit trail. Used by `generate` and `fix`: tests that pass quality thresholds write to disk with a summary for user review; failures hold for explicit approval.
+   - **manual** — Full human approval required before any files are written. No auto-proceed. Used by `init` (framework selection), `migrate` (destructive AST transforms), and `ci` (pipeline generation).
+
+   Each spoke documents its `gate_tier` in the HITL section header. The pattern: `scan → propose → [tier-gated approve] → execute → verify → report`.
 
 5. **Framework-agnostic intelligence** — Detect the stack, recommend the right framework, but never force a choice. Generate framework-specific configs, templates, and tests for Vitest, Jest, pytest, JUnit 5, Go testing, Playwright, and more.
 
