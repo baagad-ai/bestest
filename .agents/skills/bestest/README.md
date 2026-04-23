@@ -1,15 +1,17 @@
 # bestest
 
-Enterprise-grade testing architect skill for AI coding agents. Detects your stack, recommends frameworks, generates production-quality tests, manages CI pipelines, and maintains living test documentation.
+Enterprise-grade testing architect plugin for AI coding agents. Detects your stack, recommends frameworks, generates production-quality tests, manages CI pipelines, and maintains living test documentation.
 
 ## What It Does
 
 **bestest** is a plugin for [GSD/pi](https://github.com/anthropics/gsd-pi) that turns an AI agent into a testing architect. Instead of writing individual tests by hand, you describe what you need and bestest handles strategy, scaffolding, generation, and verification.
 
 - **Stack detection** — Identifies languages, frameworks, build tools, and existing test infrastructure from 80+ detection signals.
-- **Framework recommendation** — Deterministic decision trees for JS/TS (Vitest/Jest), Python (pytest), Java (JUnit 5), and Go.
+- **Framework recommendation** — Deterministic decision trees for JS/TS (Vitest/Jest/Mocha/Jasmine), Python (pytest), Java (JUnit 5/TestNG), and Go.
 - **AI test generation** — Generates tests that compile, pass, and cover meaningful behavior. Supports unit, integration, and E2E.
 - **CI pipeline generation** — Generates GitHub Actions, GitLab CI, or Jenkins pipelines with test stages.
+- **Health dashboard** — Self-contained HTML dashboard with health gauge, coverage trends, and flaky test alerts. No server or build step required.
+- **Metrics store & JUnit XML** — Structured metrics in `.bestest/state/metrics.json` and JUnit XML output for CI integration.
 - **Living documentation** — Auto-maintains `TESTING.md` with strategy, decisions, and coverage baselines.
 - **Framework migration** — Migrates Jest→Vitest, JUnit 4→5, Cypress→Playwright.
 
@@ -37,9 +39,9 @@ Requires GSD/pi or any agent runtime that loads skills from `~/.agents/skills/`.
 
 | Language | Test Frameworks | Generate Spoke |
 |----------|----------------|----------------|
-| JavaScript / TypeScript | Vitest, Jest, Playwright | `spoke-generate.md` |
+| JavaScript / TypeScript | Vitest, Jest, Mocha, Jasmine, Playwright | `spoke-generate.md` |
 | Python | pytest, unittest | `spoke-generate-python.md` |
-| Java | JUnit 5, JUnit 4 | `spoke-generate-java.md` |
+| Java | JUnit 5, JUnit 4, TestNG | `spoke-generate-java.md` |
 | Go | testing (stdlib) | `spoke-generate-go.md` |
 
 ## Commands

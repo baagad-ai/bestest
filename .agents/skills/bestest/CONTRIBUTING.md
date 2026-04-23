@@ -1,6 +1,6 @@
 # Contributing to bestest
 
-Thank you for contributing to **bestest**, the enterprise-grade testing architect skill. This guide covers the two most common contribution paths: adding a new command spoke and adding support for a new programming language.
+Thank you for contributing to **bestest**, the enterprise-grade testing architect plugin. This guide covers the two most common contribution paths: adding a new command spoke and adding support for a new programming language.
 
 ---
 
@@ -148,3 +148,54 @@ There is no automated test suite for the plugin itself. Validate changes by:
 2. **Routing consistency** — Every spoke in the routing table should appear in the reference_index and vice versa.
 3. **Schema validation** — Ensure example JSON in schema docs is valid JSON.
 4. **Dry run** — Invoke `/bestest <your-command>` in a test repo and verify the spoke loads and produces expected output.
+
+---
+
+## Project Structure
+
+```
+.agents/skills/bestest/
+├── SKILL.md                          # Orchestrator — command routing, principles, reference index
+├── README.md                         # Plugin documentation
+├── CONTRIBUTING.md                   # This file
+├── CHANGELOG.md                      # Version history
+│
+├── references/                       # Spokes & schema files (loaded on demand)
+│   ├── spoke-init.md
+│   ├── spoke-generate.md             # JS/TS (Vitest, Jest, Mocha, Jasmine, Playwright)
+│   ├── spoke-generate-python.md
+│   ├── spoke-generate-java.md        # JUnit 5, TestNG
+│   ├── spoke-generate-go.md
+│   ├── spoke-run.md
+│   ├── spoke-fix.md
+│   ├── spoke-scan.md
+│   ├── spoke-coverage.md
+│   ├── spoke-doctor.md
+│   ├── spoke-ci.md
+│   ├── spoke-migrate.md
+│   ├── spoke-report.md
+│   ├── spoke-expand.md
+│   ├── spoke-config.md
+│   ├── detection-engine.md
+│   ├── stack-profile-schema.md
+│   ├── scan-report-schema.md
+│   ├── decision-tree-js.md
+│   ├── decision-tree-python.md
+│   ├── decision-tree-java.md
+│   ├── decision-tree-go.md
+│   │
+│   ├── generate/                     # Generate phase detail files (on-demand)
+│   │
+│   └── templates/                    # Config templates & dashboard
+│       ├── config-vitest.yaml
+│       ├── config-jest.yaml
+│       ├── config-pytest.yaml
+│       ├── config-junit5.yaml
+│       ├── config-go.yaml
+│       ├── config-monorepo.yaml
+│       ├── dashboard.html            # Self-contained health dashboard
+│       └── ...
+│
+└── scripts/
+    └── validate-plugin.sh            # 275+ automated consistency checks
+```
