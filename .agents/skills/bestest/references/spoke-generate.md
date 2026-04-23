@@ -124,6 +124,8 @@ Use the Context7 helper from `references/context7-helper.md` to fetch version-sp
 - **Vitest** (libraryName: `"vitest"`, query: `"vi.mock vi.fn vi.spyOn useFakeTimers mocking patterns"`, tokens: 5000): Produces version-accurate Vitest mocking and assertion patterns.
 - **Vitest coverage** (query: `"coverage configuration v8 istanbul"`, tokens: 3000): Coverage command and configuration patterns.
 - **Jest** (libraryName: `"jest"`, query: `"jest.mock jest.fn jest.spyOn useFakeTimers"`, tokens: 5000): Jest mocking and assertion patterns. Only fetched when framework is jest.
+- **Mocha** (libraryName: `"mocha"`, query: `"describe it before after beforeEach afterEach assert expect chai"`, tokens: 5000): Mocha test structure and hook patterns with Chai assertions. Only fetched when framework is mocha.
+- **Jasmine** (libraryName: `"jasmine"`, query: `"describe it expect beforeEach afterEach spyOn createSpy"`, tokens: 5000): Jasmine BDD-style test structure and spy patterns. Only fetched when framework is jasmine.
 - **React Testing Library** (libraryName: `"testing-library react"`, query: `"render screen queries getByRole getByText waitFor"`, tokens: 5000): RTL query and interaction patterns. Only fetched when frontend is react.
 
 **Graceful fallback:** If `resolve_library` or `get_library_docs` fails, print warning and use static patterns from `references/ai-generation-guide.md`. Context7 is an enhancement, not a requirement.
@@ -183,7 +185,7 @@ Generate test files using framework-specific syntax. Every generated test follow
 
 ### Framework-specific syntax
 
-All examples use Vitest-first syntax. When the project uses Jest (detected from StackProfile or config.yaml `framework: jest`), translate to Jest equivalents.
+All examples use Vitest-first syntax. When the project uses Jest, Mocha, or Jasmine (detected from StackProfile or config.yaml `framework` field), translate to the appropriate equivalents.
 
 **Vitest test file header:**
 ```typescript
@@ -197,6 +199,20 @@ import { functionUnderTest } from './module';
 import { functionUnderTest } from './module';
 // If globals are not enabled, import explicitly:
 // import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
+```
+
+**Mocha test file header (when framework is mocha):**
+```javascript
+const { describe, it, before, after, beforeEach, afterEach } = require('mocha');
+const assert = require('assert');
+// Or with Chai: const { expect } = require('chai');
+const { functionUnderTest } = require('./module');
+```
+
+**Jasmine test file header (when framework is jasmine):**
+```javascript
+// No imports needed — describe, it, expect, beforeEach, etc. are globals
+const { functionUnderTest } = require('./module');
 ```
 
 ### Test naming convention

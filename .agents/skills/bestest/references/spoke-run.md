@@ -376,6 +376,88 @@ Timeout:
   Append: --testTimeout=<timeout-ms> (default: 300000ms = 5 minutes)
 ```
 
+### Build Mocha Command
+
+```
+Base command:
+  npx mocha --reporter json --reporter-options output=.bestest/reports/mocha-run.json
+
+Suite filter arguments:
+  If filter is "unit":
+    --grep "@unit" (if tests use tags)
+    --ignore "**/e2e/**" --ignore "**/integration/**"
+    Construct: npx mocha --reporter json --reporter-options output=.bestest/reports/mocha-run.json "src/**/*.test.{js,ts}" --ignore "**/e2e/**" --ignore "**/integration/**"
+
+  If filter is "integration":
+    Construct: npx mocha --reporter json --reporter-options output=.bestest/reports/mocha-run.json "tests/integration/**" "__tests__/integration/**"
+
+  If filter is "e2e":
+    Construct: npx mocha --reporter json --reporter-options output=.bestest/reports/mocha-run.json "e2e/**" "tests/e2e/**"
+
+  If filter is "affected":
+    Pass explicit list of affected test file paths as positional arguments
+    Construct: npx mocha --reporter json --reporter-options output=.bestest/reports/mocha-run.json path/to/test1.ts path/to/test2.ts
+
+  If filter is "all" (or unspecified):
+    No additional filter arguments — Mocha uses its configured test spec patterns
+
+Coverage (when coverage.enabled is true):
+  Append: --require @cypress/code-coverage (if installed)
+  Or use nyc: nyc --reporter=json-summary npx mocha ...
+  Output to .bestest/reports/coverage/coverage-summary.json
+
+Timeout:
+  Append: --timeout <timeout-ms> (default: 300000ms = 5 minutes)
+  Note: Mocha default timeout is 2000ms — always set an explicit timeout
+```
+
+### Build Jasmine Command
+
+```
+Base command:
+  npx jasmine --junit --output=.bestest/reports/
+
+  Jasmine does not have a native JSON reporter. Options:
+  1. jasmine-console-reporter for structured console output
+  2. jasmine-reporters JUnitXmlReporter for JUnit XML output (parsed by spoke-run)
+  3. Custom JSON reporter via jasmine.addReporter()
+
+  Recommended: Use JUnit XML reporter with output to .bestest/reports/jasmine-results.xml
+    npx jasmine --reporter=jasmine-reporters.JUnitXmlReporter --reporter-options=file=.bestest/reports/jasmine-results.xml
+
+Suite filter arguments:
+  If filter is "unit":
+    --filter="Unit" (if test names include suite type)
+    Or configure spec_dir in jasmine.json to point to unit test directory
+
+  If filter is "integration":
+    --filter="Integration"
+    Or configure spec_dir to point to integration test directory
+
+  If filter is "e2e":
+    --filter="E2E"
+    Or configure spec_dir to point to e2e test directory
+
+  If filter is "affected":
+    Jasmine does not support positional file arguments natively.
+    Create a temporary spec file that imports only the affected test files:
+      echo "require('./path/to/test1'); require('./path/to/test2');" > .bestest/temp-affected-spec.js
+      npx jasmine .bestest/temp-affected-spec.js
+    Clean up temp file after run.
+
+  If filter is "all" (or unspecified):
+    No additional filter arguments — Jasmine uses spec_files from jasmine.json
+
+Coverage (when coverage.enabled is true):
+  Use nyc wrapper: nyc --reporter=json-summary npx jasmine
+  Output to .bestest/reports/coverage/coverage-summary.json
+
+Timeout:
+  Set in jasmine.json: "jsApiReporter.__timeoutInterval": <timeout-ms>
+  Or set via jasmine.DEFAULT_TIMEOUT_INTERVAL in a helper file
+  Default process-level timeout: 300 seconds (Phase 3)
+```
+
 ### Build pytest Command
 
 pytest does not produce JSON output natively. Use `--tb=no -v` for structured verbose output, and `pytest-json-report` plugin (if installed) for JSON output. If `pytest-json-report` is not installed, fall back to verbose text parsing.
@@ -919,6 +1001,126 @@ Map each field:
 | `assertionResults[].status` | `tests[].cases[].status` | Map: `"passed"`, `"failed"`, `"pending"` → `"skipped"`, `"skipped"`, `"todo"`, `"disabled"` → `"skipped"` |
 | `assertionResults[].duration` | `tests[].cases[].durationMs` | Direct |
 | `assertionResults[].failureMessages[0]` | `tests[].cases[].error` | Direct, or `null` if empty |
+
+### Mocha JSON Output Parsing
+
+Mocha's JSON reporter (`--reporter json`) produces output in this structure:
+
+```json
+{
+  "stats": {
+    "suites": 5,
+    "tests": 42,
+    "passes": 39,
+    "failures": 1,
+    "pending": 2,
+    "start": "2024-07-15T14:30:40.000Z",
+    "end": "2024-07-15T14:30:45.123Z",
+    "duration": 5123
+  },
+  "tests": [
+    {
+      "title": "formatDate > formats ISO date to readable string",
+      "fullTitle": "formatDate formats ISO date to readable string",
+      "duration": 12,
+      "currentRetry": 0,
+      "err": {}
+    },
+    {
+      "title": "handles null input",
+      "fullTitle": "formatDate handles null input",
+      "duration": 5,
+      "currentRetry": 0,
+      "err": {
+        "message": "AssertionError: expected null to equal 'Invalid date'",
+        "stack": "AssertionError: expected null ...\n    at Context.<anonymous> (src/utils/format.test.js:28:12)"
+      }
+    }
+  ],
+  "pending": [
+    {
+      "title": "deprecated format",
+      "fullTitle": "formatDate deprecated format"
+    }
+  ],
+  "failures": [
+    {
+      "title": "handles null input",
+      "fullTitle": "formatDate handles null input",
+      "duration": 5,
+      "err": {
+        "message": "AssertionError: expected null to equal 'Invalid date'",
+        "stack": "..."
+      }
+    }
+  ],
+  "passes": [
+    {
+      "title": "formats ISO date to readable string",
+      "fullTitle": "formatDate formats ISO date to readable string",
+      "duration": 12,
+      "err": {}
+    }
+  ]
+}
+```
+
+Map each field:
+
+| Mocha JSON Field | run-results.json Field | Transformation |
+|-----------------|----------------------|----------------|
+| `stats.tests` | `summary.totalTests` | Direct |
+| `stats.passes` | `summary.passed` | Use `stats.passes` count |
+| `stats.failures` | `summary.failed` | Direct |
+| `stats.pending` | `summary.skipped` | Direct |
+| — | `summary.todo` | Mocha has no todo concept; set to 0 |
+| `stats.start` | `execution.startTime` | Direct (ISO 8601 string) |
+| `stats.end` | `execution.endTime` | Direct (ISO 8601 string) |
+| `stats.duration` | `execution.durationMs` | Direct (already in ms) |
+| `tests[].fullTitle` | `tests[].cases[].name` | Direct |
+| `tests[].duration` | `tests[].cases[].durationMs` | Direct |
+| `tests[].err.message` (when non-empty) | `tests[].cases[].error` | Direct, or `null` if `err` is empty object |
+| Passes array membership | `tests[].cases[].status` | `"passed"` |
+| Failures array membership | `tests[].cases[].status` | `"failed"` |
+| Pending array membership | `tests[].cases[].status` | `"skipped"` |
+
+Group tests by file path using stack traces or file references. If file grouping is unavailable, create one test file entry per top-level suite name.
+
+### Jasmine Output Parsing
+
+Jasmine does not have a built-in JSON reporter. Parse results from JUnit XML output (if using `jasmine-reporters.JUnitXmlReporter`) or from verbose console output.
+
+#### Strategy 1: JUnit XML report (preferred)
+
+If `jasmine-reporters` is configured to write JUnit XML to `.bestest/reports/jasmine-results.xml`, parse the XML using the same JUnit XML parsing strategy as Gradle/Maven (see "Gradle/Maven Output Parsing" Strategy 1).
+
+Mapping is identical to the JUnit XML mapping table, with these Jasmine-specific notes:
+- `classname` attribute contains the describe block name
+- `name` attribute contains the test (it) name
+- Failures include Jasmine assertion messages in the `<failure>` element
+
+#### Strategy 2: Verbose text output (fallback)
+
+If JUnit XML is not available, parse Jasmine's verbose console output:
+
+```
+Parse patterns from Jasmine verbose output:
+  Test start:   "  ✓ formats ISO date to readable string"
+  Test fail:    "  ✗ handles null input"
+                 "    AssertionError: expected null to equal 'Invalid date'"
+  Test pending: "  • deprecated format"
+  Summary line: "42 specs, 1 failure, 2 pending specs"
+  Spec duration: "Finished in 5.123 seconds"
+```
+
+Text parsing strategy:
+1. Extract per-test results from `✓` (passed), `✗` (failed), `•` (pending/skipped) prefixed lines.
+2. Extract failure messages from indented lines following `✗` markers.
+3. Extract summary counts from the final summary line: `X specs, Y failures, Z pending specs`.
+4. Extract duration from "Finished in X seconds" line.
+5. Build the run-results.json from extracted data.
+
+Set `raw_output` to the full stdout+stderr text when using text parsing fallback.
 
 ### pytest Output Parsing
 

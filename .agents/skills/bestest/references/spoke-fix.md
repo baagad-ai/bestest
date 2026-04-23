@@ -849,7 +849,158 @@ Environment fix:
   After:  const apiKey = process.env.API_KEY ?? 'test-api-key';
 ```
 
-#### pytest Fix Patterns
+##### Mocha Fix Patterns
+
+```
+Callback-based async fix:
+  Before: it('fetches data', () => {
+            fetchData().then(result => {  // done() not called, test completes immediately
+              assert.ok(result);
+            });
+          });
+  After:  it('fetches data', (done) => {
+            fetchData().then(result => {
+              assert.ok(result);
+              done();
+            }).catch(done);
+          });
+
+  — OR — convert to async/await (preferred for Mocha 6+):
+  Before: it('fetches data', (done) => { ... });
+  After:  it('fetches data', async () => {
+            const result = await fetchData();
+            assert.ok(result);
+          });
+
+Missing return on promises fix:
+  Before: it('saves user', () => {
+            saveUser(user).then(() => { /* assertion */ });
+            // Mocha sees synchronous completion, test passes prematurely
+          });
+  After:  it('saves user', () => {
+            return saveUser(user).then(() => { /* assertion */ });
+          });
+  — OR —
+  After:  it('saves user', async () => {
+            await saveUser(user);
+            // assertion
+          });
+
+Timeout fix:
+  Before: it('slow operation', () => {
+            // test exceeds Mocha's default 2000ms timeout
+            longRunningOperation();
+          });
+  After:  it('slow operation', function() {
+            this.timeout(5000);  // Increase timeout for this test
+            // Note: must use function(), not arrow function, for this.timeout
+            longRunningOperation();
+          });
+
+Hook ordering fix:
+  Before: describe('suite', () => {
+            before(() => { setup(); });
+            // Tests depend on setup but before() is at the end of the describe
+            it('test 1', () => { /* fails — setup not yet run */ });
+            before(() => { setup(); });
+          });
+  After:  describe('suite', () => {
+            before(() => { setup(); });
+            it('test 1', () => { /* now works */ });
+          });
+  Note: Mocha runs before() hooks in order, but placing them after tests is confusing.
+        Always place hooks before the tests they prepare.
+
+Assertion fix (Chai expect):
+  Before: expect(result).to.equal('Invalid date')
+  After:  expect(result).to.be.null
+
+Assertion fix (Node assert):
+  Before: assert.strictEqual(result, 'Invalid date')
+  After:  assert.strictEqual(result, null)
+
+  — OR — use deep equality:
+  Before: assert.deepEqual(result, { status: 'ok' })
+  After:  assert.deepStrictEqual(result, { status: 'ok', extra: true })
+```
+
+#### Jasmine Fix Patterns
+
+```
+done.fail() vs done() fix:
+  Before: it('handles error', (done) => {
+            fetchData().catch(err => {
+              expect(err.message).toBe('Network error');
+              done.fail();  // Jasmine 2.x style — marks test as failed
+            });
+          });
+  After:  it('handles error', (done) => {
+            fetchData().then(() => {
+              done.fail('Expected error but got success');
+            }).catch(err => {
+              expect(err.message).toBe('Network error');
+              done();
+            });
+          });
+
+  — OR — Jasmine 3+ async/await (preferred):
+  Before: it('handles error', (done) => { ... });
+  After:  it('handles error', async () => {
+            await expectAsync(fetchData()).toBeRejectedWithError('Network error');
+          });
+
+jasmine.createSpyObj fix:
+  Before: const mockRepo = { save: () => {}, find: () => {} };
+          // Manual mock — no call tracking, no return value control
+  After:  const mockRepo = jasmine.createSpyObj('UserRepository', ['save', 'find']);
+          mockRepo.save.and.returnValue(Promise.resolve({ id: 1 }));
+          mockRepo.find.and.returnValue(Promise.resolve([]));
+
+  — OR — with property stubbing:
+  Before: const mockService = { getData: jasmine.createSpy('getData') };
+  After:  const mockService = jasmine.createSpyObj('DataService', ['getData'], {
+            getData: Promise.resolve({ data: [] })
+          });
+
+Clock mocking fix:
+  Before: it('debounces calls', () => {
+            debounce(fn, 1000);
+            // Test doesn't advance time — debounced fn never fires
+          });
+  After:  it('debounces calls', () => {
+            jasmine.clock().install();
+            debounce(fn, 1000);
+            jasmine.clock().tick(1001);
+            expect(fn).toHaveBeenCalled();
+            jasmine.clock().uninstall();
+          });
+
+Async/await in Jasmine 3+ fix:
+  Before: it('fetches user', (done) => {
+            getUser(1).then(user => {
+              expect(user.name).toBe('Alice');
+              done();
+            });
+          });
+  After:  it('fetches user', async () => {
+            const user = await getUser(1);
+            expect(user.name).toBe('Alice');
+          });
+
+Assertion fix (Jasmine matchers):
+  Before: expect(result).toBe('Invalid date')
+  After:  expect(result).toBeNull()
+
+Spy setup fix:
+  Before: spyOn(service, 'fetch').and.returnValue(undefined);
+  After:  spyOn(service, 'fetch').and.returnValue(Promise.resolve({ data: [] }));
+
+  — OR — for synchronous functions:
+  Before: spyOn(util, 'format').and.returnValue(undefined);
+  After:  spyOn(util, 'format').and.returnValue('formatted');
+```
+
+### pytest Fix Patterns
 
 ```
 Import fix:

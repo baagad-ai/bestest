@@ -8,7 +8,7 @@ Complete schema for `.bestest/config.yaml`. This file is the single source of tr
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `framework` | string | — | Test framework: `vitest`, `jest`, `pytest`, `junit5`, or `go_testing`. **Required.** |
+| `framework` | string | — | Test framework: `vitest`, `jest`, `mocha`, `jasmine`, `pytest`, `junit5`, or `go_testing`. **Required.** |
 | `language` | string | auto-detected | Primary language: `javascript`, `typescript`, `python`, `java`, or `go`. Auto-detected during init if not set. |
 | `version` | string | `"1.0"` | Schema version. Managed by bestest — do not edit. |
 
@@ -128,6 +128,34 @@ Jest-specific configuration. Only used when `framework` is `jest`.
 | `jest.transform` | string | `"swc"` | `swc`, `babel`, `ts-jest` | TypeScript transform strategy |
 | `jest.environment` | string | `"jsdom"` | `node`, `jsdom` | Default test environment |
 | `jest.module_name_mapper` | object | `{}` | Path alias mapping | Module path aliases (e.g., `@/*` → `src/*`) |
+
+### `mocha.*`
+
+Mocha-specific configuration. Only used when `framework` is `mocha`.
+
+| Field | Type | Default | Valid Values | Description |
+|-------|------|---------|--------------|-------------|
+| `mocha.config_path` | string | `".mocharc.yml"` | Any file path | Path to Mocha config file |
+| `mocha.ui` | string | `"bdd"` | `bdd`, `tdd`, `qunit`, `exports` | Test interface style |
+| `mocha.timeout` | number | `2000` | Any positive number (ms) | Default test timeout in milliseconds |
+| `mocha.retries` | number | `0` | 0–10 | Number of times to retry failed tests |
+| `mocha.async_only` | boolean | `false` | `true`, `false` | Require `done()` callback or return promise in all tests |
+| `mocha.assertion_library` | string | `"chai"` | `chai`, `assert`, `expect.js` | Assertion library to use in generated tests |
+| `mocha.mocking_library` | string or null | `"sinon"` | `sinon`, `null` | Mocking library for spies, stubs, and mocks |
+
+### `jasmine.*`
+
+Jasmine-specific configuration. Only used when `framework` is `jasmine`.
+
+| Field | Type | Default | Valid Values | Description |
+|-------|------|---------|--------------|-------------|
+| `jasmine.config_path` | string | `"spec/support/jasmine.json"` | Any file path | Path to Jasmine config file |
+| `jasmine.spec_dir` | string | `"spec"` | Any directory path | Directory to search for test specs |
+| `jasmine.spec_files` | string[] | `["**/*[sS]pec.?(m)js"]` | Glob patterns | Test file patterns to include |
+| `jasmine.helpers` | string[] | `["helpers/**/*.?(m)js"]` | Glob patterns | Helper files loaded before specs |
+| `jasmine.stop_on_failure` | boolean | `false` | `true`, `false` | Stop running specs after first failure |
+| `jasmine.random` | boolean | `false` | `true`, `false` | Run specs in random order |
+| `jasmine.default_timeout` | number | `5000` | Any positive number (ms) | Default timeout for async specs |
 
 ### `pytest.*`
 
@@ -251,6 +279,30 @@ Key behaviors:
 - Transform defaults to `swc` for best TypeScript performance
 - `jest.config.ts` should reference or extend existing config if present
 - Module name mapper supports path aliases from `tsconfig.json` paths
+
+### When `framework: mocha`
+
+The `mocha.*` block is active. The `vitest.*` and `jest.*` blocks are ignored. Coverage defaults to `istanbul` provider (via nyc). Config file is `.mocharc.yml`, `.mocharc.json`, or `mocha.opts` (legacy).
+
+Key behaviors:
+- Mocha does not include a built-in assertion library — Chai (`expect`/`should`/`assert`) or Node's native `assert` module is used
+- No built-in mocking — Sinon.js is the standard companion for spies, stubs, and mocks
+- Test file structure uses `describe()` and `it()` (BDD) or `suite()`/`test()` (TDD)
+- Async support: callback-based (`done()` parameter), promise-returning, or `async/await` (Mocha 6+)
+- Default timeout is 2000ms — should be increased for integration/e2e tests
+- Globals (`describe`, `it`, `beforeEach`, etc.) are injected by Mocha by default — no imports needed
+
+### When `framework: jasmine`
+
+The `jasmine.*` block is active. The `vitest.*`, `jest.*`, and `mocha.*` blocks are ignored. Coverage defaults to `istanbul` provider (via nyc or istanbul CLI). Config file is `spec/support/jasmine.json`.
+
+Key behaviors:
+- Jasmine includes built-in assertions (`expect().toBe()`, `expect().toEqual()`, etc.) and spying (`spyOn`, `jasmine.createSpy`, `jasmine.createSpyObj`)
+- No external assertion or mocking library required
+- Test file structure uses `describe()` and `it()` — globals injected by Jasmine
+- Async support: `done()` callback (Jasmine 2.x), `async/await` (Jasmine 3+), or `expectAsync()` (Jasmine 3+)
+- Clock mocking via `jasmine.clock().install()` / `jasmine.clock().tick()` / `jasmine.clock().uninstall()`
+- Configuration via `jasmine.json`: `spec_dir`, `spec_files`, `helpers`, `stopSpecOnExpectationFailure`, `random`
 
 ### When `framework: pytest`
 
