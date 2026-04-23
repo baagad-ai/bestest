@@ -41,7 +41,7 @@ We take security vulnerabilities seriously. If you discover a security issue in
 
 ## Scope
 
-This policy covers the **bestest** skill and its bundled scripts (`validate-skill.sh`,
+This policy covers the **bestest** plugin and its bundled scripts (`validate-plugin.sh`,
 `verify-m005-s05.sh`, and all spoke files under `references/`).
 
 Out of scope:

@@ -1,6 +1,6 @@
 # Validation Error Codes
 
-Error code taxonomy for `scripts/validate-skill.sh`. Each code represents one discrete consistency check that the validation script performs against the bestest skill's reference files, routing table, and structural integrity.
+Error code taxonomy for `scripts/validate-plugin.sh`. Each code represents one discrete consistency check that the validation script performs against the bestest skill's reference files, routing table, and structural integrity.
 
 ## Severity Definitions
 

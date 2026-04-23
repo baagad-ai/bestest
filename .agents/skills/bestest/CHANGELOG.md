@@ -23,8 +23,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conv
 - `pre-flight-protocol.md`: shared validation patterns reference (271 lines) (S06).
 - `dot-bestest-schema.md`: complete `.bestest/` directory tree documentation (251 lines) (S06).
 - `error-codes.md`: error taxonomy (E001–E025, 5 domains) (S07).
-- `validate-skill.sh`: 266 automated consistency checks across 7 domains (S07).
-- GitHub Actions CI workflow for automated skill validation (S07).
+- `validate-plugin.sh`: 266 automated consistency checks across 7 domains (S07).
+- GitHub Actions CI workflow for automated plugin validation (S07).
 
 ---
 

@@ -82,8 +82,8 @@ get_index_refs() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
-echo "═══ bestest skill validation ═══"
-echo "Skill directory: $SKILL_DIR"
+echo "═══ bestest plugin validation ═══"
+echo "Plugin directory: $SKILL_DIR"
 echo ""
 
 # ─── Domain 1: Routing Table ↔ Reference Index Consistency ────────────────

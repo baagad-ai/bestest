@@ -1,7 +1,7 @@
 ---
 name: bestest
 version: "1.3.0"
-description: Enterprise-grade testing architect skill. Detects your stack, recommends frameworks, generates production-quality tests, manages CI pipelines, and maintains living test documentation.
+description: Enterprise-grade testing architect plugin. Detects your stack, recommends frameworks, generates production-quality tests, manages CI pipelines, and maintains living test documentation.
 triggers:
   - /bestest
   - bestest
