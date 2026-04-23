@@ -1517,6 +1517,8 @@ Write the run report to disk, update config state, and print a console summary.
    ### Report
    - Written to: .bestest/reports/run-{timestamp}.json
    - config.yaml state.last_run updated
+   {If ci.junit.enabled (default true):}
+   - JUnit XML: .bestest/{ci.junit.outputPath}
 
    ### Next Steps
    {If failures exist:}
@@ -1537,6 +1539,97 @@ Write the run report to disk, update config state, and print a console summary.
 | Updated config state | `.bestest/config.yaml` | `state.last_run` set to run timestamp |
 | Framework raw output | `.bestest/reports/vitest-run.json` or `.bestest/reports/jest-run.json` | Preserved raw framework JSON for debugging |
 | Console summary | Terminal | Key metrics: test results, duration, coverage, failures |
+| JUnit XML report | `.bestest/reports/junit-report.xml` | CI-compatible structured test results in JUnit XML format |
+
+---
+
+## JUnit XML Emission
+
+After writing the JSON report and updating config state (Phase 5), emit a JUnit XML report as a side-effect artifact. This report follows the de facto Apache Ant/Jenkins xUnit schema, enabling CI systems (GitHub Actions, GitLab CI, Jenkins, CircleCI) to ingest test results natively.
+
+> **Non-blocking:** JUnit XML emission never blocks or fails the run. If writing fails, log a warning and continue. The JSON report is the authoritative output; JUnit XML is a derived CI convenience.
+
+### Configuration
+
+Controlled by `ci.junit.*` fields in `.bestest/config.yaml`:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `ci.junit.enabled` | boolean | `true` | Enable JUnit XML emission |
+| `ci.junit.outputPath` | string | `"reports/junit-report.xml"` | Output path relative to `.bestest/` |
+
+If `ci.junit.enabled` is `false`, skip this section entirely. If the `ci.junit` block is absent from config, default to enabled with the default output path.
+
+### Mapping: run-results.json → JUnit XML
+
+Transform the in-memory run-results.json structure to JUnit XML using this mapping:
+
+| run-results.json Field | JUnit XML Element/Attribute | Transformation |
+|------------------------|----------------------------|----------------|
+| — | `<testsuites>` | Root wrapper element |
+| `summary.totalTests` | `<testsuites tests="">` | Direct |
+| `summary.failed` | `<testsuites failures="">` | Direct |
+| `execution.durationMs` ÷ 1000 | `<testsuites time="">` | Milliseconds → seconds (3 decimal places) |
+| `tests[]` grouped by `filePath` | `<testsuite>` | One `<testsuite>` per unique `filePath` |
+| `tests[].filePath` | `<testsuite name="">` | Direct |
+| Count of cases in file | `<testsuite tests="">` | Count of `cases[]` entries for this file |
+| Count of failed cases in file | `<testsuite failures="">` | Count where `status === "failed"` |
+| Count of error cases in file | `<testsuite errors="">` | Count where `status === "failed"` (same as failures) |
+| Count of skipped cases in file | `<testsuite skipped="">` | Count where `status === "skipped"` |
+| `tests[].durationMs` ÷ 1000 (sum) | `<testsuite time="">` | Sum of case durations, ms → seconds |
+| `timestamp` | `<testsuite timestamp="">` | Direct ISO 8601 |
+| `tests[].cases[].name` | `<testcase name="">` | Direct |
+| `tests[].filePath` | `<testcase classname="">` | File path without extension (e.g., `src/utils/format.test`) |
+| `tests[].cases[].durationMs` ÷ 1000 | `<testcase time="">` | Milliseconds → seconds (3 decimal places) |
+| `status: "passed"` | No child element | Passed test — absence of failure/error/skipped |
+| `status: "failed"` | `<failure message="" type="">` | `message` from `cases[].error` (truncated to 1000 chars), `type` from error class or `"AssertionError"` |
+| `status: "skipped"` | `<skipped />` | Self-closing element |
+
+### JUnit XML Output Format
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="42" failures="1" errors="0" time="5.123">
+  <testsuite name="src/utils/format.test.ts" tests="5" failures="1" errors="1" skipped="1" time="1.234" timestamp="2024-07-15T14:30:45Z">
+    <testcase name="formatDate > formats ISO date" classname="src/utils/format.test" time="0.012" />
+    <testcase name="formatDate > handles null input" classname="src/utils/format.test" time="0.005">
+      <failure message="AssertionError: expected null to be 'Invalid date'" type="AssertionError">
+        AssertionError: expected null to be 'Invalid date'
+      </failure>
+    </testcase>
+    <testcase name="formatDate > deprecated format" classname="src/utils/format.test" time="0.001">
+      <skipped />
+    </testcase>
+  </testsuite>
+</testsuites>
+```
+
+### Emission Steps
+
+1. **Check config gate** — Read `ci.junit.enabled` from config. If `false`, skip. If absent, default to `true`.
+2. **Group tests by filePath** — Iterate `tests[]` from run-results.json, grouping cases by their parent `filePath`. Each group becomes one `<testsuite>` element.
+3. **Build XML** — Construct the XML string with proper escaping:
+   - Escape `<`, `>`, `&`, `"`, `'` in attribute values and text content using standard XML entity encoding.
+   - Truncate `failure` message attributes to 1000 characters to prevent unbounded XML size.
+   - Use `\n` as line separator inside `<failure>` text content for readability.
+4. **Determine output path** — Use `ci.junit.outputPath` (default: `reports/junit-report.xml`), resolved relative to `.bestest/`.
+5. **Write to disk** — Write the XML to `.bestest/{ci.junit.outputPath}`. Ensure parent directory exists (`mkdir -p`).
+6. **Log result** — Print: `"JUnit XML report written to .bestest/{ci.junit.outputPath}"`.
+
+### Error Handling
+
+If JUnit XML emission fails for any reason (disk full, permission error, malformed data):
+```
+Print: "Warning: Failed to write JUnit XML report: {error message}"
+```
+Do NOT set a non-zero exit code. Do NOT abort the spoke. The JSON report is authoritative.
+
+### Console Summary Update
+
+When JUnit XML is generated, append to the Phase 5 console summary "### Report" section:
+```
+- JUnit XML: .bestest/{ci.junit.outputPath}
+```
 
 ---
 
@@ -1739,6 +1832,7 @@ After successful completion, the following artifacts exist:
 | Updated config state | `.bestest/config.yaml` | `state.last_run` set to run timestamp |
 | Framework raw output | `.bestest/reports/vitest-run.json`, `.bestest/reports/jest-run.json`, or `.bestest/reports/go-test-output.json` | Preserved raw framework JSON for deep debugging |
 | Console summary | Terminal | Key metrics: test results, duration, coverage, failure details |
+| JUnit XML report | `.bestest/reports/junit-report.xml` | CI-compatible structured test results in JUnit XML format (when `ci.junit.enabled` is true) |
 | Prior reports preserved | `.bestest/reports/` | All previous run reports retained for trend analysis |
 
 A future agent or CI pipeline can compare consecutive run reports to detect test regressions, flaky tests, or coverage trends. The run-results.json is the single source of truth — the console output is a derived view for humans.

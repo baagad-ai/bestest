@@ -103,6 +103,8 @@ CI/CD pipeline integration settings.
 |-------|------|---------|--------------|-------------|
 | `ci.enabled` | boolean | `false` | `true`, `false` | Enable CI pipeline scaffolding |
 | `ci.provider` | string or null | `null` | `github-actions`, `gitlab-ci`, `jenkins`, `circleci`, `null` | CI platform for pipeline generation |
+| `ci.junit.enabled` | boolean | `true` | `true`, `false` | Enable JUnit XML report emission from spoke-run. When true, `junit-report.xml` is written to `.bestest/reports/` as a side-effect after every run. |
+| `ci.junit.outputPath` | string | `"reports/junit-report.xml"` | Any relative file path | Output path for JUnit XML report, relative to `.bestest/`. Only used when `ci.junit.enabled` is `true`. |
 
 ### `vitest.*`
 

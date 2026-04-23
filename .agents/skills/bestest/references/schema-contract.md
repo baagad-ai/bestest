@@ -20,6 +20,7 @@ Patches (documentation-only changes) do not increment the version.
 | `stack-profile.json` | Top-level `schemaVersion` | `1.3` |
 | `scan-report.json` | Top-level `schemaVersion` | `1.2` |
 | `run-results.json` | Top-level `schemaVersion` | `1.0` |
+| `junit-report.xml` | XML declaration + `<testsuites>` root element | `1.0` |
 | `metrics.json` | Top-level `schemaVersion` | `1.0` |
 | `config.yaml` | `version` (top-level) | `1.0` |
 
@@ -59,6 +60,12 @@ Patches (documentation-only changes) do not increment the version.
 | Version | Date | Change |
 |---------|------|--------|
 | 1.0 | 2025-04 | Initial schema. Metrics store for continuous test health aggregation across all spokes. |
+
+#### junit-report-schema
+
+| Version | Date | Change |
+|---------|------|--------|
+| 1.0 | 2025-04 | Initial schema. JUnit XML report emitted by spoke-run as CI side-effect. Follows de facto Apache Ant/Jenkins xUnit schema with `<testsuites>`, `<testsuite>`, `<testcase>`, `<failure>`, and `<skipped>` elements. |
 
 #### config-schema
 
