@@ -19,6 +19,8 @@ Scaffold new test types beyond the default unit/integration tests set up by `/be
 
 Run these checks before starting any scaffolding work. They validate the environment and give the user early, actionable feedback.
 
+> See **references/pre-flight-protocol.md** for the standard 3-step `.bestest/` validation pattern and spoke-specific variants.
+
 ### 1. Check for `.bestest/` with valid config
 
 ```

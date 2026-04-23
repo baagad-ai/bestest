@@ -33,11 +33,29 @@ The fix spoke is a downstream consumer of the run spoke. The run spoke produces 
 
 ## Pre-Flight Checks
 
-> **Shared protocol:** This spoke uses the **Standard 3-Step `.bestest/` Validation** from `references/pre-flight-protocol.md` (Steps 1–3: `.bestest/` existence, `config.yaml` presence, YAML validity). Read that document for the full validation specification including error message templates.
+Run these checks before starting diagnosis. They guard against invalid states and provide early, actionable feedback.
 
-Spoke-specific additions beyond the shared protocol:
+> See **references/pre-flight-protocol.md** for the standard 3-step `.bestest/` validation pattern and spoke-specific variants.
 
-### Check for run reports
+### 1. Check for `.bestest/` with valid config
+
+```
+If .bestest/ does not exist:
+  Print: "No .bestest/ directory found. Run /bestest init first to set up testing infrastructure."
+  Exit. No diagnosis performed.
+
+If .bestest/config.yaml does not exist:
+  Print: ".bestest/config.yaml is missing. The config file is required for fix."
+  Print: "Run /bestest init to regenerate it, or restore it from version control."
+  Exit.
+
+If .bestest/config.yaml exists but is invalid YAML:
+  Print: ".bestest/config.yaml contains invalid YAML and cannot be parsed."
+  Print: "Fix the syntax error and re-run /bestest fix."
+  Exit.
+```
+
+### 2. Check for run reports
 
 ```
 Glob for .bestest/reports/run-*.json files.
@@ -53,7 +71,7 @@ If run reports found:
   Continue.
 ```
 
-### Check test framework is installed
+### 3. Check test framework is installed
 
 ```
 Read config.yaml → framework field (vitest, jest, or pytest).
@@ -849,158 +867,7 @@ Environment fix:
   After:  const apiKey = process.env.API_KEY ?? 'test-api-key';
 ```
 
-##### Mocha Fix Patterns
-
-```
-Callback-based async fix:
-  Before: it('fetches data', () => {
-            fetchData().then(result => {  // done() not called, test completes immediately
-              assert.ok(result);
-            });
-          });
-  After:  it('fetches data', (done) => {
-            fetchData().then(result => {
-              assert.ok(result);
-              done();
-            }).catch(done);
-          });
-
-  — OR — convert to async/await (preferred for Mocha 6+):
-  Before: it('fetches data', (done) => { ... });
-  After:  it('fetches data', async () => {
-            const result = await fetchData();
-            assert.ok(result);
-          });
-
-Missing return on promises fix:
-  Before: it('saves user', () => {
-            saveUser(user).then(() => { /* assertion */ });
-            // Mocha sees synchronous completion, test passes prematurely
-          });
-  After:  it('saves user', () => {
-            return saveUser(user).then(() => { /* assertion */ });
-          });
-  — OR —
-  After:  it('saves user', async () => {
-            await saveUser(user);
-            // assertion
-          });
-
-Timeout fix:
-  Before: it('slow operation', () => {
-            // test exceeds Mocha's default 2000ms timeout
-            longRunningOperation();
-          });
-  After:  it('slow operation', function() {
-            this.timeout(5000);  // Increase timeout for this test
-            // Note: must use function(), not arrow function, for this.timeout
-            longRunningOperation();
-          });
-
-Hook ordering fix:
-  Before: describe('suite', () => {
-            before(() => { setup(); });
-            // Tests depend on setup but before() is at the end of the describe
-            it('test 1', () => { /* fails — setup not yet run */ });
-            before(() => { setup(); });
-          });
-  After:  describe('suite', () => {
-            before(() => { setup(); });
-            it('test 1', () => { /* now works */ });
-          });
-  Note: Mocha runs before() hooks in order, but placing them after tests is confusing.
-        Always place hooks before the tests they prepare.
-
-Assertion fix (Chai expect):
-  Before: expect(result).to.equal('Invalid date')
-  After:  expect(result).to.be.null
-
-Assertion fix (Node assert):
-  Before: assert.strictEqual(result, 'Invalid date')
-  After:  assert.strictEqual(result, null)
-
-  — OR — use deep equality:
-  Before: assert.deepEqual(result, { status: 'ok' })
-  After:  assert.deepStrictEqual(result, { status: 'ok', extra: true })
-```
-
-#### Jasmine Fix Patterns
-
-```
-done.fail() vs done() fix:
-  Before: it('handles error', (done) => {
-            fetchData().catch(err => {
-              expect(err.message).toBe('Network error');
-              done.fail();  // Jasmine 2.x style — marks test as failed
-            });
-          });
-  After:  it('handles error', (done) => {
-            fetchData().then(() => {
-              done.fail('Expected error but got success');
-            }).catch(err => {
-              expect(err.message).toBe('Network error');
-              done();
-            });
-          });
-
-  — OR — Jasmine 3+ async/await (preferred):
-  Before: it('handles error', (done) => { ... });
-  After:  it('handles error', async () => {
-            await expectAsync(fetchData()).toBeRejectedWithError('Network error');
-          });
-
-jasmine.createSpyObj fix:
-  Before: const mockRepo = { save: () => {}, find: () => {} };
-          // Manual mock — no call tracking, no return value control
-  After:  const mockRepo = jasmine.createSpyObj('UserRepository', ['save', 'find']);
-          mockRepo.save.and.returnValue(Promise.resolve({ id: 1 }));
-          mockRepo.find.and.returnValue(Promise.resolve([]));
-
-  — OR — with property stubbing:
-  Before: const mockService = { getData: jasmine.createSpy('getData') };
-  After:  const mockService = jasmine.createSpyObj('DataService', ['getData'], {
-            getData: Promise.resolve({ data: [] })
-          });
-
-Clock mocking fix:
-  Before: it('debounces calls', () => {
-            debounce(fn, 1000);
-            // Test doesn't advance time — debounced fn never fires
-          });
-  After:  it('debounces calls', () => {
-            jasmine.clock().install();
-            debounce(fn, 1000);
-            jasmine.clock().tick(1001);
-            expect(fn).toHaveBeenCalled();
-            jasmine.clock().uninstall();
-          });
-
-Async/await in Jasmine 3+ fix:
-  Before: it('fetches user', (done) => {
-            getUser(1).then(user => {
-              expect(user.name).toBe('Alice');
-              done();
-            });
-          });
-  After:  it('fetches user', async () => {
-            const user = await getUser(1);
-            expect(user.name).toBe('Alice');
-          });
-
-Assertion fix (Jasmine matchers):
-  Before: expect(result).toBe('Invalid date')
-  After:  expect(result).toBeNull()
-
-Spy setup fix:
-  Before: spyOn(service, 'fetch').and.returnValue(undefined);
-  After:  spyOn(service, 'fetch').and.returnValue(Promise.resolve({ data: [] }));
-
-  — OR — for synchronous functions:
-  Before: spyOn(util, 'format').and.returnValue(undefined);
-  After:  spyOn(util, 'format').and.returnValue('formatted');
-```
-
-### pytest Fix Patterns
+#### pytest Fix Patterns
 
 ```
 Import fix:
@@ -1218,100 +1085,6 @@ Specific Java scenarios:
 - Missing test dependency in `build.gradle`/`pom.xml` → `environment.java.dependency` (exception: adding dependencies to build config is allowed)
 
 **Exception to the source modification rule for Java:** Adding test dependencies (JUnit 5, Mockito, AssertJ, etc.) to `build.gradle` or `pom.xml` is permitted — this is configuring the build for testing, not modifying source code. However, existing dependencies must not be removed or modified.
-
-#### TestNG Fix Patterns
-
-```
-Data provider mismatch fix:
-  Symptom: "Data Provider method must return Object[][] or Iterator<Object[]>"
-  Root cause: @DataProvider method returns wrong type (e.g., List<String> instead of Object[][])
-  Before:
-    @DataProvider(name = "users")
-    public List<String> userProvider() { return List.of("alice", "bob"); }
-  After:
-    @DataProvider(name = "users")
-    public Object[][] userProvider() { return new Object[][] { {"alice"}, {"bob"} }; }
-
-Missing @DataProvider annotation fix:
-  Symptom: "java.lang.IllegalArgumentException: dataProvider 'name' not found"
-  Root cause: Method exists but lacks @DataProvider annotation
-  Before:
-    public Object[][] userData() { ... }
-    @Test(dataProvider = "userData")
-    void testCreate(Object[] data) { ... }
-  After:
-    @DataProvider(name = "userData")
-    public Object[][] userData() { ... }
-    @Test(dataProvider = "userData")
-    void testCreate(Object[] data) { ... }
-
-dependsOnMethods ordering fix:
-  Symptom: Test skipped with "depends on not successfully finished methods"
-  Root cause: dependsOnMethods references a test that failed or doesn't exist
-  Before:
-    @Test(dependsOnMethods = "testInit")
-    void testProcess() { ... }  // skipped if testInit failed
-  After:
-    @Test
-    void testProcess() {
-      // Make test self-contained instead of depending on other tests
-      // Setup required state inline
-    }
-
-Circular dependency fix:
-  Symptom: "cyclic dependency detected"
-  Root cause: dependsOnMethods creates a cycle (A depends on B, B depends on A)
-  Fix: Remove dependsOnMethods entirely and make tests independent. Use
-       @BeforeMethod for shared setup instead of test-to-test dependencies.
-
-Parallel data-driven test fix:
-  Symptom: Data-driven tests fail intermittently with shared state corruption
-  Root cause: @DataProvider missing (parallel = true) or tests share mutable state
-  Before:
-    @DataProvider(name = "data")
-    public Object[][] data() { ... }
-  After:
-    @DataProvider(name = "data", parallel = true)
-    public Object[][] data() { ... }
-    // Also ensure each test method uses local variables, not shared fields
-
-Assertion import confusion fix:
-  Symptom: Compilation error "cannot find symbol: assertEquals" or wrong assertion behavior
-  Root cause: Mixed imports between TestNG Assert and JUnit Assertions
-  Before:
-    import org.junit.jupiter.api.Assertions;  // JUnit 5
-    import org.testng.annotations.Test;       // TestNG
-    @Test
-    void test() { assertEquals(1, result); }  // JUnit assertEquals(actual, expected)
-  After:
-    import org.testng.Assert;                 // TestNG
-    import org.testng.annotations.Test;
-    @Test
-    void test() { Assert.assertEquals(result, 1); }  // TestNG assertEquals(actual, expected)
-
-@BeforeSuite/@AfterSuite lifecycle fix:
-  Symptom: NullPointerException in @BeforeSuite or resource leak in @AfterSuite
-  Root cause: Suite-level setup/teardown runs once per XML suite, not per test class
-  Fix: Move per-test setup to @BeforeMethod. Reserve @BeforeSuite for one-time
-       expensive resources (database connections, embedded servers). Ensure
-       @AfterSuite cleans up resources allocated in @BeforeSuite.
-
-Mock initialization fix (TestNG + Mockito):
-  Symptom: NullPointerException when calling mock methods
-  Root cause: No MockitoExtension in TestNG — mocks must be initialized manually
-  Before:
-    @Mock
-    private UserRepository userRepo;
-    @Test
-    void testCreateUser() { userRepo.save(user); }  // NPE
-  After:
-    @Mock
-    private UserRepository userRepo;
-    @BeforeMethod
-    void setUp() { MockitoAnnotations.openMocks(this); }
-    @Test
-    void testCreateUser() { userRepo.save(user); }  // Works
-```
 
 ### Go Fix Patterns
 
@@ -1749,40 +1522,6 @@ Print a human-readable summary of the fix results:
 
 ---
 
-## Metrics Update
-
-After Phase 5 completes and all artifacts are written, update `.bestest/state/metrics.json` per the shared protocol in `references/metrics-schema.md`. The fix spoke updates test counts, run history, failure tracking, and activity after applying fixes.
-
-### Protocol
-
-1. **Read `.bestest/state/metrics.json`** — If the file does not exist, treat as first-time creation with defaults from `metrics-schema.md`.
-2. **Parse** — If parsing fails (corruption), log a warning and reinitialize with defaults plus current fix data. **Never abort the spoke** — metrics are observability, not a gate.
-3. **Validate `schemaVersion`** — Warn if MAJOR version differs; proceed if MINOR differs.
-4. **Merge spoke-specific data** (see field mapping below).
-5. **Recalculate derived values** — `healthScore.breakdown.passRate`, `healthScore.breakdown.freshness`, `healthScore.overall`.
-6. **Write back** — Atomic write (write to temp file, then rename).
-7. **Update `config.yaml`** — Set `state.last_metrics` to current ISO 8601 timestamp.
-
-### Fields Updated by spoke-fix
-
-| Metrics Section | Source Data | Merge Logic |
-|----------------|------------|-------------|
-| `tests` | Post-fix verification results | Replace `total`, `passing`, `failing`, `skipped` with counts from the verification run. |
-| `runs.total` | Cumulative | Increment by 1. |
-| `runs.history[]` | Fix verification run | Append entry: `{ timestamp, spoke: "spoke-fix", total, passed, failed, skipped, duration_ms, coverage }`. Evict oldest entries exceeding `historyMaxLength` (100). |
-| `failures.heatMap[]` | Fixed test files | For each file where fix was applied AND verified: decrement `count` by 1 (if > 0). Remove entries where `count` reaches 0. For files where fix failed: leave unchanged. |
-| `healthScore.breakdown.passRate` | `tests.passing / max(tests.total, 1)` | Recalculate. |
-| `healthScore.breakdown.freshness` | Current time vs `lastUpdated` | Set to 1.0 (just updated). |
-| `healthScore.overall` | Average of non-null breakdown scores | Recalculate. |
-| `activity[]` | Fix summary | Append `{ timestamp, spoke: "spoke-fix", action: "fix", summary: "{fixedCount} tests fixed, {failedCount} fix failures" }`. Evict oldest entries exceeding `activityMaxLength` (200). |
-| `lastUpdated` | Current time | Set to current ISO 8601 timestamp. |
-
-### Bounded Array Eviction
-
-All arrays use FIFO eviction: append new entry to end, then remove from beginning if length exceeds `*maxLength`. See `metrics-schema.md` → Bounded Array Eviction for the canonical algorithm.
-
----
-
 ## Error Handling
 
 ### 1. No Failures Found
@@ -2000,8 +1739,6 @@ Re-examine the race condition stack traces. If the race is in source code gorout
 ---
 
 ## HITL Gate
-
-<!-- gate_tier: provisional — Proceed when fix confidence ≥0.8 and fix category is test_bug or timing. Escalate to manual for source_bug, environment, or low-confidence fixes. Log auto-proceed decisions for audit trail. -->
 
 Before applying any fixes to test files, present the proposed changes to the user for review and approval. This gate ensures the user maintains control over all test file modifications.
 

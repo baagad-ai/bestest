@@ -23,9 +23,27 @@ All generated pipelines follow the **4-stage architecture** defined in `referenc
 
 ## Pre-Flight Checks
 
-> **Shared protocol:** This spoke uses the **Standard 3-Step `.bestest/` Validation** from `references/pre-flight-protocol.md` (Steps 1–3: `.bestest/` existence, `config.yaml` presence, YAML validity). Read that document for the full validation specification including error message templates.
+Run these checks before starting generation. They guard against invalid states and give the user early, actionable feedback.
 
-Spoke-specific additions beyond the shared protocol:
+> See **references/pre-flight-protocol.md** for the standard 3-step `.bestest/` validation pattern and spoke-specific variants.
+
+### 1. Check for `.bestest/` with valid config
+
+```
+If .bestest/ does not exist:
+  Print: "No .bestest/ directory found. Run /bestest init first to set up testing infrastructure."
+  Exit. No CI file generated.
+
+If .bestest/config.yaml does not exist:
+  Print: ".bestest/config.yaml is missing. The config file is required for CI generation."
+  Print: "Run /bestest init to regenerate it, or restore it from version control."
+  Exit.
+
+If .bestest/config.yaml exists but is invalid YAML:
+  Print: ".bestest/config.yaml contains invalid YAML and cannot be parsed."
+  Print: "Fix the syntax error and re-run /bestest ci."
+  Exit.
+```
 
 Parse and extract fields used during generation:
 - `ci.enabled` — whether CI integration is active (default: `false`)
@@ -36,7 +54,7 @@ Parse and extract fields used during generation:
 - `framework` — primary test framework for command selection
 - `paths.src` — source file glob (used for working directory hints)
 
-### Check for StackProfile
+### 2. Check for StackProfile
 
 ```
 If .bestest/state/stack-profile.json does not exist:
@@ -49,7 +67,7 @@ Else:
   Set mode = "profile"
 ```
 
-### Validate CLI argument (if provided)
+### 3. Validate CLI argument (if provided)
 
 ```
 If user provides a provider argument:
@@ -565,8 +583,6 @@ Select the base template for the detected provider, inject language-specific com
 ---
 
 ## Phase 5 — HITL Gate (Human-in-the-Loop Review)
-
-<!-- gate_tier: manual — Full human approval required. CI pipeline generation affects repository infrastructure and deployment workflows. -->
 
 Present the generated pipeline to the user for review before writing to disk. This is a mandatory gate — the user must approve, modify, or cancel.
 

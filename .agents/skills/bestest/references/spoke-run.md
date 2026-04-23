@@ -17,11 +17,29 @@ The run command is non-destructive to source code: it never modifies test files 
 
 ## Pre-Flight Checks
 
-> **Shared protocol:** This spoke uses the **Standard 3-Step `.bestest/` Validation** + **Scan/Run-Specific Additions** from `references/pre-flight-protocol.md`. Read that document for the full validation specification (Steps 1–3 baseline + Steps A–B for StackProfile warning and test framework installation check).
+Run these checks before starting test execution. They guard against invalid states and give the user early, actionable feedback.
 
-Spoke-specific details beyond the shared protocol:
+> See **references/pre-flight-protocol.md** for the standard 3-step `.bestest/` validation pattern and spoke-specific variants.
 
-### StackProfile (warning, non-blocking)
+### 1. Check for `.bestest/` with valid config
+
+```
+If .bestest/ does not exist:
+  Print: "No .bestest/ directory found. Run /bestest init first to set up testing infrastructure."
+  Exit. No tests executed.
+
+If .bestest/config.yaml does not exist:
+  Print: ".bestest/config.yaml is missing. The config file is required for run."
+  Print: "Run /bestest init to regenerate it, or restore it from version control."
+  Exit.
+
+If .bestest/config.yaml exists but is invalid YAML:
+  Print: ".bestest/config.yaml contains invalid YAML and cannot be parsed."
+  Print: "Fix the syntax error and re-run /bestest run."
+  Exit.
+```
+
+### 2. Check for StackProfile
 
 ```
 If .bestest/state/stack-profile.json does not exist:
@@ -34,7 +52,7 @@ Else:
   Set mode = "full"
 ```
 
-### Test framework installation check
+### 3. Check test framework is installed
 
 ```
 Read config.yaml → framework field (vitest, jest, or pytest).
@@ -376,88 +394,6 @@ Timeout:
   Append: --testTimeout=<timeout-ms> (default: 300000ms = 5 minutes)
 ```
 
-### Build Mocha Command
-
-```
-Base command:
-  npx mocha --reporter json --reporter-options output=.bestest/reports/mocha-run.json
-
-Suite filter arguments:
-  If filter is "unit":
-    --grep "@unit" (if tests use tags)
-    --ignore "**/e2e/**" --ignore "**/integration/**"
-    Construct: npx mocha --reporter json --reporter-options output=.bestest/reports/mocha-run.json "src/**/*.test.{js,ts}" --ignore "**/e2e/**" --ignore "**/integration/**"
-
-  If filter is "integration":
-    Construct: npx mocha --reporter json --reporter-options output=.bestest/reports/mocha-run.json "tests/integration/**" "__tests__/integration/**"
-
-  If filter is "e2e":
-    Construct: npx mocha --reporter json --reporter-options output=.bestest/reports/mocha-run.json "e2e/**" "tests/e2e/**"
-
-  If filter is "affected":
-    Pass explicit list of affected test file paths as positional arguments
-    Construct: npx mocha --reporter json --reporter-options output=.bestest/reports/mocha-run.json path/to/test1.ts path/to/test2.ts
-
-  If filter is "all" (or unspecified):
-    No additional filter arguments — Mocha uses its configured test spec patterns
-
-Coverage (when coverage.enabled is true):
-  Append: --require @cypress/code-coverage (if installed)
-  Or use nyc: nyc --reporter=json-summary npx mocha ...
-  Output to .bestest/reports/coverage/coverage-summary.json
-
-Timeout:
-  Append: --timeout <timeout-ms> (default: 300000ms = 5 minutes)
-  Note: Mocha default timeout is 2000ms — always set an explicit timeout
-```
-
-### Build Jasmine Command
-
-```
-Base command:
-  npx jasmine --junit --output=.bestest/reports/
-
-  Jasmine does not have a native JSON reporter. Options:
-  1. jasmine-console-reporter for structured console output
-  2. jasmine-reporters JUnitXmlReporter for JUnit XML output (parsed by spoke-run)
-  3. Custom JSON reporter via jasmine.addReporter()
-
-  Recommended: Use JUnit XML reporter with output to .bestest/reports/jasmine-results.xml
-    npx jasmine --reporter=jasmine-reporters.JUnitXmlReporter --reporter-options=file=.bestest/reports/jasmine-results.xml
-
-Suite filter arguments:
-  If filter is "unit":
-    --filter="Unit" (if test names include suite type)
-    Or configure spec_dir in jasmine.json to point to unit test directory
-
-  If filter is "integration":
-    --filter="Integration"
-    Or configure spec_dir to point to integration test directory
-
-  If filter is "e2e":
-    --filter="E2E"
-    Or configure spec_dir to point to e2e test directory
-
-  If filter is "affected":
-    Jasmine does not support positional file arguments natively.
-    Create a temporary spec file that imports only the affected test files:
-      echo "require('./path/to/test1'); require('./path/to/test2');" > .bestest/temp-affected-spec.js
-      npx jasmine .bestest/temp-affected-spec.js
-    Clean up temp file after run.
-
-  If filter is "all" (or unspecified):
-    No additional filter arguments — Jasmine uses spec_files from jasmine.json
-
-Coverage (when coverage.enabled is true):
-  Use nyc wrapper: nyc --reporter=json-summary npx jasmine
-  Output to .bestest/reports/coverage/coverage-summary.json
-
-Timeout:
-  Set in jasmine.json: "jsApiReporter.__timeoutInterval": <timeout-ms>
-  Or set via jasmine.DEFAULT_TIMEOUT_INTERVAL in a helper file
-  Default process-level timeout: 300 seconds (Phase 3)
-```
-
 ### Build pytest Command
 
 pytest does not produce JSON output natively. Use `--tb=no -v` for structured verbose output, and `pytest-json-report` plugin (if installed) for JSON output. If `pytest-json-report` is not installed, fall back to verbose text parsing.
@@ -649,111 +585,6 @@ Timeout:
   Maven: -Dsurefire.timeout=<seconds> for per-test timeout
   Default process timeout: 300 seconds (same as JS/TS and Python)
 ```
-
-### Build Gradle/Maven Test Command (Java/TestNG)
-
-TestNG uses the same Gradle/Maven build tools as JUnit 5, but with different configuration. Detection is based on TestNG-specific signals rather than JUnit Platform.
-
-```
-Pre-requisite: TestNG Detection
-
-Before building the command, detect TestNG in the project:
-
-1. Check build.gradle for TestNG:
-   - Look for testImplementation 'org.testng:testng' dependency
-   - Look for useTestNG() in the test block (instead of useJUnitPlatform())
-
-2. Check pom.xml for TestNG:
-   - Look for <groupId>org.testng</groupId> <artifactId>testng</artifactId> dependency
-   - Look for testng.xml or testng.yaml suite config file in project root
-
-3. Check source imports:
-   - Look for org.testng.annotations.Test imports in src/test/java/**/*.java
-
-If TestNG detected:
-  Print: "TestNG detected via {detection_source}. Using TestNG configuration."
-
-Gradle command:
-  Base: ./gradlew test --no-daemon
-  Note: build.gradle must have useTestNG() in the test block (not useJUnitPlatform())
-  Test class filter: --tests "com.example.ServiceTest"
-  Suite filter:
-    Via testng.xml: add -Dsuitexml=testng.xml to JVM args via test.systemProperty
-    Via test block: useTestNG { suites = ['testng.xml'] }
-    Groups: useTestNG { includeGroups = ['unit'] } or -Dgroups=unit
-  Coverage (JaCoCo): append jacocoTestReport (same as JUnit 5)
-  Parallel: --parallel --max-workers=N
-
-  Full command example:
-    ./gradlew test --no-daemon --tests "com.example.ServiceTest" jacocoTestReport
-
-Maven command:
-  Base: ./mvnw test
-  Test class filter: -Dtest=ServiceTest
-  Suite filter:
-    Via testng.xml: -Dsurefire.suiteXmlFiles=testng.xml
-    Groups: -Dgroups=unit
-  Coverage (JaCoCo): jacoco:report goal (same as JUnit 5)
-
-  Full command example:
-    ./mvnw test -Dtest=ServiceTest jacoco:report
-
-Timeout:
-  Gradle: no native --timeout flag per test. Set process-level timeout in Phase 3.
-  Maven: -Dsurefire.timeout=<seconds> for per-test timeout
-  Default process timeout: 300 seconds (same as JUnit 5)
-```
-
-### TestNG XML Output Parsing
-
-TestNG produces its own XML output format (`testng-results.xml`) which differs from JUnit XML. When TestNG is detected, use TestNG XML parsing instead of JUnit XML parsing.
-
-**TestNG XML output locations:**
-- Gradle: `build/reports/tests/test/` (contains both JUnit XML and TestNG-format output)
-- Maven: `target/surefire-reports/` (Surefire can output both formats)
-- TestNG native: `test-output/testng-results.xml` (when run directly via TestNG)
-
-**TestNG XML structure:**
-```xml
-<testng-results skipped="1" failed="1" total="5" passed="3">
-  <suite name="Suite1" duration-ms="234">
-    <test name="Test1" duration-ms="234">
-      <class name="com.example.ServiceTest">
-        <test-method name="testCreate" signature="testCreate()[pri:0, instance:com.example.ServiceTest@abc]" status="PASS" duration-ms="45" />
-        <test-method name="testDelete" signature="testDelete()[pri:0, instance:com.example.ServiceTest@abc]" status="FAIL" duration-ms="12">
-          <exception class="java.lang.AssertionError">
-            <message><![CDATA[expected [201] but found [200]]]></message>
-            <full-stacktrace>Stack trace content...</full-stacktrace>
-          </exception>
-        </test-method>
-        <test-method name="testList" signature="testList()[pri:0, instance:com.example.ServiceTest@abc]" status="SKIP" duration-ms="0">
-          <exception class="org.testng.SkipException">
-            <message><![CDATA[Skipped due to dependency failure]]></message>
-          </exception>
-        </test-method>
-      </class>
-    </test>
-  </suite>
-</testng-results>
-```
-
-**TestNG XML field mapping:**
-
-| TestNG XML Field | run-results.json Field | Transformation |
-|-----------------|----------------------|----------------|
-| `testng-results.total` | `summary.totalTests` | Direct |
-| `testng-results.passed` | `summary.passed` | Direct |
-| `testng-results.failed` | `summary.failed` | Direct |
-| `testng-results.skipped` | `summary.skipped` | Direct |
-| `test-method/@name` | `tests[].cases[].name` | Direct |
-| `test-method/@duration-ms` | `tests[].cases[].durationMs` | Direct (already in ms) |
-| `test-method/@status` | `tests[].cases[].status` | `PASS` → `"passed"`, `FAIL` → `"failed"`, `SKIP` → `"skipped"` |
-| `test-method/exception/message` | `tests[].cases[].error` | Extract from CDATA |
-| `test-method/exception/@class` | `tests[].cases[].errorType` | Direct |
-| `class/@name` | `tests[].filePath` | Convert class name to file path |
-| `suite/@duration-ms` | `summary.durationMs` | Sum of suite durations |
-
-**Fallback:** If TestNG XML is not found at expected paths, fall back to console output parsing (same strategy as JUnit 5 Gradle/Maven console fallback). Set `language: "java"` and `framework: "testng"` in the results.
 
 ### Build Go Test Command (Go/testing)
 
@@ -1106,126 +937,6 @@ Map each field:
 | `assertionResults[].status` | `tests[].cases[].status` | Map: `"passed"`, `"failed"`, `"pending"` → `"skipped"`, `"skipped"`, `"todo"`, `"disabled"` → `"skipped"` |
 | `assertionResults[].duration` | `tests[].cases[].durationMs` | Direct |
 | `assertionResults[].failureMessages[0]` | `tests[].cases[].error` | Direct, or `null` if empty |
-
-### Mocha JSON Output Parsing
-
-Mocha's JSON reporter (`--reporter json`) produces output in this structure:
-
-```json
-{
-  "stats": {
-    "suites": 5,
-    "tests": 42,
-    "passes": 39,
-    "failures": 1,
-    "pending": 2,
-    "start": "2024-07-15T14:30:40.000Z",
-    "end": "2024-07-15T14:30:45.123Z",
-    "duration": 5123
-  },
-  "tests": [
-    {
-      "title": "formatDate > formats ISO date to readable string",
-      "fullTitle": "formatDate formats ISO date to readable string",
-      "duration": 12,
-      "currentRetry": 0,
-      "err": {}
-    },
-    {
-      "title": "handles null input",
-      "fullTitle": "formatDate handles null input",
-      "duration": 5,
-      "currentRetry": 0,
-      "err": {
-        "message": "AssertionError: expected null to equal 'Invalid date'",
-        "stack": "AssertionError: expected null ...\n    at Context.<anonymous> (src/utils/format.test.js:28:12)"
-      }
-    }
-  ],
-  "pending": [
-    {
-      "title": "deprecated format",
-      "fullTitle": "formatDate deprecated format"
-    }
-  ],
-  "failures": [
-    {
-      "title": "handles null input",
-      "fullTitle": "formatDate handles null input",
-      "duration": 5,
-      "err": {
-        "message": "AssertionError: expected null to equal 'Invalid date'",
-        "stack": "..."
-      }
-    }
-  ],
-  "passes": [
-    {
-      "title": "formats ISO date to readable string",
-      "fullTitle": "formatDate formats ISO date to readable string",
-      "duration": 12,
-      "err": {}
-    }
-  ]
-}
-```
-
-Map each field:
-
-| Mocha JSON Field | run-results.json Field | Transformation |
-|-----------------|----------------------|----------------|
-| `stats.tests` | `summary.totalTests` | Direct |
-| `stats.passes` | `summary.passed` | Use `stats.passes` count |
-| `stats.failures` | `summary.failed` | Direct |
-| `stats.pending` | `summary.skipped` | Direct |
-| — | `summary.todo` | Mocha has no todo concept; set to 0 |
-| `stats.start` | `execution.startTime` | Direct (ISO 8601 string) |
-| `stats.end` | `execution.endTime` | Direct (ISO 8601 string) |
-| `stats.duration` | `execution.durationMs` | Direct (already in ms) |
-| `tests[].fullTitle` | `tests[].cases[].name` | Direct |
-| `tests[].duration` | `tests[].cases[].durationMs` | Direct |
-| `tests[].err.message` (when non-empty) | `tests[].cases[].error` | Direct, or `null` if `err` is empty object |
-| Passes array membership | `tests[].cases[].status` | `"passed"` |
-| Failures array membership | `tests[].cases[].status` | `"failed"` |
-| Pending array membership | `tests[].cases[].status` | `"skipped"` |
-
-Group tests by file path using stack traces or file references. If file grouping is unavailable, create one test file entry per top-level suite name.
-
-### Jasmine Output Parsing
-
-Jasmine does not have a built-in JSON reporter. Parse results from JUnit XML output (if using `jasmine-reporters.JUnitXmlReporter`) or from verbose console output.
-
-#### Strategy 1: JUnit XML report (preferred)
-
-If `jasmine-reporters` is configured to write JUnit XML to `.bestest/reports/jasmine-results.xml`, parse the XML using the same JUnit XML parsing strategy as Gradle/Maven (see "Gradle/Maven Output Parsing" Strategy 1).
-
-Mapping is identical to the JUnit XML mapping table, with these Jasmine-specific notes:
-- `classname` attribute contains the describe block name
-- `name` attribute contains the test (it) name
-- Failures include Jasmine assertion messages in the `<failure>` element
-
-#### Strategy 2: Verbose text output (fallback)
-
-If JUnit XML is not available, parse Jasmine's verbose console output:
-
-```
-Parse patterns from Jasmine verbose output:
-  Test start:   "  ✓ formats ISO date to readable string"
-  Test fail:    "  ✗ handles null input"
-                 "    AssertionError: expected null to equal 'Invalid date'"
-  Test pending: "  • deprecated format"
-  Summary line: "42 specs, 1 failure, 2 pending specs"
-  Spec duration: "Finished in 5.123 seconds"
-```
-
-Text parsing strategy:
-1. Extract per-test results from `✓` (passed), `✗` (failed), `•` (pending/skipped) prefixed lines.
-2. Extract failure messages from indented lines following `✗` markers.
-3. Extract summary counts from the final summary line: `X specs, Y failures, Z pending specs`.
-4. Extract duration from "Finished in X seconds" line.
-5. Build the run-results.json from extracted data.
-
-Set `raw_output` to the full stdout+stderr text when using text parsing fallback.
 
 ### pytest Output Parsing
 
@@ -1824,8 +1535,6 @@ Write the run report to disk, update config state, and print a console summary.
    ### Report
    - Written to: .bestest/reports/run-{timestamp}.json
    - config.yaml state.last_run updated
-   {If ci.junit.enabled (default true):}
-   - JUnit XML: .bestest/{ci.junit.outputPath}
 
    ### Next Steps
    {If failures exist:}
@@ -1846,137 +1555,6 @@ Write the run report to disk, update config state, and print a console summary.
 | Updated config state | `.bestest/config.yaml` | `state.last_run` set to run timestamp |
 | Framework raw output | `.bestest/reports/vitest-run.json` or `.bestest/reports/jest-run.json` | Preserved raw framework JSON for debugging |
 | Console summary | Terminal | Key metrics: test results, duration, coverage, failures |
-| JUnit XML report | `.bestest/reports/junit-report.xml` | CI-compatible structured test results in JUnit XML format |
-
----
-
-## JUnit XML Emission
-
-After writing the JSON report and updating config state (Phase 5), emit a JUnit XML report as a side-effect artifact. This report follows the de facto Apache Ant/Jenkins xUnit schema, enabling CI systems (GitHub Actions, GitLab CI, Jenkins, CircleCI) to ingest test results natively.
-
-> **Non-blocking:** JUnit XML emission never blocks or fails the run. If writing fails, log a warning and continue. The JSON report is the authoritative output; JUnit XML is a derived CI convenience.
-
-### Configuration
-
-Controlled by `ci.junit.*` fields in `.bestest/config.yaml`:
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `ci.junit.enabled` | boolean | `true` | Enable JUnit XML emission |
-| `ci.junit.outputPath` | string | `"reports/junit-report.xml"` | Output path relative to `.bestest/` |
-
-If `ci.junit.enabled` is `false`, skip this section entirely. If the `ci.junit` block is absent from config, default to enabled with the default output path.
-
-### Mapping: run-results.json → JUnit XML
-
-Transform the in-memory run-results.json structure to JUnit XML using this mapping:
-
-| run-results.json Field | JUnit XML Element/Attribute | Transformation |
-|------------------------|----------------------------|----------------|
-| — | `<testsuites>` | Root wrapper element |
-| `summary.totalTests` | `<testsuites tests="">` | Direct |
-| `summary.failed` | `<testsuites failures="">` | Direct |
-| `execution.durationMs` ÷ 1000 | `<testsuites time="">` | Milliseconds → seconds (3 decimal places) |
-| `tests[]` grouped by `filePath` | `<testsuite>` | One `<testsuite>` per unique `filePath` |
-| `tests[].filePath` | `<testsuite name="">` | Direct |
-| Count of cases in file | `<testsuite tests="">` | Count of `cases[]` entries for this file |
-| Count of failed cases in file | `<testsuite failures="">` | Count where `status === "failed"` |
-| Count of error cases in file | `<testsuite errors="">` | Count where `status === "failed"` (same as failures) |
-| Count of skipped cases in file | `<testsuite skipped="">` | Count where `status === "skipped"` |
-| `tests[].durationMs` ÷ 1000 (sum) | `<testsuite time="">` | Sum of case durations, ms → seconds |
-| `timestamp` | `<testsuite timestamp="">` | Direct ISO 8601 |
-| `tests[].cases[].name` | `<testcase name="">` | Direct |
-| `tests[].filePath` | `<testcase classname="">` | File path without extension (e.g., `src/utils/format.test`) |
-| `tests[].cases[].durationMs` ÷ 1000 | `<testcase time="">` | Milliseconds → seconds (3 decimal places) |
-| `status: "passed"` | No child element | Passed test — absence of failure/error/skipped |
-| `status: "failed"` | `<failure message="" type="">` | `message` from `cases[].error` (truncated to 1000 chars), `type` from error class or `"AssertionError"` |
-| `status: "skipped"` | `<skipped />` | Self-closing element |
-
-### JUnit XML Output Format
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="42" failures="1" errors="0" time="5.123">
-  <testsuite name="src/utils/format.test.ts" tests="5" failures="1" errors="1" skipped="1" time="1.234" timestamp="2024-07-15T14:30:45Z">
-    <testcase name="formatDate > formats ISO date" classname="src/utils/format.test" time="0.012" />
-    <testcase name="formatDate > handles null input" classname="src/utils/format.test" time="0.005">
-      <failure message="AssertionError: expected null to be 'Invalid date'" type="AssertionError">
-        AssertionError: expected null to be 'Invalid date'
-      </failure>
-    </testcase>
-    <testcase name="formatDate > deprecated format" classname="src/utils/format.test" time="0.001">
-      <skipped />
-    </testcase>
-  </testsuite>
-</testsuites>
-```
-
-### Emission Steps
-
-1. **Check config gate** — Read `ci.junit.enabled` from config. If `false`, skip. If absent, default to `true`.
-2. **Group tests by filePath** — Iterate `tests[]` from run-results.json, grouping cases by their parent `filePath`. Each group becomes one `<testsuite>` element.
-3. **Build XML** — Construct the XML string with proper escaping:
-   - Escape `<`, `>`, `&`, `"`, `'` in attribute values and text content using standard XML entity encoding.
-   - Truncate `failure` message attributes to 1000 characters to prevent unbounded XML size.
-   - Use `\n` as line separator inside `<failure>` text content for readability.
-4. **Determine output path** — Use `ci.junit.outputPath` (default: `reports/junit-report.xml`), resolved relative to `.bestest/`.
-5. **Write to disk** — Write the XML to `.bestest/{ci.junit.outputPath}`. Ensure parent directory exists (`mkdir -p`).
-6. **Log result** — Print: `"JUnit XML report written to .bestest/{ci.junit.outputPath}"`.
-
-### Error Handling
-
-If JUnit XML emission fails for any reason (disk full, permission error, malformed data):
-```
-Print: "Warning: Failed to write JUnit XML report: {error message}"
-```
-Do NOT set a non-zero exit code. Do NOT abort the spoke. The JSON report is authoritative.
-
-### Console Summary Update
-
-When JUnit XML is generated, append to the Phase 5 console summary "### Report" section:
-```
-- JUnit XML: .bestest/{ci.junit.outputPath}
-```
-
----
-
-## Metrics Update
-
-After Phase 6 completes and all artifacts are written, update `.bestest/state/metrics.json` per the shared protocol in `references/metrics-schema.md`. The run spoke writes the highest volume of metrics data — run history, test results, coverage snapshots, slowest tests, and failure tracking.
-
-### Protocol
-
-1. **Read `.bestest/state/metrics.json`** — If the file does not exist, treat as first-time creation with defaults from `metrics-schema.md`.
-2. **Parse** — If parsing fails (corruption), log a warning and reinitialize with defaults plus current run data. **Never abort the spoke** — metrics are observability, not a gate.
-3. **Validate `schemaVersion`** — Warn if MAJOR version differs; proceed if MINOR differs.
-4. **Merge spoke-specific data** (see field mapping below).
-5. **Recalculate derived values** — `healthScore` (passRate, coverage ratio, freshness), `overallFlakeRate`.
-6. **Write back** — Atomic write (write to temp file, then rename).
-7. **Update `config.yaml`** — Set `state.last_metrics` to current ISO 8601 timestamp.
-
-### Fields Updated by spoke-run
-
-| Metrics Section | Source Data | Merge Logic |
-|----------------|------------|-------------|
-| `tests` | `run-results.json` summary | Replace `total`, `passing`, `failing`, `skipped` with latest run counts. Update `byType` if suite filter provides type breakdown. |
-| `runs.total` | Cumulative | Increment by 1. |
-| `runs.history[]` | `run-results.json` | Append entry: `{ timestamp, spoke: "spoke-run", total, passed, failed, skipped, duration_ms, coverage }`. Evict oldest entries exceeding `historyMaxLength` (100). |
-| `coverage.current` | `run-results.json` coverage block | Replace with latest coverage snapshot (`lines`, `branches`, `functions`, `statements`). |
-| `coverage.trend[]` | `coverage.current` after update | Append new coverage snapshot with timestamp. Evict oldest entries exceeding `trendMaxLength` (50). |
-| `healthScore.breakdown.coverage` | `coverage.current.lines / coverage.target` | Recalculate. Cap at 1.0. Skip if coverage not collected. |
-| `healthScore.breakdown.passRate` | `tests.passing / max(tests.total, 1)` | Recalculate. |
-| `healthScore.breakdown.freshness` | Current time vs `lastUpdated` | Set to 1.0 (just updated). |
-| `healthScore.overall` | Average of non-null breakdown scores | Recalculate. |
-| `slowest.tests[]` | Per-test `durationMs` from parsed results | Replace with top-10 slowest tests from this run (sort descending by `duration_ms`, take first `maxLength` entries). Each entry: `{ file, name, duration_ms }`. |
-| `failures.heatMap[]` | Failed test files | For each failed test file: increment `count` if already in heatMap and update `lastFailed`; otherwise append new entry. Evict entries exceeding `maxLength` (20) by removing lowest-count entries first. |
-| `activity[]` | Run summary | Append `{ timestamp, spoke: "spoke-run", action: "run", summary: "{passed} passed, {failed} failed (coverage {pct}%)" }`. Evict oldest entries exceeding `activityMaxLength` (200). |
-| `lastUpdated` | Current time | Set to current ISO 8601 timestamp. |
-
-### Bounded Array Eviction
-
-All arrays use FIFO eviction: append new entry to end, then remove from beginning if length exceeds `*maxLength`. See `metrics-schema.md` → Bounded Array Eviction for the canonical algorithm.
-
-> **Dashboard refresh:** The health dashboard at `.bestest/dashboard.html` reads `state/metrics.json` on each page load — the metrics update above is all that's needed to refresh the dashboard. No separate dashboard rebuild step is required.
 
 ---
 
@@ -2141,7 +1719,6 @@ After successful completion, the following artifacts exist:
 | Updated config state | `.bestest/config.yaml` | `state.last_run` set to run timestamp |
 | Framework raw output | `.bestest/reports/vitest-run.json`, `.bestest/reports/jest-run.json`, or `.bestest/reports/go-test-output.json` | Preserved raw framework JSON for deep debugging |
 | Console summary | Terminal | Key metrics: test results, duration, coverage, failure details |
-| JUnit XML report | `.bestest/reports/junit-report.xml` | CI-compatible structured test results in JUnit XML format (when `ci.junit.enabled` is true) |
 | Prior reports preserved | `.bestest/reports/` | All previous run reports retained for trend analysis |
 
 A future agent or CI pipeline can compare consecutive run reports to detect test regressions, flaky tests, or coverage trends. The run-results.json is the single source of truth — the console output is a derived view for humans.

@@ -20,6 +20,8 @@ The report command is **read-only**: it never re-runs tests, modifies source cod
 
 Run these checks before loading data. They guard against invalid states and give the user early, actionable feedback.
 
+> See **references/pre-flight-protocol.md** for the standard 3-step `.bestest/` validation pattern and spoke-specific variants.
+
 ### 1. Check for `.bestest/` with valid config
 
 ```
@@ -868,32 +870,6 @@ Write the generated markdown report to disk, print a console summary, and update
 | Markdown report | `.bestest/reports/report-<timestamp>.md` | Human-readable test quality report with all sections |
 | Updated config state | `.bestest/config.yaml` | `state.last_report` set to report timestamp |
 | Console summary | Terminal | Key findings, trends, and next steps |
-
----
-
-## Metrics Update
-
-After Phase 4 completes and all artifacts are written, update `.bestest/state/metrics.json` per the shared protocol in `references/metrics-schema.md`. The report spoke is a terminal spoke (per MEM002) — it only logs an activity entry and does not modify test/coverage/health data.
-
-### Protocol
-
-1. **Read `.bestest/state/metrics.json`** — If the file does not exist, treat as first-time creation with defaults from `metrics-schema.md`.
-2. **Parse** — If parsing fails (corruption), log a warning and reinitialize with defaults. **Never abort the spoke** — metrics are observability, not a gate.
-3. **Validate `schemaVersion`** — Warn if MAJOR version differs; proceed if MINOR differs.
-4. **Merge spoke-specific data** (see field mapping below).
-5. **Write back** — Atomic write (write to temp file, then rename).
-6. **Update `config.yaml`** — Set `state.last_metrics` to current ISO 8601 timestamp.
-
-### Fields Updated by spoke-report
-
-| Metrics Section | Source Data | Merge Logic |
-|----------------|------------|-------------|
-| `activity[]` | Report summary | Append `{ timestamp, spoke: "spoke-report", action: "report", summary: "Report generated ({mode} mode): {passRate}% pass rate, {linesPct}% coverage, {gapCount} gaps" }`. Evict oldest entries exceeding `activityMaxLength` (200). |
-| `lastUpdated` | Current time | Set to current ISO 8601 timestamp. |
-
-### Bounded Array Eviction
-
-All arrays use FIFO eviction: append new entry to end, then remove from beginning if length exceeds `*maxLength`. See `metrics-schema.md` → Bounded Array Eviction for the canonical algorithm.
 
 ---
 

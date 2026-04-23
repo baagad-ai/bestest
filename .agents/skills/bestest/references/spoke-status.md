@@ -14,6 +14,8 @@ Use `/bestest status` for a quick health check without running a full `scan` or 
 
 ## Pre-Flight Checks
 
+> See **references/pre-flight-protocol.md** for the standard 3-step `.bestest/` validation pattern and spoke-specific variants.
+
 ### 1. Check for `.bestest/` with valid config
 
 ```

@@ -14,6 +14,8 @@ Use `/bestest version` to verify the installed version, locate the skill files, 
 
 No pre-flight checks required. The version spoke must not fail under any circumstances.
 
+> See **references/pre-flight-protocol.md** for the standard 3-step `.bestest/` validation pattern and spoke-specific variants.
+
 ---
 
 ## Workflow

@@ -15,6 +15,8 @@ Use `/bestest help` to see all available commands with one-line descriptions, or
 
 No pre-flight checks are required. The help spoke is designed to be the entry point for new users and must not fail due to missing infrastructure.
 
+> See **references/pre-flight-protocol.md** for the standard 3-step `.bestest/` validation pattern and spoke-specific variants.
+
 ### 1. Check for `.bestest/` (optional context)
 
 ```

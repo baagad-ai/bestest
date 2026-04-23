@@ -11,6 +11,8 @@ View and modify the `.bestest/config.yaml` test configuration. This spoke is loa
 - `config-schema.md` is the authoritative source for all field definitions, types, valid values, ranges, and defaults
 - StackProfile in `.bestest/state/stack-profile.json` provides context for smart defaults during reset
 
+> See **references/pre-flight-protocol.md** for the standard 3-step `.bestest/` validation pattern and spoke-specific variants.
+
 ## Sub-command Parsing
 
 Parse the first argument after `config` to determine the action:
