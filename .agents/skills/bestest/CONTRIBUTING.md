@@ -1,6 +1,6 @@
 # Contributing to bestest
 
-Thank you for contributing to **bestest**, the enterprise-grade testing architect plugin. This guide covers the two most common contribution paths: adding a new command spoke and adding support for a new programming language.
+Thank you for contributing to **bestest**, the enterprise-grade testing architect skill. This guide covers the two most common contribution paths: adding a new command spoke and adding support for a new programming language.
 
 ---
 
@@ -142,7 +142,7 @@ In SKILL.md `<routing>` section:
 
 ## Testing Your Changes
 
-There is no automated test suite for the plugin itself. Validate changes by:
+There is no automated test suite for the skill itself. Validate changes by:
 
 1. **Grep checks** — Verify all referenced files exist: `grep -o 'references/[a-z0-9-]*.md' SKILL.md | sort -u | while read f; do test -f "$HOME/.agents/skills/bestest/$f" && echo "OK $f" || echo "MISSING $f"; done`
 2. **Routing consistency** — Every spoke in the routing table should appear in the reference_index and vice versa.
@@ -156,7 +156,7 @@ There is no automated test suite for the plugin itself. Validate changes by:
 ```
 .agents/skills/bestest/
 ├── SKILL.md                          # Orchestrator — command routing, principles, reference index
-├── README.md                         # Plugin documentation
+├── README.md                         # Skill documentation
 ├── CONTRIBUTING.md                   # This file
 ├── CHANGELOG.md                      # Version history
 │
@@ -176,13 +176,35 @@ There is no automated test suite for the plugin itself. Validate changes by:
 │   ├── spoke-report.md
 │   ├── spoke-expand.md
 │   ├── spoke-config.md
+│   ├── spoke-help.md                 # Help UX spoke
+│   ├── spoke-explain.md              # Explain UX spoke
+│   ├── spoke-status.md               # Status UX spoke
+│   ├── spoke-version.md              # Version UX spoke
 │   ├── detection-engine.md
+│   ├── detection-signals.md
+│   ├── parallel-dispatch.md          # Parallel dispatch protocol for multi-worker generation
+│   ├── pre-flight-protocol.md        # Pre-flight checks before generation
+│   ├── quick_reference.md            # Quick reference card
 │   ├── stack-profile-schema.md
 │   ├── scan-report-schema.md
-│   ├── decision-tree-js.md
-│   ├── decision-tree-python.md
-│   ├── decision-tree-java.md
-│   ├── decision-tree-go.md
+│   ├── config-schema.md              # Configuration schema
+│   ├── dot-bestest-schema.md         # .bestest directory schema
+│   ├── metrics-schema.md             # metrics.json specification
+│   ├── schema-contract.md            # Schema versioning contract
+│   ├── error-codes.md                # Error code reference
+│   ├── context7-helper.md            # Context7 integration helper
+│   ├── js-ts-decision-tree.md        # JavaScript/TypeScript decision tree
+│   ├── python-decision-tree.md       # Python decision tree
+│   ├── java-decision-tree.md         # Java decision tree
+│   ├── go-decision-tree.md           # Go decision tree
+│   ├── anti-patterns.md
+│   ├── ci-patterns.md
+│   ├── framework-decisions.md
+│   ├── migration-rules.md
+│   ├── ai-generation-guide.md
+│   ├── js-ts-generation-guide.md
+│   ├── python-generation-guide.md
+│   ├── go-generation-guide.md
 │   │
 │   ├── generate/                     # Generate phase detail files (on-demand)
 │   │
@@ -197,5 +219,6 @@ There is no automated test suite for the plugin itself. Validate changes by:
 │       └── ...
 │
 └── scripts/
-    └── validate-plugin.sh            # 275+ automated consistency checks
+    ├── validate-skill.sh             # 288+ automated consistency checks
+    └── verify-m005-s05.sh            # S05 verification script
 ```

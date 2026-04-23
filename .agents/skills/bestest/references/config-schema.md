@@ -247,6 +247,17 @@ Test generation behavior settings.
 | `generation.verify_pass` | boolean | `true` | `true`, `false` | Run tests after generation to verify they pass |
 | `generation.max_retries` | number | `2` | 0–5 | Maximum retry attempts when generated tests fail verification |
 
+#### `generation.parallel.*`
+
+Parallel dispatch settings for test generation. When enabled and target count meets the threshold, the orchestrator dispatches multiple workers to generate tests concurrently. See `references/parallel-dispatch.md` for the full protocol.
+
+| Field | Type | Default | Valid Values | Description |
+|-------|------|---------|--------------|-------------|
+| `generation.parallel.enabled` | boolean | `true` | `true`, `false` | Allow parallel dispatch when 5+ targets detected |
+| `generation.parallel.min_targets` | number | `5` | `3`–`20` | Minimum target count to trigger parallel dispatch |
+| `generation.parallel.group_size` | number | `5` | `3`–`10` | Maximum source files per worker group |
+| `generation.parallel.depth_limit` | number | `1` | `1` | Maximum dispatch recursion depth (always 1 — workers never spawn workers) |
+
 ### `reports.*`
 
 Scan report retention settings. Controls how many historical scan reports are kept on disk.
