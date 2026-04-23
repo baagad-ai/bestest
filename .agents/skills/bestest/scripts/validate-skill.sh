@@ -269,6 +269,28 @@ LINE_COUNT=$(wc -l < "$SKILL_FILE" | tr -d ' ')
 check "SKILL.md line count ($LINE_COUNT) is within bounds (180-310)" "E017" "warning" \
   "[ '$LINE_COUNT' -ge 180 ] && [ '$LINE_COUNT' -le 310 ]"
 
+# ─── Domain 8: Dashboard & JUnit XML Cross-Cutting ────────────────────────
+echo "── Domain 8: Dashboard & JUnit XML Cross-Cutting ──"
+
+# E018: dashboard.html template exists and non-empty
+check "dashboard.html template exists and non-empty" "E018" "critical" \
+  "[ -s '$TD/dashboard.html' ]"
+
+# E019: dashboard.html contains metrics.json reference
+check "dashboard.html references metrics.json" "E019" "critical" \
+  "grep -q 'metrics\\.json' '$TD/dashboard.html'"
+
+# E020: spoke-init.md references dashboard.html
+check "spoke-init.md references dashboard.html" "E020" "critical" \
+  "grep -q 'dashboard\\.html' '$SKILL_DIR/references/spoke-init.md'"
+
+# E021: dot-bestest-schema.md references both dashboard.html and junit-report.xml
+check "dot-bestest-schema.md references dashboard.html" "E021" "critical" \
+  "grep -q 'dashboard\\.html' '$SKILL_DIR/references/dot-bestest-schema.md'"
+
+check "dot-bestest-schema.md references junit-report.xml" "E021" "critical" \
+  "grep -q 'junit-report\\.xml' '$SKILL_DIR/references/dot-bestest-schema.md'"
+
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""
 echo "═══ Results ═══"

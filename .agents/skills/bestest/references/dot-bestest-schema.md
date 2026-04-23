@@ -9,6 +9,7 @@ Complete reference for the `.bestest/` directory tree — what creates each file
 ```
 .bestest/
 ├── config.yaml                        # Main test configuration
+├── dashboard.html                     # Self-contained health dashboard (spoke-init)
 ├── .gitignore                         # Ignores state/, reports/, and cache
 ├── adrs/
 │   └── ADR-001-test-framework.md      # Framework selection decision record
@@ -23,6 +24,7 @@ Complete reference for the `.bestest/` directory tree — what creates each file
     ├── doctor-<timestamp>.json        # Health check reports (spoke-doctor)
     ├── report-<timestamp>.md          # Human-readable reports (spoke-report)
     ├── migration-<timestamp>.json     # Migration reports (spoke-migrate)
+    ├── junit-report.xml               # JUnit XML for CI (spoke-run, when ci.junit.enabled)
     ├── vitest-run.json                # Raw Vitest output (ephemeral)
     ├── jest-run.json                  # Raw Jest output (ephemeral)
     ├── coverage.json                  # Raw pytest-cov output (ephemeral)
@@ -74,6 +76,17 @@ These fields are set during init and are immutable — they record the init-time
 | **Read by** | Git — ensures state/, reports/, and cache/ are not committed |
 | **Ignores** | `state/`, `reports/`, `cache/` |
 | **Safe to delete** | Yes, but state and reports will then be tracked by git unless the root `.gitignore` covers them. |
+
+### `.bestest/dashboard.html`
+
+| Attribute | Detail |
+|-----------|--------|
+| **Created by** | `spoke-init` (Phase 4 — Scaffold) |
+| **Template** | `references/templates/dashboard.html` (copied verbatim, no placeholders) |
+| **Updated by** | None — static after creation. Refreshes automatically by reading `state/metrics.json` on each page load. |
+| **Read by** | Humans (opens in browser). Reads `.bestest/state/metrics.json` at runtime via `fetch('./state/metrics.json')`. |
+| **Contains** | Self-contained HTML health dashboard with 9 widgets: health gauge, coverage trend, test results, flaky alerts, run history, module map, slowest tests, failure hotspots, activity feed. Uses inline SVG Lucide icons, dark/light mode, responsive layout. Zero dependencies, no server, no build step. |
+| **Safe to delete** | Yes — re-run `/bestest init` to regenerate. No data loss (reads metrics.json at runtime). |
 
 ### `.bestest/adrs/`
 
@@ -158,6 +171,21 @@ These fields are set during init and are immutable — they record the init-time
 | `doctor-<timestamp>.json` | `spoke-doctor` | `spoke-doctor` (historical comparison) | Same |
 | `report-<timestamp>.md` | `spoke-report` | User (human-readable) | Same |
 | `migration-<timestamp>.json` | `spoke-migrate` | `spoke-migrate` (rollback), `spoke-report` | Same |
+| `junit-report.xml` | `spoke-run` (when `ci.junit.enabled` is true) | CI systems (Jenkins, GitHub Actions, GitLab CI, CircleCI) | JUnit XML format, no timestamp — overwritten each run |
+
+#### `.bestest/reports/junit-report.xml`
+
+| Attribute | Detail |
+|-----------|--------|
+| **Created by** | `spoke-run` (JUnit XML emission phase — between Phase 5 and Metrics Update) |
+| **Config** | Controlled by `ci.junit.enabled` (default: `true`) and `ci.junit.outputPath` (default: `"reports/junit-report.xml"`) in `config.yaml` |
+| **Template** | None — generated programmatically from run results |
+| **Updated by** | `spoke-run` — overwritten on each run (not rotated) |
+| **Read by** | CI systems (Jenkins xUnit plugin, GitHub Actions test reporter, GitLab CI JUnit report, CircleCI JUnit) |
+| **Format** | De facto Apache Ant/Jenkins xUnit schema: `<testsuites>` root with `<testsuite>`, `<testcase>`, `<failure>`, `<skipped>` elements |
+| **Schema** | Versioned in `references/schema-contract.md` as `junit-report-schema` (version `1.0`) |
+| **Lifecycle** | Only created when `ci.junit.enabled` is `true`. Emission is non-blocking — failures are logged but do not affect spoke-run exit code. |
+| **Safe to delete** | Yes — regenerated on next `spoke-run` invocation. |
 
 #### Ephemeral Report Files
 
@@ -205,20 +233,20 @@ These files live at the repository root, **not** inside `.bestest/`. They are cr
 
 Which spokes create or modify files inside `.bestest/`:
 
-| Spoke | config.yaml | state/ | reports/ | adrs/ | Root files |
-|-------|-------------|--------|----------|-------|------------|
-| **spoke-init** | ✅ creates | ✅ creates `stack-profile.json`, `metrics.json` | ✅ creates directory | ✅ creates ADR-001 | ✅ TESTING.md, framework config |
-| **spoke-scan** | ✅ updates `state.last_scan` | ✅ updates `metrics.json` | ✅ `scan-<ts>.json`, ephemeral files | — | — |
-| **spoke-run** | ✅ updates `state.last_run` | ✅ updates `metrics.json` | ✅ `run-<ts>.json`, ephemeral files | — | — |
-| **spoke-generate** | ✅ updates `state.last_generate` | ✅ updates `metrics.json` | — | — | ✅ creates test files |
-| **spoke-fix** | ✅ updates `state.last_fix` | ✅ updates `metrics.json` | ✅ `fix-<ts>.json`, `fix-verify.json` | — | ✅ modifies test files |
-| **spoke-doctor** | ✅ updates `state.last_doctor` | ✅ updates `metrics.json` | ✅ `doctor-<ts>.json` | — | — |
-| **spoke-report** | — | ✅ updates `metrics.json` | ✅ `report-<ts>.md` | — | — |
-| **spoke-config** | ✅ updates (set/reset) | ✅ updates `metrics.json` | — | — | — |
-| **spoke-expand** | ✅ adds test type blocks | — | — | — | ✅ framework config updates, helper files |
-| **spoke-ci** | ✅ updates `ci.*` | — | — | — | ✅ CI pipeline file |
-| **spoke-migrate** | ✅ updates framework fields | ✅ `migration-backup.json` | ✅ `migration-<ts>.json` | — | ✅ dependency changes |
-| **spoke-coverage** | — | — | — | — | — |
+| Spoke | config.yaml | state/ | reports/ | adrs/ | Root files | Other |
+|-------|-------------|--------|----------|-------|------------|-------|
+| **spoke-init** | ✅ creates | ✅ creates `stack-profile.json`, `metrics.json` | ✅ creates directory | ✅ creates ADR-001 | ✅ TESTING.md, framework config | ✅ `dashboard.html` |
+| **spoke-scan** | ✅ updates `state.last_scan` | ✅ updates `metrics.json` | ✅ `scan-<ts>.json`, ephemeral files | — | — | — |
+| **spoke-run** | ✅ updates `state.last_run` | ✅ updates `metrics.json` | ✅ `run-<ts>.json`, ephemeral files, `junit-report.xml` | — | — | — |
+| **spoke-generate** | ✅ updates `state.last_generate` | ✅ updates `metrics.json` | — | — | ✅ creates test files | — |
+| **spoke-fix** | ✅ updates `state.last_fix` | ✅ updates `metrics.json` | ✅ `fix-<ts>.json`, `fix-verify.json` | — | ✅ modifies test files | — |
+| **spoke-doctor** | ✅ updates `state.last_doctor` | ✅ updates `metrics.json` | ✅ `doctor-<ts>.json` | — | — | — |
+| **spoke-report** | — | ✅ updates `metrics.json` | ✅ `report-<ts>.md` | — | — | — |
+| **spoke-config** | ✅ updates (set/reset) | ✅ updates `metrics.json` | — | — | — | — |
+| **spoke-expand** | ✅ adds test type blocks | — | — | — | ✅ framework config updates, helper files | — |
+| **spoke-ci** | ✅ updates `ci.*` | — | — | — | ✅ CI pipeline file | — |
+| **spoke-migrate** | ✅ updates framework fields | ✅ `migration-backup.json` | ✅ `migration-<ts>.json` | — | ✅ dependency changes | — |
+| **spoke-coverage** | — | — | — | — | — | — |
 
 ---
 

@@ -96,7 +96,7 @@ All reference files are relative to `~/.agents/skills/bestest/`.
 | `references/generate/go/phase7-quality-audit.md` | Quality scoring against Go generation guide rubric and stability testing |
 | `references/generate/go/error-handling.md` | All error scenarios for the Go generate spoke |
 
-## Templates (6)
+## Templates (7)
 | File | Description |
 |------|-------------|
 | `references/templates/vitest-config-ts.md` | Complete vitest.config.ts templates for 4 stack variants |
@@ -105,6 +105,7 @@ All reference files are relative to `~/.agents/skills/bestest/`.
 | `references/templates/stryker-conf.md` | Stryker mutation testing configs for 2 test runner variants |
 | `references/templates/supertest-helpers.md` | Reusable API test helper patterns for supertest |
 | `references/templates/testing-md.md` | TESTING.md template with project documentation structure |
+| `references/templates/dashboard.html` | Self-contained HTML health dashboard with Lucide icons, 9 widgets, dark/light mode — reads `.bestest/state/metrics.json` at runtime |
 
 ## Migration (1)
 | File | Description |
