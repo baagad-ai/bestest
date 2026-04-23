@@ -1219,6 +1219,100 @@ Specific Java scenarios:
 
 **Exception to the source modification rule for Java:** Adding test dependencies (JUnit 5, Mockito, AssertJ, etc.) to `build.gradle` or `pom.xml` is permitted — this is configuring the build for testing, not modifying source code. However, existing dependencies must not be removed or modified.
 
+#### TestNG Fix Patterns
+
+```
+Data provider mismatch fix:
+  Symptom: "Data Provider method must return Object[][] or Iterator<Object[]>"
+  Root cause: @DataProvider method returns wrong type (e.g., List<String> instead of Object[][])
+  Before:
+    @DataProvider(name = "users")
+    public List<String> userProvider() { return List.of("alice", "bob"); }
+  After:
+    @DataProvider(name = "users")
+    public Object[][] userProvider() { return new Object[][] { {"alice"}, {"bob"} }; }
+
+Missing @DataProvider annotation fix:
+  Symptom: "java.lang.IllegalArgumentException: dataProvider 'name' not found"
+  Root cause: Method exists but lacks @DataProvider annotation
+  Before:
+    public Object[][] userData() { ... }
+    @Test(dataProvider = "userData")
+    void testCreate(Object[] data) { ... }
+  After:
+    @DataProvider(name = "userData")
+    public Object[][] userData() { ... }
+    @Test(dataProvider = "userData")
+    void testCreate(Object[] data) { ... }
+
+dependsOnMethods ordering fix:
+  Symptom: Test skipped with "depends on not successfully finished methods"
+  Root cause: dependsOnMethods references a test that failed or doesn't exist
+  Before:
+    @Test(dependsOnMethods = "testInit")
+    void testProcess() { ... }  // skipped if testInit failed
+  After:
+    @Test
+    void testProcess() {
+      // Make test self-contained instead of depending on other tests
+      // Setup required state inline
+    }
+
+Circular dependency fix:
+  Symptom: "cyclic dependency detected"
+  Root cause: dependsOnMethods creates a cycle (A depends on B, B depends on A)
+  Fix: Remove dependsOnMethods entirely and make tests independent. Use
+       @BeforeMethod for shared setup instead of test-to-test dependencies.
+
+Parallel data-driven test fix:
+  Symptom: Data-driven tests fail intermittently with shared state corruption
+  Root cause: @DataProvider missing (parallel = true) or tests share mutable state
+  Before:
+    @DataProvider(name = "data")
+    public Object[][] data() { ... }
+  After:
+    @DataProvider(name = "data", parallel = true)
+    public Object[][] data() { ... }
+    // Also ensure each test method uses local variables, not shared fields
+
+Assertion import confusion fix:
+  Symptom: Compilation error "cannot find symbol: assertEquals" or wrong assertion behavior
+  Root cause: Mixed imports between TestNG Assert and JUnit Assertions
+  Before:
+    import org.junit.jupiter.api.Assertions;  // JUnit 5
+    import org.testng.annotations.Test;       // TestNG
+    @Test
+    void test() { assertEquals(1, result); }  // JUnit assertEquals(actual, expected)
+  After:
+    import org.testng.Assert;                 // TestNG
+    import org.testng.annotations.Test;
+    @Test
+    void test() { Assert.assertEquals(result, 1); }  // TestNG assertEquals(actual, expected)
+
+@BeforeSuite/@AfterSuite lifecycle fix:
+  Symptom: NullPointerException in @BeforeSuite or resource leak in @AfterSuite
+  Root cause: Suite-level setup/teardown runs once per XML suite, not per test class
+  Fix: Move per-test setup to @BeforeMethod. Reserve @BeforeSuite for one-time
+       expensive resources (database connections, embedded servers). Ensure
+       @AfterSuite cleans up resources allocated in @BeforeSuite.
+
+Mock initialization fix (TestNG + Mockito):
+  Symptom: NullPointerException when calling mock methods
+  Root cause: No MockitoExtension in TestNG — mocks must be initialized manually
+  Before:
+    @Mock
+    private UserRepository userRepo;
+    @Test
+    void testCreateUser() { userRepo.save(user); }  // NPE
+  After:
+    @Mock
+    private UserRepository userRepo;
+    @BeforeMethod
+    void setUp() { MockitoAnnotations.openMocks(this); }
+    @Test
+    void testCreateUser() { userRepo.save(user); }  // Works
+```
+
 ### Go Fix Patterns
 
 Go test fixes use either standard library `testing.T` methods or testify assertions. The fix strategy depends on whether testify is detected in `go.mod`.

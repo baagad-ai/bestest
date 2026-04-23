@@ -123,6 +123,17 @@ Multiple signals compound via noisy-OR: `confidence = min(0.99, 1 - Π(1 - w_i))
 | `*_test.go` files exist | Glob for `**/*_test.go` | Go testing in use | high (0.40) |
 | `"github.com/stretchr/testify"` in `go.mod` | Parse go.mod require | testify assertions | medium (0.20) |
 
+### TestNG (Java)
+
+| Signal | Check | Indicates | Strength |
+|--------|-------|-----------|----------|
+| `"testng"` dependency in `build.gradle` or `pom.xml` | Parse build file dependencies | TestNG test framework | high (0.40) |
+| `@Test` from `org.testng.annotations.*` imports | Grep for `import org.testng.annotations.Test` | TestNG test files present | high (0.40) |
+| `testng.xml` or `testng.yaml` suite config file | File existence check | TestNG suite configuration | medium (0.20) |
+| `useTestNG()` in Gradle build file | Parse Gradle test block | TestNG via Gradle | high (0.40) |
+| `@DataProvider` annotation in test files | Grep for `org.testng.annotations.DataProvider` | TestNG data-driven tests | medium (0.20) |
+| `@BeforeSuite` or `@AfterSuite` in test files | Grep for TestNG suite lifecycle annotations | TestNG suite lifecycle usage | low (0.08) |
+
 ## Legacy Test Framework Detection
 
 These frameworks are considered "legacy" in the sense that bestest's primary recommendation targets are Vitest (JS/TS) and pytest (Python). Detecting them is essential for brownfield init — the spoke must know what already exists so it can coexist, migrate, or replace.

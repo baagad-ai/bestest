@@ -131,6 +131,7 @@ Use the Context7 helper from SKILL.md to fetch version-specific documentation. F
 - **Spring Boot Test** (libraryName: `"spring-boot-test"`, query: `"@SpringBootTest @WebMvcTest @DataJpaTest MockMvc @MockBean TestRestTemplate"`, tokens: 5000): Spring Boot testing patterns with slice annotations and context management. Only fetched when Spring Boot is detected.
 - **AssertJ** (libraryName: `"assertj"`, query: `"assertThat assertThatThrownBy assertThatCode Assertions entry contains"`, tokens: 3000): Fluent assertion patterns for readable test assertions.
 - **Testcontainers** (libraryName: `"testcontainers-java"`, query: `"@Testcontainers @Container PostgreSQLContainer DynamicPropertySource GenericContainer"`, tokens: 3000): Testcontainers patterns for integration testing with real infrastructure. Only fetched when database or external service dependencies are detected.
+- **TestNG** (libraryName: `"testng"`, query: `"@Test @DataProvider @BeforeMethod @AfterMethod Assert assertEquals dependsOnMethods"`, tokens: 5000): TestNG patterns for test declarations, data-driven tests via @DataProvider, lifecycle hooks, and assertion methods. Only fetched when framework is testng.
 
 **Graceful fallback:** If `resolve_library` or `get_library_docs` fails, print warning and use static patterns embedded in this spoke. Context7 is an enhancement, not a requirement.
 
@@ -219,6 +220,32 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 ```
+
+### TestNG test file header (when framework is testng)
+
+```java
+package com.example.service;
+
+import org.testng.annotations.Test;
+import org.testng.Assert;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.DataProvider;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+```
+
+**Key differences from JUnit 5 when generating TestNG tests:**
+- `@Test` comes from `org.testng.annotations.Test` (not `org.junit.jupiter.api.Test`)
+- Assertions use `org.testng.Assert` (static imports: `Assert.assertEquals`, `Assert.assertTrue`) or AssertJ
+- `@DataProvider` for parameterized tests (returns `Object[][]` or `Iterator<Object[]>`), referenced via `@Test(dataProvider = "name")`
+- `dependsOnMethods` attribute on `@Test` for explicit test ordering (use sparingly — prefer independent tests)
+- Lifecycle: `@BeforeMethod` / `@AfterMethod` (per-test), `@BeforeClass` / `@AfterClass` (per-class), `@BeforeSuite` / `@AfterSuite` (per-suite)
+- No `@ExtendWith` — TestNG has its own listener model (`ITestListener`, `IInvokedMethodListener`)
+- Mocking: use `@Mock` + `@InjectMocks` with `MockitoAnnotations.openMocks(this)` in `@BeforeMethod` (no MockitoExtension)
 
 ### Mocking approach summary
 

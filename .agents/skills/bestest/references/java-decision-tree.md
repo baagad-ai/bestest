@@ -24,6 +24,34 @@ Has useJUnitPlatform() in build.gradle or junit-jupiter in pom.xml?
 └─ NO → Proceed to Step 2
 ```
 
+### Step 1b: Check for Existing TestNG
+
+```
+Has useTestNG() in build.gradle or testng dependency in pom.xml or testng.xml suite file?
+├─ YES → Evaluate TestNG usage depth
+│         ├─ Has >30 test classes with @DataProvider, dependsOnMethods, suite configs? → Keep TestNG
+│         │   Rationale: Heavy TestNG investment. Migration cost exceeds benefit for established suites.
+│         │   Coverage: JaCoCo (same as JUnit 5 — Gradle jacoco plugin or Maven jacoco-maven-plugin)
+│         │   Config file: build.gradle (test block with useTestNG()) or pom.xml + testng.xml
+│         │
+│         ├─ Has <30 test classes, mostly simple @Test annotations? → Recommend JUnit 5 migration
+│         │   Rationale: Small TestNG footprint. JUnit 5 migration is mechanical:
+│         │   1. Replace org.testng.annotations.Test → org.junit.jupiter.api.Test
+│         │   2. Replace Assert.assertEquals(a, b) → Assertions.assertEquals(b, a) (note argument order swap)
+│         │   3. Replace @DataProvider → @ParameterizedTest + @MethodSource
+│         │   4. Replace dependsOnMethods → independent tests with @BeforeEach setup
+│         │   5. Replace @BeforeSuite/@AfterSuite → @BeforeAll/@AfterAll
+│         │   6. Update build.gradle: useTestNG() → useJUnitPlatform()
+│         │   7. Add MockitoExtension for mock initialization (replaces manual openMocks)
+│         │
+│         └─ Has complex TestNG-specific features (parallel data providers, XML suite configs,
+│             custom listeners, dependency groups)? → Keep TestNG for those suites
+│             Rationale: TestNG's parallel @DataProvider and XML suite configuration have no
+│             direct JUnit 5 equivalents. Keep TestNG where these features are essential.
+│
+└─ NO → Proceed to Step 2
+```
+
 ### Step 2: Check for JUnit 4
 
 ```
@@ -248,6 +276,10 @@ Determine coverage approach:
 | @WebMvcTest detected → Controller slice testing | 0.90+ | Spring's recommended controller test pattern |
 | @DataJpaTest detected → Repository slice testing | 0.90+ | Spring's recommended repository test pattern |
 | Testcontainers detected → Integration test infra | 0.85+ | Best practice for DB integration tests |
+| Existing TestNG, >30 classes → Keep TestNG | 0.85+ | Heavy investment, migration cost exceeds benefit |
+| Existing TestNG, <30 classes → Migrate to JUnit 5 | 0.80+ | Small footprint, mechanical migration |
+| Both JUnit 5 + TestNG → JUnit 5 primary | 0.80+ | Standardize on JUnit 5, keep TestNG for specific suites |
+| New project → JUnit 5 over TestNG | 0.90+ | Modern standard, better Spring Boot integration, larger community |
 
 ## Decision Summary Table
 
@@ -264,6 +296,12 @@ Determine coverage approach:
 | Existing JUnit 4 (Maven) | JUnit 5 + Vintage | Mockito | JaCoCo | Mixed JUnit 4/5 | `pom.xml` |
 | Existing JUnit 5 (Gradle) | JUnit 5 (keep) | Mockito | JaCoCo | Full JUnit 5 feature set | Existing config |
 | Existing JUnit 5 (Maven) | JUnit 5 (keep) | Mockito | JaCoCo | Full JUnit 5 feature set | Existing config |
+| Existing TestNG, >30 classes (Gradle) | TestNG (keep) | Mockito | JaCoCo | @Test, @DataProvider, @BeforeMethod | `build.gradle` + `testng.xml` |
+| Existing TestNG, >30 classes (Maven) | TestNG (keep) | Mockito | JaCoCo | @Test, @DataProvider, @BeforeMethod | `pom.xml` + `testng.xml` |
+| Existing TestNG, <30 classes (Gradle) | Migrate to JUnit 5 | Mockito | JaCoCo | @Test, @ParameterizedTest, @Nested | `build.gradle` |
+| Existing TestNG, <30 classes (Maven) | Migrate to JUnit 5 | Mockito | JaCoCo | @Test, @ParameterizedTest, @Nested | `pom.xml` |
+| JUnit 5 + TestNG both detected (Gradle) | JUnit 5 primary | Mockito | JaCoCo | JUnit 5 for new, TestNG for legacy suites | `build.gradle` |
+| JUnit 5 + TestNG both detected (Maven) | JUnit 5 primary | Mockito | JaCoCo | JUnit 5 for new, TestNG for legacy suites | `pom.xml` |
 | Monorepo (Gradle) | JUnit 5 per module | Mockito | JaCoCo per module | Per-module testing | Root `settings.gradle` + per-module `build.gradle` |
 
 ## ADR Template
@@ -300,7 +338,7 @@ coverage via the Gradle plugin."
 
 ## Alternatives Considered
 - **JUnit 4**: [Legacy, no extension model, @Rule-based workarounds, no nested tests]
-- **TestNG**: [Flexible but less Spring Boot integration, smaller community]
+- **TestNG**: [Flexible data-driven testing and suite configuration, but less Spring Boot integration, smaller community, no extension model like JUnit 5]
 - **Spock**: [Groovy-based, excellent for specification-style tests, but adds Groovy dependency]
 ```
 
@@ -338,3 +376,7 @@ The decision tree is deterministic: the same StackProfile always produces the sa
 | Coverage | jacoco (Gradle plugin / Maven plugin) | Line and branch coverage for JVM |
 | Parallel execution | junit-platform-launcher config | junit.platform.execution.parallel.enabled=true |
 | Legacy JUnit 4 compat | junit-vintage-engine | Run JUnit 4 tests on JUnit 5 Platform |
+| TestNG testing | testng | TestNG core library for data-driven and suite-based testing |
+| TestNG + Mockito | testng + mockito-core | TestNG tests with Mockito mocking (manual openMocks in @BeforeMethod) |
+| TestNG data-driven | testng @DataProvider | Parameterized tests via @DataProvider returning Object[][] |
+| TestNG suite config | testng.xml / testng.yaml | Suite-level test grouping, listeners, and parallel execution |

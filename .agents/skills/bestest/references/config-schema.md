@@ -8,7 +8,7 @@ Complete schema for `.bestest/config.yaml`. This file is the single source of tr
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `framework` | string | — | Test framework: `vitest`, `jest`, `mocha`, `jasmine`, `pytest`, `junit5`, or `go_testing`. **Required.** |
+| `framework` | string | — | Test framework: `vitest`, `jest`, `mocha`, `jasmine`, `pytest`, `junit5`, `testng`, or `go_testing`. **Required.** |
 | `language` | string | auto-detected | Primary language: `javascript`, `typescript`, `python`, `java`, or `go`. Auto-detected during init if not set. |
 | `version` | string | `"1.0"` | Schema version. Managed by bestest — do not edit. |
 
@@ -186,6 +186,23 @@ JUnit 5-specific configuration. Only used when `framework` is `junit5`.
 | `junit5.parallel_execution` | boolean | `false` | `true`, `false` | Enable JUnit 5 parallel test execution |
 | `junit5.java_version` | string | auto-detected | Java version strings | Source compatibility version (from `sourceCompatibility` or `"17"`) |
 
+### `testng.*`
+
+TestNG-specific configuration. Only used when `framework` is `testng`.
+
+| Field | Type | Default | Valid Values | Description |
+|-------|------|---------|--------------|-------------|
+| `testng.build_tool` | string | `"gradle"` | `gradle`, `maven` | Build tool for test execution and dependency management |
+| `testng.test_src_dir` | string | `"src/test/java"` | Any directory path | Path to test source root |
+| `testng.main_src_dir` | string | `"src/main/java"` | Any directory path | Path to main source root (coverage target) |
+| `testng.dependency_management` | string | `"gradle"` | `gradle`, `maven` | How to declare and resolve dependencies |
+| `testng.coverage_provider` | string | `"jacoco"` | `jacoco` | Coverage instrumentation provider |
+| `testng.suite_xml` | string or null | `null` | Any file path | Path to testng.xml or testng.yaml suite configuration file |
+| `testng.test_annotations` | string[] | `["@Test", "@DataProvider", "@BeforeMethod", "@AfterMethod"]` | TestNG annotations | Annotations available for generated tests |
+| `testng.parallel_execution` | boolean | `false` | `true`, `false` | Enable parallel test execution via @DataProvider(parallel=true) or suite config |
+| `testng.java_version` | string | auto-detected | Java version strings | Source compatibility version (from `sourceCompatibility` or `"17"`) |
+| `testng.assertion_library` | string | `"testng"` | `testng`, `assertj` | Assertion library: `testng` for org.testng.Assert, `assertj` for AssertJ fluent assertions |
+
 ### `go.*`
 
 Go-specific configuration. Only used when `framework` is `go_testing`.
@@ -329,6 +346,24 @@ Key behaviors:
 - Spring Boot projects: `spring-boot-starter-test` provides JUnit 5 + Mockito + AssertJ automatically
 - Test annotations include `@Test`, `@ParameterizedTest`, and `@Nested` by default
 - `parallel_execution` is off by default; enable for large test suites via `junit-platform.properties`
+
+### When `framework: testng`
+
+The `testng.*` block is active. The `vitest.*`, `jest.*`, `pytest.*`, and `junit5.*` blocks are ignored. Coverage defaults to `jacoco` provider. Config lives in `build.gradle` (test block with `useTestNG()`) or `pom.xml` (maven-surefire-plugin with TestNG provider).
+
+Key behaviors:
+- `build_tool` determines test execution: `./gradlew test` for Gradle, `mvn test` for Maven
+- Gradle: `test { useTestNG() }` must be configured in build.gradle (not `useJUnitPlatform()`)
+- Maven: TestNG is auto-detected by surefire when testng is on the classpath; use `-Dsurefire.suiteXmlFiles=testng.xml` for suite-based runs
+- `suite_xml` points to a testng.xml or testng.yaml file for suite-based test configuration (groups, listeners, parallel settings)
+- `test_src_dir` defaults to `src/test/java` (Maven/Gradle standard layout)
+- `java_version` is auto-detected from `sourceCompatibility` in build.gradle or `java.version` in pom.xml, defaults to `"17"`
+- Coverage uses JaCoCo: `./gradlew jacocoTestReport` (Gradle) or `mvn verify` (Maven) — same as JUnit 5
+- TestNG output: `test-output/testng-results.xml` (native) or `build/test-results/test/` (Gradle) or `target/surefire-reports/` (Maven)
+- Test annotations include `@Test`, `@DataProvider`, `@BeforeMethod`, and `@AfterMethod` by default
+- `parallel_execution` enables parallel data-driven tests via `@DataProvider(parallel = true)`
+- Mocking: Mockito with manual initialization in `@BeforeMethod` via `MockitoAnnotations.openMocks(this)` (no extension model)
+- `assertion_library` defaults to `testng` (org.testng.Assert); use `assertj` for fluent assertions
 
 ### When `framework: go_testing`
 

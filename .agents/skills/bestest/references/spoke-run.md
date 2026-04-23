@@ -650,6 +650,111 @@ Timeout:
   Default process timeout: 300 seconds (same as JS/TS and Python)
 ```
 
+### Build Gradle/Maven Test Command (Java/TestNG)
+
+TestNG uses the same Gradle/Maven build tools as JUnit 5, but with different configuration. Detection is based on TestNG-specific signals rather than JUnit Platform.
+
+```
+Pre-requisite: TestNG Detection
+
+Before building the command, detect TestNG in the project:
+
+1. Check build.gradle for TestNG:
+   - Look for testImplementation 'org.testng:testng' dependency
+   - Look for useTestNG() in the test block (instead of useJUnitPlatform())
+
+2. Check pom.xml for TestNG:
+   - Look for <groupId>org.testng</groupId> <artifactId>testng</artifactId> dependency
+   - Look for testng.xml or testng.yaml suite config file in project root
+
+3. Check source imports:
+   - Look for org.testng.annotations.Test imports in src/test/java/**/*.java
+
+If TestNG detected:
+  Print: "TestNG detected via {detection_source}. Using TestNG configuration."
+
+Gradle command:
+  Base: ./gradlew test --no-daemon
+  Note: build.gradle must have useTestNG() in the test block (not useJUnitPlatform())
+  Test class filter: --tests "com.example.ServiceTest"
+  Suite filter:
+    Via testng.xml: add -Dsuitexml=testng.xml to JVM args via test.systemProperty
+    Via test block: useTestNG { suites = ['testng.xml'] }
+    Groups: useTestNG { includeGroups = ['unit'] } or -Dgroups=unit
+  Coverage (JaCoCo): append jacocoTestReport (same as JUnit 5)
+  Parallel: --parallel --max-workers=N
+
+  Full command example:
+    ./gradlew test --no-daemon --tests "com.example.ServiceTest" jacocoTestReport
+
+Maven command:
+  Base: ./mvnw test
+  Test class filter: -Dtest=ServiceTest
+  Suite filter:
+    Via testng.xml: -Dsurefire.suiteXmlFiles=testng.xml
+    Groups: -Dgroups=unit
+  Coverage (JaCoCo): jacoco:report goal (same as JUnit 5)
+
+  Full command example:
+    ./mvnw test -Dtest=ServiceTest jacoco:report
+
+Timeout:
+  Gradle: no native --timeout flag per test. Set process-level timeout in Phase 3.
+  Maven: -Dsurefire.timeout=<seconds> for per-test timeout
+  Default process timeout: 300 seconds (same as JUnit 5)
+```
+
+### TestNG XML Output Parsing
+
+TestNG produces its own XML output format (`testng-results.xml`) which differs from JUnit XML. When TestNG is detected, use TestNG XML parsing instead of JUnit XML parsing.
+
+**TestNG XML output locations:**
+- Gradle: `build/reports/tests/test/` (contains both JUnit XML and TestNG-format output)
+- Maven: `target/surefire-reports/` (Surefire can output both formats)
+- TestNG native: `test-output/testng-results.xml` (when run directly via TestNG)
+
+**TestNG XML structure:**
+```xml
+<testng-results skipped="1" failed="1" total="5" passed="3">
+  <suite name="Suite1" duration-ms="234">
+    <test name="Test1" duration-ms="234">
+      <class name="com.example.ServiceTest">
+        <test-method name="testCreate" signature="testCreate()[pri:0, instance:com.example.ServiceTest@abc]" status="PASS" duration-ms="45" />
+        <test-method name="testDelete" signature="testDelete()[pri:0, instance:com.example.ServiceTest@abc]" status="FAIL" duration-ms="12">
+          <exception class="java.lang.AssertionError">
+            <message><![CDATA[expected [201] but found [200]]]></message>
+            <full-stacktrace>Stack trace content...</full-stacktrace>
+          </exception>
+        </test-method>
+        <test-method name="testList" signature="testList()[pri:0, instance:com.example.ServiceTest@abc]" status="SKIP" duration-ms="0">
+          <exception class="org.testng.SkipException">
+            <message><![CDATA[Skipped due to dependency failure]]></message>
+          </exception>
+        </test-method>
+      </class>
+    </test>
+  </suite>
+</testng-results>
+```
+
+**TestNG XML field mapping:**
+
+| TestNG XML Field | run-results.json Field | Transformation |
+|-----------------|----------------------|----------------|
+| `testng-results.total` | `summary.totalTests` | Direct |
+| `testng-results.passed` | `summary.passed` | Direct |
+| `testng-results.failed` | `summary.failed` | Direct |
+| `testng-results.skipped` | `summary.skipped` | Direct |
+| `test-method/@name` | `tests[].cases[].name` | Direct |
+| `test-method/@duration-ms` | `tests[].cases[].durationMs` | Direct (already in ms) |
+| `test-method/@status` | `tests[].cases[].status` | `PASS` → `"passed"`, `FAIL` → `"failed"`, `SKIP` → `"skipped"` |
+| `test-method/exception/message` | `tests[].cases[].error` | Extract from CDATA |
+| `test-method/exception/@class` | `tests[].cases[].errorType` | Direct |
+| `class/@name` | `tests[].filePath` | Convert class name to file path |
+| `suite/@duration-ms` | `summary.durationMs` | Sum of suite durations |
+
+**Fallback:** If TestNG XML is not found at expected paths, fall back to console output parsing (same strategy as JUnit 5 Gradle/Maven console fallback). Set `language: "java"` and `framework: "testng"` in the results.
+
 ### Build Go Test Command (Go/testing)
 
 Go uses the built-in `go test` tool. There is no separate test framework to install — the Go toolchain includes testing support natively. testify is an optional assertion library.
