@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-SKILL_DIR="$HOME/.agents/skills/bestest"
+SKILL_DIR="${SKILL_DIR:-$HOME/.agents/skills/bestest}"
 SKILL_FILE="$SKILL_DIR/SKILL.md"
 ERROR_CODES="$SKILL_DIR/references/error-codes.md"
 

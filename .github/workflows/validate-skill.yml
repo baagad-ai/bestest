@@ -11,13 +11,13 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      SKILL_DIR: ${{ github.workspace }}/.agents/skills/bestest
     steps:
-      - name: Checkout skill
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          path: '.agents/skills/bestest'
 
       - name: Run validation script
         run: |
-          chmod +x "$HOME/.agents/skills/bestest/scripts/validate-skill.sh"
-          "$HOME/.agents/skills/bestest/scripts/validate-skill.sh"
+          chmod +x "$SKILL_DIR/scripts/validate-skill.sh"
+          "$SKILL_DIR/scripts/validate-skill.sh"
