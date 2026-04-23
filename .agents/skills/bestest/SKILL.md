@@ -201,12 +201,13 @@ All reference files are relative to `~/.agents/skills/bestest/`.
 | `references/spoke-migrate.md` | `/bestest migrate` |
 | `references/spoke-ci.md` | `/bestest ci` |
 
-### Schemas (3)
+### Schemas (4)
 | File | Description |
 |------|-------------|
 | `references/config-schema.md` | Complete schema for `.bestest/config.yaml` — single source of truth for all spoke commands |
 | `references/scan-report-schema.md` | JSON schema for scan reports written to `.bestest/reports/scan-<timestamp>.json` |
 | `references/schema-contract.md` | Versioning policy for all bestest schema artifacts with `schemaVersion` field validation |
+| `references/metrics-schema.md` | Canonical schema for `.bestest/state/metrics.json` — continuously-updated metrics store aggregated from every state-changing spoke |
 
 ### Generation Guides (3)
 | File | Description |

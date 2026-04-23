@@ -1520,6 +1520,40 @@ Print a human-readable summary of the fix results:
 
 ---
 
+## Metrics Update
+
+After Phase 5 completes and all artifacts are written, update `.bestest/state/metrics.json` per the shared protocol in `references/metrics-schema.md`. The fix spoke updates test counts, run history, failure tracking, and activity after applying fixes.
+
+### Protocol
+
+1. **Read `.bestest/state/metrics.json`** — If the file does not exist, treat as first-time creation with defaults from `metrics-schema.md`.
+2. **Parse** — If parsing fails (corruption), log a warning and reinitialize with defaults plus current fix data. **Never abort the spoke** — metrics are observability, not a gate.
+3. **Validate `schemaVersion`** — Warn if MAJOR version differs; proceed if MINOR differs.
+4. **Merge spoke-specific data** (see field mapping below).
+5. **Recalculate derived values** — `healthScore.breakdown.passRate`, `healthScore.breakdown.freshness`, `healthScore.overall`.
+6. **Write back** — Atomic write (write to temp file, then rename).
+7. **Update `config.yaml`** — Set `state.last_metrics` to current ISO 8601 timestamp.
+
+### Fields Updated by spoke-fix
+
+| Metrics Section | Source Data | Merge Logic |
+|----------------|------------|-------------|
+| `tests` | Post-fix verification results | Replace `total`, `passing`, `failing`, `skipped` with counts from the verification run. |
+| `runs.total` | Cumulative | Increment by 1. |
+| `runs.history[]` | Fix verification run | Append entry: `{ timestamp, spoke: "spoke-fix", total, passed, failed, skipped, duration_ms, coverage }`. Evict oldest entries exceeding `historyMaxLength` (100). |
+| `failures.heatMap[]` | Fixed test files | For each file where fix was applied AND verified: decrement `count` by 1 (if > 0). Remove entries where `count` reaches 0. For files where fix failed: leave unchanged. |
+| `healthScore.breakdown.passRate` | `tests.passing / max(tests.total, 1)` | Recalculate. |
+| `healthScore.breakdown.freshness` | Current time vs `lastUpdated` | Set to 1.0 (just updated). |
+| `healthScore.overall` | Average of non-null breakdown scores | Recalculate. |
+| `activity[]` | Fix summary | Append `{ timestamp, spoke: "spoke-fix", action: "fix", summary: "{fixedCount} tests fixed, {failedCount} fix failures" }`. Evict oldest entries exceeding `activityMaxLength` (200). |
+| `lastUpdated` | Current time | Set to current ISO 8601 timestamp. |
+
+### Bounded Array Eviction
+
+All arrays use FIFO eviction: append new entry to end, then remove from beginning if length exceeds `*maxLength`. See `metrics-schema.md` → Bounded Array Eviction for the canonical algorithm.
+
+---
+
 ## Error Handling
 
 ### 1. No Failures Found

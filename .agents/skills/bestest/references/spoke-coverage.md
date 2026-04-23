@@ -715,6 +715,39 @@ The `gaps[]` array from Phase 2 uses the same schema as `scan-report-schema.md` 
 
 ---
 
+## Metrics Update
+
+After Phase 4 completes and all artifacts are written, update `.bestest/state/metrics.json` per the shared protocol in `references/metrics-schema.md`. The coverage spoke updates coverage data, health score, module-level breakdowns, and activity.
+
+### Protocol
+
+1. **Read `.bestest/state/metrics.json`** — If the file does not exist, treat as first-time creation with defaults from `metrics-schema.md`.
+2. **Parse** — If parsing fails (corruption), log a warning and reinitialize with defaults plus current coverage data. **Never abort the spoke** — metrics are observability, not a gate.
+3. **Validate `schemaVersion`** — Warn if MAJOR version differs; proceed if MINOR differs.
+4. **Merge spoke-specific data** (see field mapping below).
+5. **Recalculate derived values** — `healthScore.breakdown.coverage`, `healthScore.breakdown.freshness`, `healthScore.overall`.
+6. **Write back** — Atomic write (write to temp file, then rename).
+7. **Update `config.yaml`** — Set `state.last_metrics` to current ISO 8601 timestamp.
+
+### Fields Updated by spoke-coverage
+
+| Metrics Section | Source Data | Merge Logic |
+|----------------|------------|-------------|
+| `coverage.current` | Phase 1 aggregate coverage | Replace with latest coverage snapshot (`lines`, `branches`, `functions`, `statements`). |
+| `coverage.trend[]` | `coverage.current` after update | Append new coverage snapshot with timestamp. Evict oldest entries exceeding `trendMaxLength` (50). |
+| `healthScore.breakdown.coverage` | `coverage.current.lines / coverage.target` | Recalculate. Cap at 1.0. |
+| `healthScore.breakdown.freshness` | Current time vs `lastUpdated` | Set to 1.0 (just updated). |
+| `healthScore.overall` | Average of non-null breakdown scores | Recalculate. |
+| `modules.entries[]` | Phase 2 per-file coverage data | Update coverage for modules present in the gaps analysis. Replace entries for modules with new data; leave existing entries for untouched modules unchanged. |
+| `activity[]` | Coverage summary | Append `{ timestamp, spoke: "spoke-coverage", action: "coverage", summary: "{totalGaps} gaps found ({overallStatus}), {linesPct}% lines coverage" }`. Evict oldest entries exceeding `activityMaxLength` (200). |
+| `lastUpdated` | Current time | Set to current ISO 8601 timestamp. |
+
+### Bounded Array Eviction
+
+All arrays use FIFO eviction: append new entry to end, then remove from beginning if length exceeds `*maxLength`. See `metrics-schema.md` → Bounded Array Eviction for the canonical algorithm.
+
+---
+
 ## Error Handling
 
 ### 1. No data source found

@@ -1982,6 +1982,34 @@ If TESTING.md exists:
 
 ---
 
+## Metrics Update
+
+After Phase 7 (Finalization) completes and all artifacts are written, update `.bestest/state/metrics.json` per the shared protocol in `references/metrics-schema.md`. The migrate spoke logs migration activity and records a run entry for the post-migration verification.
+
+### Protocol
+
+1. **Read `.bestest/state/metrics.json`** — If the file does not exist, treat as first-time creation with defaults from `metrics-schema.md`.
+2. **Parse** — If parsing fails (corruption), log a warning and reinitialize with defaults plus current migration data. **Never abort the spoke** — metrics are observability, not a gate.
+3. **Validate `schemaVersion`** — Warn if MAJOR version differs; proceed if MINOR differs.
+4. **Merge spoke-specific data** (see field mapping below).
+5. **Write back** — Atomic write (write to temp file, then rename).
+6. **Update `config.yaml`** — Set `state.last_metrics` to current ISO 8601 timestamp.
+
+### Fields Updated by spoke-migrate
+
+| Metrics Section | Source Data | Merge Logic |
+|----------------|------------|-------------|
+| `runs.total` | Cumulative | Increment by 1 (post-migration verification run counts as a run). |
+| `runs.history[]` | Post-migration verification results | Append entry: `{ timestamp, spoke: "spoke-migrate", total, passed, failed, skipped, duration_ms, coverage }`. Evict oldest entries exceeding `historyMaxLength` (100). |
+| `activity[]` | Migration summary | Append `{ timestamp, spoke: "spoke-migrate", action: "migrate", summary: "Migrated {from} → {to}: {successCount}/{totalCount} files transformed, {failedCount} failures" }`. Evict oldest entries exceeding `activityMaxLength` (200). |
+| `lastUpdated` | Current time | Set to current ISO 8601 timestamp. |
+
+### Bounded Array Eviction
+
+All arrays use FIFO eviction: append new entry to end, then remove from beginning if length exceeds `*maxLength`. See `metrics-schema.md` → Bounded Array Eviction for the canonical algorithm.
+
+---
+
 ## Error Handling
 
 ### 1. Git not initialized

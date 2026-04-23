@@ -361,6 +361,34 @@ Update .bestest/config.yaml:
 
 ---
 
+## Metrics Update
+
+After the HITL gate completes and all artifacts are written, update `.bestest/state/metrics.json` per the shared protocol in `references/metrics-schema.md`. The generate (Python) spoke updates test counts and logs generation activity.
+
+### Protocol
+
+1. **Read `.bestest/state/metrics.json`** — If the file does not exist, treat as first-time creation with defaults from `metrics-schema.md`.
+2. **Parse** — If parsing fails (corruption), log a warning and reinitialize with defaults plus current generation data. **Never abort the spoke** — metrics are observability, not a gate.
+3. **Validate `schemaVersion`** — Warn if MAJOR version differs; proceed if MINOR differs.
+4. **Merge spoke-specific data** (see field mapping below).
+5. **Write back** — Atomic write (write to temp file, then rename).
+6. **Update `config.yaml`** — Set `state.last_metrics` to current ISO 8601 timestamp.
+
+### Fields Updated by spoke-generate-python
+
+| Metrics Section | Source Data | Merge Logic |
+|----------------|------------|-------------|
+| `tests.total` | Generated test count | Increment by number of new test functions generated across all files. |
+| `tests.passing` | Post-generation verification | Increment by number of generated tests that passed verification. |
+| `activity[]` | Generation summary | Append `{ timestamp, spoke: "spoke-generate-python", action: "generate", summary: "{fileCount} Python files generated ({testCount} tests, avg quality {avgScore})" }`. Evict oldest entries exceeding `activityMaxLength` (200). |
+| `lastUpdated` | Current time | Set to current ISO 8601 timestamp. |
+
+### Bounded Array Eviction
+
+All arrays use FIFO eviction: append new entry to end, then remove from beginning if length exceeds `*maxLength`. See `metrics-schema.md` → Bounded Array Eviction for the canonical algorithm.
+
+---
+
 ## Error Handling
 
 > **On-demand load:** For all error handling scenarios (no targets found, source syntax errors, Context7 unavailable, pytest not installed, virtual environment not activated, max retries exceeded, coverage tool fails, missing __init__.py, large files, existing test conflicts, monorepo configs), read `references/generate/python/error-handling.md`. Each scenario includes trigger conditions and prescribed responses.
