@@ -111,9 +111,10 @@ All reference files are relative to `~/.agents/skills/bestest/`.
 |------|-------------|
 | `references/migration-rules.md` | Transformation rule catalog for jest→vitest, junit4→junit5, cypress→playwright |
 
-## Reference Infrastructure (3)
+## Reference Infrastructure (4)
 | File | Description |
 |------|-------------|
+| `references/reference-index.md` | Complete catalog of all reference files across 12 categories |
 | `references/quick_reference.md` | On-demand quick reference extracted from SKILL.md for reduced token loading *(created by T02)* |
-| `references/pre-flight-protocol.md` | Shared validation pattern referenced by all generate spokes *(created by T03)* |
+| `references/pre-flight-protocol.md` | Shared validation pattern referenced by all spokes *(created by T03)* |
 | `references/dot-bestest-schema.md` | Full `.bestest/` directory tree documentation *(created by T04)* |

@@ -15,27 +15,11 @@ The scan is non-destructive: it never modifies source code or test files. It rea
 
 ## Pre-Flight Checks
 
-Run these checks before starting any analysis work. They guard against invalid states and give the user early, actionable feedback.
+> **Shared protocol:** This spoke uses the **Standard 3-Step `.bestest/` Validation** + **Scan/Run-Specific Additions** from `references/pre-flight-protocol.md`. Read that document for the full validation specification (Steps 1–3 baseline + Steps A–B for StackProfile warning and test framework installation check).
 
-### 1. Check for `.bestest/` with valid config
+Spoke-specific details beyond the shared protocol:
 
-```
-If .bestest/ does not exist:
-  Print: "No .bestest/ directory found. Run /bestest init first to set up testing infrastructure."
-  Exit. No scan performed.
-
-If .bestest/config.yaml does not exist:
-  Print: ".bestest/config.yaml is missing. The config file is required for scan."
-  Print: "Run /bestest init to regenerate it, or restore it from version control."
-  Exit.
-
-If .bestest/config.yaml exists but is invalid YAML:
-  Print: ".bestest/config.yaml contains invalid YAML and cannot be parsed."
-  Print: "Fix the syntax error and re-run /bestest scan."
-  Exit.
-```
-
-### 2. Check for StackProfile
+### StackProfile (warning, non-blocking)
 
 ```
 If .bestest/state/stack-profile.json does not exist:
@@ -48,7 +32,7 @@ Else:
   Set mode = "full"
 ```
 
-### 3. Check test framework is installed
+### Test framework installation check
 
 ```
 Read config.yaml → framework field.

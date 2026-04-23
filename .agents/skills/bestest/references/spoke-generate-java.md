@@ -17,13 +17,11 @@ The generate spoke is the primary value delivery command — it transforms scan 
 
 ## Pre-Flight Checks
 
-### 1. Check for `.bestest/` with valid config
+> **Shared protocol:** This spoke uses the **Standard 3-Step `.bestest/` Validation** + **Generate-Specific Additions** from `references/pre-flight-protocol.md`. Read that document for the full validation specification (Steps 1–3 baseline + Steps A–E generate additions).
 
-```
-If .bestest/ does not exist or config.yaml is missing/invalid:
-  Print appropriate error with guidance (run /bestest init).
-  Exit.
-```
+Spoke-specific details beyond the shared protocol:
+
+### Generation config fields
 
 Parse `generation.*` fields from config (see `references/config-schema.md` for full schema):
 
@@ -34,51 +32,25 @@ Parse `generation.*` fields from config (see `references/config-schema.md` for f
 | `generation.verify_pass` | boolean | `true` | Whether Phase 6 (execution check) runs. Skip to generate without running tests. |
 | `generation.max_retries` | number | `2` | Maximum fix-and-rerun attempts in Phase 6 when generated tests fail. |
 
-Verify that `config.yaml` has `framework: junit5` and `language: java`. If `framework` is something else (vitest, jest, pytest), route to the appropriate generation spoke instead.
+### Java-specific checks
 
-### 2. Check for Java environment
+Verify that `config.yaml` has `framework: junit5` and `language: java`. If `framework` is something else (vitest, jest, pytest), route to the appropriate generation spoke instead.
 
 Verify JDK 11+ is available (`java -version`, `javac -version`, `JAVA_HOME`). Verify Gradle (`gradlew`/`build.gradle`) or Maven (`mvnw`/`pom.xml`). Verify JUnit 5 in dependencies. On failure, print install guidance and exit. On warning (wrong version, missing JUnit 5 config), continue in degraded mode.
 
 > **On-demand load:** Full JDK detection logic, Maven/Gradle dual-path resolution, and annotation processor detection → `references/generate/java/phase1-target-detail.md` → "Java Environment Detection Detail" section.
 
-### 3. Check for StackProfile
+### Java StackProfile extraction
+
+When StackProfile exists, extract Java-specific fields beyond the shared protocol:
 
 ```
-If .bestest/state/stack-profile.json does not exist:
-  Print: "Warning: StackProfile not found."
-  Set framework = detect from build file dependencies and source annotations.
-Else:
-  Read and parse StackProfile JSON. Extract testFrameworks, coverage, web framework, build tool.
-  If JSON parsing fails → see state corruption handling in references/generate/java/phase1-target-detail.md.
+Extract testFrameworks, coverage, web framework, build tool.
+If JSON parsing fails → see state corruption handling in references/generate/java/phase1-target-detail.md.
+If StackProfile not found: Set framework = detect from build file dependencies and source annotations.
 ```
 
 > **On-demand load:** State corruption handling, schema version validation logic → `references/generate/java/phase1-target-detail.md`.
-
-### 4. Confidence Gate
-
-Confidence gate: See SKILL.md "Confidence Gate (R5)" — the orchestrator checks confidence before loading this spoke. If you reached this spoke, confidence already passed the gate.
-
-### 5. Check for scan report
-
-```
-If no scan report exists:
-  Print: "Warning: No scan report found. Generation will use filesystem scanning."
-  Set mode = "filesystem-scan", gaps = [], testInventory = [].
-Else:
-  Load most recent scan report. Extract gaps[], testInventory[], configSnapshot.
-  Set mode = "scan-guided".
-```
-
-### 6. Validate artifact schemaVersions
-
-```
-Validate stack-profile.json schemaVersion ≤ 1.3 and scan-report.json schemaVersion ≤ 1.2.
-If MAJOR version differs → error and exit. If MINOR version higher → warn and continue.
-If missing → treat as "1.0" legacy.
-```
-
-> **On-demand load:** Full schema version validation algorithm → `references/generate/java/phase1-target-detail.md` → "Schema version validation" section.
 
 ---
 

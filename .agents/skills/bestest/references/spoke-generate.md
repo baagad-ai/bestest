@@ -15,15 +15,11 @@ The generate spoke is the primary value delivery command — it transforms scan 
 
 ## Pre-Flight Checks
 
-Run these checks before starting any generation work. They validate the environment, configuration, and data sources needed for the 7-phase pipeline.
+> **Shared protocol:** This spoke uses the **Standard 3-Step `.bestest/` Validation** + **Generate-Specific Additions** from `references/pre-flight-protocol.md`. Read that document for the full validation specification (Steps 1–3 baseline + Steps A–E generate additions).
 
-### 1. Check for `.bestest/` with valid config
+Spoke-specific details beyond the shared protocol:
 
-```
-If .bestest/ does not exist or config.yaml is missing/invalid:
-  Print appropriate error with guidance (run /bestest init).
-  Exit.
-```
+### Generation config fields
 
 Parse `generation.*` fields from config (see `references/config-schema.md` for full schema):
 
@@ -33,43 +29,6 @@ Parse `generation.*` fields from config (see `references/config-schema.md` for f
 | `generation.verify_compilation` | boolean | `true` | Whether Phase 5 (compilation check) runs. Skip to speed up generation at the cost of type safety. |
 | `generation.verify_pass` | boolean | `true` | Whether Phase 6 (execution check) runs. Skip to generate without running tests. |
 | `generation.max_retries` | number | `2` | Maximum fix-and-rerun attempts in Phase 6 when generated tests fail. |
-
-### 2. Check for StackProfile
-
-```
-If .bestest/state/stack-profile.json does not exist:
-  Print: "Warning: StackProfile not found. Will attempt framework detection from package.json."
-  Set framework = detect from package.json devDependencies.
-Else:
-  Read and parse StackProfile JSON.
-  Extract testFrameworks.existing, coverage.provider, monorepo, frontend, languages.
-  If JSON parsing fails → see state corruption handling in references/generate/phase1-target-detail.md.
-```
-
-### 3. Confidence Gate
-
-Confidence gate: See SKILL.md "Confidence Gate (R5)" — the orchestrator checks confidence before loading this spoke. If you reached this spoke, confidence already passed the gate.
-
-### 4. Check for scan report
-
-```
-If no scan report exists in .bestest/reports/:
-  Print: "Warning: No scan report found. Generation will use filesystem scanning."
-  Set mode = "filesystem-scan", gaps = [], testInventory = [].
-Else:
-  Load most recent scan report. Extract gaps[], testInventory[], configSnapshot.
-  Set mode = "scan-guided".
-```
-
-### 5. Validate artifact schemaVersions
-
-```
-Validate stack-profile.json schemaVersion ≤ 1.3 and scan-report.json schemaVersion ≤ 1.2.
-If MAJOR version differs → error and exit.
-If MINOR exceeds expected → warning and continue.
-If missing → treat as "1.0" legacy. Continue.
-See references/generate/phase1-target-detail.md for full validation algorithm.
-```
 
 ---
 

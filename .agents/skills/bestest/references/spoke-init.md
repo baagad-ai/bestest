@@ -12,39 +12,9 @@ Full audit and scaffold of the testing infrastructure for a multi-language repos
 
 ## Pre-Flight Checks
 
-Run these checks before starting any detection work. They guard against invalid states and give the user early feedback.
+> **Shared protocol:** This spoke uses the **Init-Specific Pattern (Inverse)** from `references/pre-flight-protocol.md` — `.bestest/` must **not** exist, project manifest must exist, git status is informational. Read that document for the full validation specification including error message templates.
 
-### 1. Check for existing `.bestest/`
-
-```
-If .bestest/ exists:
-  Print: "A .bestest/ directory already exists. This suggests testing infrastructure has been set up before."
-  Print: "Run /bestest doctor to validate your existing setup, or delete .bestest/ to start fresh."
-  Exit. No files created or modified.
-
-Note: If the user explicitly wants to re-init on a brownfield repo (e.g., to change handling mode from coexist to migrate),
-they must delete .bestest/ first. The init spoke does not modify an existing .bestest/ directory.
-```
-
-### 2. Check for project manifest
-
-```
-Check for the following files at the project root (in order):
-  1. package.json → JS/TS ecosystem
-  2. pyproject.toml → Python ecosystem (modern)
-  3. requirements.txt → Python ecosystem (classic)
-  4. setup.py → Python ecosystem (legacy)
-  5. go.mod → Go ecosystem
-  6. pom.xml → JVM ecosystem (Maven)
-  7. build.gradle or build.gradle.kts → JVM ecosystem (Gradle)
-
-If none found:
-  Print: "No supported project manifest found. /bestest init requires a JS/TS, Python, Java, or Go project."
-  Print: "Looked for: package.json, pyproject.toml, requirements.txt, setup.py, go.mod, pom.xml, build.gradle"
-  Print: "Supported ecosystems: JavaScript, TypeScript, Python (pytest, unittest), Java (JUnit 5), Go (testing, testify)"
-  Print: "If this is a different ecosystem (Go, Ruby), support is planned but not yet available."
-  Exit.
-```
+Spoke-specific additions beyond the shared protocol:
 
 ### 3. Check git status (informational)
 
@@ -61,6 +31,8 @@ Else (no .git directory):
   Print: "Note: No git repository detected. Init will proceed, but version control is recommended."
   Continue.
 ```
+
+> **Note:** If the user explicitly wants to re-init on a brownfield repo (e.g., to change handling mode from coexist to migrate), they must delete `.bestest/` first. The init spoke does not modify an existing `.bestest/` directory.
 
 ---
 

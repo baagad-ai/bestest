@@ -25,25 +25,9 @@ The migrate spoke uses a git-based backup strategy (stash) for safe rollback, pe
 
 ## Pre-Flight Checks
 
-Run these checks before starting any migration work. They validate the environment, detect the source framework, and create the backup that enables rollback.
+> **Shared protocol:** This spoke uses the **Standard 3-Step `.bestest/` Validation** from `references/pre-flight-protocol.md` (Steps 1–3: `.bestest/` existence, `config.yaml` presence, YAML validity). Read that document for the full validation specification including error message templates.
 
-### 1. Check for `.bestest/` with valid config
-
-```
-If .bestest/ does not exist:
-  Print: "No .bestest/ directory found. Run /bestest init first to set up testing infrastructure."
-  Exit. No migration performed.
-
-If .bestest/config.yaml does not exist:
-  Print: ".bestest/config.yaml is missing. The config file is required for migration."
-  Print: "Run /bestest init to regenerate it, or restore it from version control."
-  Exit.
-
-If .bestest/config.yaml exists but is invalid YAML:
-  Print: ".bestest/config.yaml contains invalid YAML and cannot be parsed."
-  Print: "Fix the syntax error and re-run /bestest migrate."
-  Exit.
-```
+Spoke-specific additions beyond the shared protocol:
 
 Parse and extract fields used during migration:
 - `framework` — current test framework (should match source framework)
@@ -51,7 +35,7 @@ Parse and extract fields used during migration:
 - `paths.test` — test file glob pattern
 - `paths.src` — source file glob pattern
 
-### 2. Check git is initialized
+### Check git is initialized
 
 ```
 If .git directory does not exist:
@@ -79,7 +63,7 @@ If git working tree has uncommitted changes:
     Exit.
 ```
 
-### 3. Check source framework is detected
+### Check source framework is detected
 
 Validate that the source framework is actually present in the project. Detection patterns:
 
@@ -101,7 +85,7 @@ If source framework cannot be detected:
   Exit. No migration performed.
 ```
 
-### 4. Validate target framework
+### Validate target framework
 
 Check that the requested migration path is supported:
 

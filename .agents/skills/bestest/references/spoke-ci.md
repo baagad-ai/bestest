@@ -23,25 +23,9 @@ All generated pipelines follow the **4-stage architecture** defined in `referenc
 
 ## Pre-Flight Checks
 
-Run these checks before starting generation. They guard against invalid states and give the user early, actionable feedback.
+> **Shared protocol:** This spoke uses the **Standard 3-Step `.bestest/` Validation** from `references/pre-flight-protocol.md` (Steps 1–3: `.bestest/` existence, `config.yaml` presence, YAML validity). Read that document for the full validation specification including error message templates.
 
-### 1. Check for `.bestest/` with valid config
-
-```
-If .bestest/ does not exist:
-  Print: "No .bestest/ directory found. Run /bestest init first to set up testing infrastructure."
-  Exit. No CI file generated.
-
-If .bestest/config.yaml does not exist:
-  Print: ".bestest/config.yaml is missing. The config file is required for CI generation."
-  Print: "Run /bestest init to regenerate it, or restore it from version control."
-  Exit.
-
-If .bestest/config.yaml exists but is invalid YAML:
-  Print: ".bestest/config.yaml contains invalid YAML and cannot be parsed."
-  Print: "Fix the syntax error and re-run /bestest ci."
-  Exit.
-```
+Spoke-specific additions beyond the shared protocol:
 
 Parse and extract fields used during generation:
 - `ci.enabled` — whether CI integration is active (default: `false`)
@@ -52,7 +36,7 @@ Parse and extract fields used during generation:
 - `framework` — primary test framework for command selection
 - `paths.src` — source file glob (used for working directory hints)
 
-### 2. Check for StackProfile
+### Check for StackProfile
 
 ```
 If .bestest/state/stack-profile.json does not exist:
@@ -65,7 +49,7 @@ Else:
   Set mode = "profile"
 ```
 
-### 3. Validate CLI argument (if provided)
+### Validate CLI argument (if provided)
 
 ```
 If user provides a provider argument:

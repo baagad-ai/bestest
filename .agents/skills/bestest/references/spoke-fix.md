@@ -33,27 +33,11 @@ The fix spoke is a downstream consumer of the run spoke. The run spoke produces 
 
 ## Pre-Flight Checks
 
-Run these checks before starting diagnosis. They guard against invalid states and provide early, actionable feedback.
+> **Shared protocol:** This spoke uses the **Standard 3-Step `.bestest/` Validation** from `references/pre-flight-protocol.md` (Steps 1–3: `.bestest/` existence, `config.yaml` presence, YAML validity). Read that document for the full validation specification including error message templates.
 
-### 1. Check for `.bestest/` with valid config
+Spoke-specific additions beyond the shared protocol:
 
-```
-If .bestest/ does not exist:
-  Print: "No .bestest/ directory found. Run /bestest init first to set up testing infrastructure."
-  Exit. No diagnosis performed.
-
-If .bestest/config.yaml does not exist:
-  Print: ".bestest/config.yaml is missing. The config file is required for fix."
-  Print: "Run /bestest init to regenerate it, or restore it from version control."
-  Exit.
-
-If .bestest/config.yaml exists but is invalid YAML:
-  Print: ".bestest/config.yaml contains invalid YAML and cannot be parsed."
-  Print: "Fix the syntax error and re-run /bestest fix."
-  Exit.
-```
-
-### 2. Check for run reports
+### Check for run reports
 
 ```
 Glob for .bestest/reports/run-*.json files.
@@ -69,7 +53,7 @@ If run reports found:
   Continue.
 ```
 
-### 3. Check test framework is installed
+### Check test framework is installed
 
 ```
 Read config.yaml → framework field (vitest, jest, or pytest).

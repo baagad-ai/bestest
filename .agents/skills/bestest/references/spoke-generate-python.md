@@ -16,15 +16,11 @@ The generate spoke is the primary value delivery command — it transforms scan 
 
 ## Pre-Flight Checks
 
-Run these checks before starting any generation work. They validate the environment, configuration, and data sources needed for the 7-phase pipeline.
+> **Shared protocol:** This spoke uses the **Standard 3-Step `.bestest/` Validation** + **Generate-Specific Additions** from `references/pre-flight-protocol.md`. Read that document for the full validation specification (Steps 1–3 baseline + Steps A–E generate additions).
 
-### 1. Check for `.bestest/` with valid config
+Spoke-specific details beyond the shared protocol:
 
-```
-If .bestest/ does not exist or config.yaml is missing/invalid:
-  Print appropriate error with guidance (run /bestest init).
-  Exit.
-```
+### Generation config fields
 
 Parse `generation.*` fields from config (see `references/config-schema.md` for full schema):
 
@@ -35,9 +31,9 @@ Parse `generation.*` fields from config (see `references/config-schema.md` for f
 | `generation.verify_pass` | boolean | `true` | Whether Phase 6 (execution check) runs. Skip to generate without running tests. |
 | `generation.max_retries` | number | `2` | Maximum fix-and-rerun attempts in Phase 6 when generated tests fail. |
 
-Verify that `config.yaml` has `framework: pytest` and `language: python`. If `framework` is something else (vitest, jest), route to the appropriate generation spoke instead.
+### Python-specific checks
 
-### 2. Check for Python environment
+Verify that `config.yaml` has `framework: pytest` and `language: python`. If `framework` is something else (vitest, jest), route to the appropriate generation spoke instead.
 
 ```
 Check for virtual environment, then verify pytest is installed.
@@ -49,49 +45,17 @@ Check for pytest plugins (pytest-asyncio, pytest-mock, pytest-cov, httpx, pytest
 
 > **On-demand load:** For detailed virtual environment detection algorithm (venv, Poetry, Conda, Pipenv), pytest plugin detection list, and degraded-mode behavior, read `references/generate/python/phase1-target-detail.md`.
 
-### 3. Check for StackProfile
+### Python StackProfile extraction
 
-Reference: `references/stack-profile-schema.md` for the full JSON shape.
-
-```
-If .bestest/state/stack-profile.json does not exist:
-  Print: "Warning: StackProfile not found. Will attempt framework detection from pyproject.toml and imports."
-  Set framework = detect from pyproject.toml dependencies and source imports
-  If framework cannot be detected:
-    Set framework = "generic"
-Else:
-  Read and parse StackProfile JSON.
-  If JSON parsing fails → see state corruption handling in references/generate/python/phase1-target-detail.md.
-  Extract testFrameworks.existing → confirm it matches "pytest".
-  Extract coverage.provider → determines coverage commands (pytest-cov).
-  Extract web framework → determines test client pattern (FastAPI, Flask, Django).
-  Extract languages → confirms Python is primary.
-  Extract async usage → determines pytest-asyncio need.
-```
-
-### 4. Confidence Gate
-
-Confidence gate: See SKILL.md "Confidence Gate (R5)" — the orchestrator checks confidence before loading this spoke. If you reached this spoke, confidence already passed the gate.
-
-### 5. Check for scan report
+When StackProfile exists, extract Python-specific fields beyond the shared protocol:
 
 ```
-If no scan report exists in .bestest/reports/:
-  Print: "Warning: No scan report found. Generation will use filesystem scanning."
-  Set mode = "filesystem-scan", gaps = [], testInventory = [].
-Else:
-  Load most recent scan report. Extract gaps[], testInventory[], configSnapshot.
-  Set mode = "scan-guided".
-```
-
-### 6. Validate artifact schemaVersions
-
-```
-Validate stack-profile.json schemaVersion ≤ 1.3 and scan-report.json schemaVersion ≤ 1.2.
-If MAJOR version differs → error and exit.
-If MINOR exceeds expected → warning and continue.
-If missing → treat as "1.0" legacy. Continue.
-See references/generate/python/phase1-target-detail.md for full validation algorithm.
+Extract testFrameworks.existing → confirm it matches "pytest".
+Extract coverage.provider → determines coverage commands (pytest-cov).
+Extract web framework → determines test client pattern (FastAPI, Flask, Django).
+Extract languages → confirms Python is primary.
+Extract async usage → determines pytest-asyncio need.
+If framework cannot be detected from pyproject.toml: Set framework = "generic".
 ```
 
 ---
