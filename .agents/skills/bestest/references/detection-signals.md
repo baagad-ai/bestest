@@ -123,6 +123,69 @@ Multiple signals compound via noisy-OR: `confidence = min(0.99, 1 - Π(1 - w_i))
 | `*_test.go` files exist | Glob for `**/*_test.go` | Go testing in use | high (0.40) |
 | `"github.com/stretchr/testify"` in `go.mod` | Parse go.mod require | testify assertions | medium (0.20) |
 
+## Legacy Test Framework Detection
+
+These frameworks are considered "legacy" in the sense that bestest's primary recommendation targets are Vitest (JS/TS) and pytest (Python). Detecting them is essential for brownfield init — the spoke must know what already exists so it can coexist, migrate, or replace.
+
+### Mocha
+
+| Signal | Check | Indicates | Strength |
+|--------|-------|-----------|----------|
+| `.mocharc.{js,json,yml,yaml,cjs}` exists | Glob for config file | Mocha test runner | high (0.40) |
+| `"mocha"` in `package.json` devDependencies | Parse JSON field | Mocha dependency | high (0.40) |
+| `"test"` script references `mocha` | Parse `scripts.test` in `package.json` | Mocha is the test runner | medium (0.20) |
+| `mocha` CLI in `node_modules/.bin/` | File existence check | Mocha installed locally | low (0.08) |
+
+### Jasmine
+
+| Signal | Check | Indicates | Strength |
+|--------|-------|-----------|----------|
+| `spec/support/jasmine.json` exists | File existence check | Jasmine configuration | high (0.40) |
+| `jasmine.json` exists (root) | File existence check | Jasmine configuration (alternative location) | high (0.40) |
+| `"jasmine"` in `package.json` devDependencies | Parse JSON field | Jasmine dependency | high (0.40) |
+| `"test"` script references `jasmine` | Parse `scripts.test` in `package.json` | Jasmine is the test runner | medium (0.20) |
+
+### Ava
+
+| Signal | Check | Indicates | Strength |
+|--------|-------|-----------|----------|
+| `ava.config.{js,cjs,mjs}` exists | Glob for config file | Ava test runner | high (0.40) |
+| `"ava"` in `package.json` devDependencies | Parse JSON field | Ava dependency | high (0.40) |
+| `"test"` script references `ava` | Parse `scripts.test` in `package.json` | Ava is the test runner | medium (0.20) |
+
+### tap
+
+| Signal | Check | Indicates | Strength |
+|--------|-------|-----------|----------|
+| `.taprc` or `.taprc.{yml,json,js}` exists | Glob for config file | tap test runner | high (0.40) |
+| `"tap"` in `package.json` devDependencies | Parse JSON field | tap dependency | high (0.40) |
+| `"test"` script references `tap` | Parse `scripts.test` in `package.json` | tap is the test runner | medium (0.20) |
+
+### node:test (Node.js built-in test runner)
+
+| Signal | Check | Indicates | Strength |
+|--------|-------|-----------|----------|
+| `import ... from 'node:test'` in `*.test.{js,mjs,ts}` files | Grep for import/require of `node:test` | node:test runner in use | high (0.40) |
+| `require('node:test')` in `*.test.{js,cjs}` files | Grep for require of `node:test` | node:test runner in use (CJS) | high (0.40) |
+| `"test"` script references `node --test` | Parse `scripts.test` in `package.json` | node:test CLI runner | medium (0.20) |
+
+### Karma
+
+| Signal | Check | Indicates | Strength |
+|--------|-------|-----------|----------|
+| `karma.conf.{js,ts,coffee}` exists | Glob for config file | Karma test runner | high (0.40) |
+| `"karma"` in `package.json` devDependencies | Parse JSON field | Karma dependency | high (0.40) |
+| `"test"` script references `karma` | Parse `scripts.test` in `package.json` | Karma is the test runner | medium (0.20) |
+
+### nose2 (Python)
+
+| Signal | Check | Indicates | Strength |
+|--------|-------|-----------|----------|
+| `[tool.nose2]` section in `pyproject.toml` | Parse TOML section | nose2 configuration | high (0.40) |
+| `unittest.cfg` exists (root) | File existence check | nose2 configuration (INI format) | high (0.40) |
+| `"nose2"` in `requirements.txt` or `pyproject.toml` | Parse dependency list | nose2 dependency | high (0.40) |
+| `"test"` script or Makefile target references `nose2` | Parse script/target | nose2 is the test runner | medium (0.20) |
+
 ## E2E Test Framework Detection
 
 | Signal | Check | Indicates | Strength |

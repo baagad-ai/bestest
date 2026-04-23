@@ -203,6 +203,58 @@ When multiple test frameworks are detected, apply a **category-based detection a
 
 **Conflict resolution principle:** Always recommend the modern framework as primary with a migration path. Never silently drop a detected framework — both are recorded in `testFrameworks.existing` as an array, and the user chooses during the HITL gate (Phase 3 of spoke-init.md).
 
+### Phase 5.5: Legacy Framework Detection
+
+After modern test frameworks are identified in Phase 5, scan for legacy test frameworks that may already be in use. This phase is critical for brownfield repos — the init spoke needs to know what already exists to offer coexist, migrate, or replace modes.
+
+**JS/TS legacy frameworks:**
+
+1. **Mocha** — Check for `.mocharc.{js,json,yml,yaml,cjs}`, `"mocha"` in devDependencies, or `"mocha"` in test script.
+2. **Jasmine** — Check for `spec/support/jasmine.json` or root `jasmine.json`, `"jasmine"` in devDependencies, or `"jasmine"` in test script.
+3. **Ava** — Check for `ava.config.{js,cjs,mjs}`, `"ava"` in devDependencies, or `"ava"` in test script.
+4. **tap** — Check for `.taprc` (or `.taprc.{yml,json,js}`), `"tap"` in devDependencies, or `"tap"` in test script.
+5. **node:test** — Check for `import ... from 'node:test'` or `require('node:test')` in test files, or `"node --test"` in test script. This is Node.js's built-in runner (Node 18+) — it may coexist with other frameworks.
+6. **Karma** — Check for `karma.conf.{js,ts,coffee}`, `"karma"` in devDependencies, or `"karma"` in test script.
+
+**Python legacy frameworks:**
+
+1. **nose2** — Check for `[tool.nose2]` in `pyproject.toml`, `unittest.cfg` at project root, `"nose2"` in requirements, or `"nose2"` in test script/target.
+
+**Algorithm:**
+
+1. For each legacy framework, collect signals using the same noisy-OR confidence scoring as Phase 5.
+2. If confidence ≥ 0.60, record the framework in `testFrameworks.existing` alongside any modern frameworks from Phase 5.
+3. Apply the category-based conflict detection from Phase 5 — legacy frameworks compete in the "unit" category against modern ones (e.g., Mocha vs Vitest is a `legacy-modern-coexistence` conflict).
+4. Record a `legacyDetected` flag in the StackProfile to signal the init spoke that brownfield handling is needed:
+   ```json
+   {
+     "testFrameworks": {
+       "existing": ["mocha", "vitest"],
+       "legacyDetected": true,
+       "legacyFrameworks": [
+         { "name": "mocha", "confidence": 0.95, "signals": [".mocharc.js", "devDependency"] }
+       ]
+     }
+   }
+   ```
+5. If any legacy framework is detected, compute a lightweight **test inventory snapshot** — count test files by glob pattern (e.g., `test/**/*.test.js`, `spec/**/*.spec.js`, `tests/*_test.py`). This inventory is stored in `testFrameworks.inventory` for downstream gap analysis by the scan and generate spokes:
+   ```json
+   {
+     "testFrameworks": {
+       "inventory": {
+         "totalFiles": 47,
+         "byPattern": {
+           "test/**/*.test.js": 32,
+           "spec/**/*.spec.js": 15
+         },
+         "byFramework": {
+           "mocha": { "estimatedFiles": 47, "configFile": ".mocharc.js" }
+         }
+       }
+     }
+   }
+   ```
+
 ### Phase 6: E2E Framework
 
 - `playwright.config.*` or `"@playwright/test"` in devDependencies → Playwright
@@ -288,6 +340,6 @@ The complete signal catalog with strength ratings is in `references/detection-si
 
 ### Output
 
-Produce a `StackProfile` JSON following the schema in `references/stack-profile-schema.md`. Include `confidence` scores (0–1) and `evidence` arrays for every detection. Write it to `.bestest/state/stack-profile.json`.
+Produce a `StackProfile` JSON following the schema in `references/stack-profile-schema.md`. Include `confidence` scores (0–1) and `evidence` arrays for every detection. If Phase 5.5 detected any legacy frameworks, also include `testFrameworks.legacyDetected`, `testFrameworks.legacyFrameworks`, and `testFrameworks.inventory` in the output. Write it to `.bestest/state/stack-profile.json`.
 
 </detection_engine>
