@@ -1,7 +1,7 @@
 ---
 name: bestest
-version: "1.4.0"
-description: Enterprise-grade testing architect plugin. Detects your stack, recommends frameworks, generates production-quality tests, manages CI pipelines, and maintains living test documentation.
+version: "1.3.0"
+description: Enterprise-grade testing architect skill. Detects your stack, recommends frameworks, generates production-quality tests, manages CI pipelines, and maintains living test documentation.
 triggers:
   - /bestest
   - bestest
@@ -19,13 +19,7 @@ Core principles govern every action:
 
 3. **Progressive complexity** — Init gives you a production-grade foundation. Each subsequent command adds capability. Meet the user where they are.
 
-4. **Three-tier human-in-the-loop (HITL) gate model** — Commands that modify files or state use one of three HITL tiers, calibrated by risk and reversibility. Read-only commands (`scan`, `run`, `config show`, `coverage`, `report`, `doctor`) execute without confirmation gates. The three tiers for mutating commands:
-
-   - **auto** — Proceed immediately. Log the decision and rationale for audit trail. Used when the action is trivially reversible or carries negligible risk. No spoke currently uses this tier; it is reserved for future low-risk operations.
-   - **provisional** — Proceed when quality criteria are met; flag results for review. If criteria fail, escalate to manual tier. Log auto-proceed decisions for audit trail. Used by `generate` and `fix`: tests that pass quality thresholds write to disk with a summary for user review; failures hold for explicit approval.
-   - **manual** — Full human approval required before any files are written. No auto-proceed. Used by `init` (framework selection), `migrate` (destructive AST transforms), and `ci` (pipeline generation).
-
-   Each spoke documents its `gate_tier` in the HITL section header. The pattern: `scan → propose → [tier-gated approve] → execute → verify → report`.
+4. **Strategic human-in-the-loop (mutating commands only)** — HITL gates apply exclusively to commands that modify files or state: `init`, `generate`, `fix`, `migrate`, and `ci`. Read-only commands (`scan`, `run`, `config show`, `coverage`, `report`, `doctor`) execute without confirmation gates. For mutating commands, pause for human judgment at decision gates: framework selection, coverage targets, CI pipeline design, and before committing generated tests. The pattern: `scan → propose → approve → execute → verify → report`.
 
 5. **Framework-agnostic intelligence** — Detect the stack, recommend the right framework, but never force a choice. Generate framework-specific configs, templates, and tests for Vitest, Jest, pytest, JUnit 5, Go testing, Playwright, and more.
 
@@ -46,6 +40,10 @@ See `references/framework-decisions.md` for framework decision tree summaries. L
 <context7_helper>
 See `references/context7-helper.md` for Context7 integration pattern and library mappings. Load on-demand for generate commands only.
 </context7_helper>
+
+<parallel_dispatch>
+See `references/parallel-dispatch.md` for the agent-agnostic parallel dispatch protocol. Load on-demand for generate commands with 5+ target files.
+</parallel_dispatch>
 
 <routing>
 
@@ -74,6 +72,11 @@ The `generate` command routes to a language-specific generation spoke based on t
 | `expand` | `references/spoke-expand.md` | Add new test types |
 | `migrate` | `references/spoke-migrate.md` | Migrate test frameworks |
 | `ci` | `references/spoke-ci.md` | Generate CI pipelines |
+
+| `help` | `references/spoke-help.md` | Show available commands, current config summary, and quick-start guide |
+| `explain` | `references/spoke-explain.md` | Explain testing architecture decisions, ADRs, and framework choices |
+| `status` | `references/spoke-status.md` | Show current test health: coverage, last scan, flaky tests, CI status |
+| `version` | `references/spoke-version.md` | Show bestest version, skill location, and last update timestamp |
 
 ### Migration Command Routing
 
@@ -154,7 +157,7 @@ If the user specifies an unrecognized command:
 
 ## Spoke Loading
 
-Read the spoke file from the plugin directory. The path is relative to `~/.agents/skills/bestest/`. Load only the spoke file for the requested command — do not load all spokes.
+Read the spoke file from the skill directory. The path is relative to `~/.agents/skills/bestest/`. Load only the spoke file for the requested command — do not load all spokes.
 
 </routing>
 
@@ -163,9 +166,134 @@ See references/quick_reference.md for the StackProfile JSON example, command qui
 </quick_reference>
 
 <reference_index>
-See `references/reference-index.md` for the complete catalog of all 66 reference files across 12 categories (Detection, Principles, Spokes, Schemas, Generation Guides, Generation Sub-Files per language, Templates, Migration, Reference Infrastructure).
-</reference_index>
 
+## Reference Files
+
+All reference files are relative to `~/.agents/skills/bestest/`.
+
+### Detection (9)
+| File | Description |
+|------|-------------|
+| `references/stack-profile-schema.md` | StackProfile JSON schema with field descriptions, confidence score semantics, and 6 example outputs |
+| `references/detection-signals.md` | Complete catalog of 80+ detection signals across 12 categories with strength ratings |
+| `references/detection-engine.md` | Full detection engine specification with 7-phase detection order |
+| `references/js-ts-decision-tree.md` | 7-step JS/TS framework selection decision tree with ADR template |
+| `references/python-decision-tree.md` | 7-step Python framework selection decision tree with ADR template |
+| `references/java-decision-tree.md` | 7-step Java/JVM framework selection decision tree with ADR template |
+| `references/go-decision-tree.md` | 7-step Go framework selection decision tree with ADR template |
+| `references/framework-decisions.md` | Framework decision tree summaries for all supported languages |
+| `references/context7-helper.md` | Context7 integration pattern and library ID mappings |
+
+### Principles (3)
+| File | Description |
+|------|-------------|
+| `references/anti-patterns.md` | 20+ test smells with detection methods and fixes |
+| `references/ci-patterns.md` | CI pipeline design patterns |
+| `references/ai-generation-guide.md` | 7-phase AI test generation pipeline (JS/TS) |
+
+### Spokes (19)
+| File | Command |
+|------|---------|
+| `references/spoke-init.md` | `/bestest init` |
+| `references/spoke-config.md` | `/bestest config` |
+| `references/spoke-scan.md` | `/bestest scan` |
+| `references/spoke-generate.md` | `/bestest generate` (JS/TS) |
+| `references/spoke-generate-python.md` | `/bestest generate` (Python) |
+| `references/spoke-generate-java.md` | `/bestest generate` (Java) |
+| `references/spoke-generate-go.md` | `/bestest generate` (Go) |
+| `references/spoke-run.md` | `/bestest run` |
+| `references/spoke-fix.md` | `/bestest fix` |
+| `references/spoke-coverage.md` | `/bestest coverage` |
+| `references/spoke-report.md` | `/bestest report` |
+| `references/spoke-doctor.md` | `/bestest doctor` |
+| `references/spoke-expand.md` | `/bestest expand` |
+| `references/spoke-migrate.md` | `/bestest migrate` |
+| `references/spoke-ci.md` | `/bestest ci` |
+| `references/spoke-help.md` | `/bestest help` |
+| `references/spoke-explain.md` | `/bestest explain` |
+| `references/spoke-status.md` | `/bestest status` |
+| `references/spoke-version.md` | `/bestest version` |
+
+### Schemas (5)
+| File | Description |
+|------|-------------|
+| `references/config-schema.md` | Complete schema for `.bestest/config.yaml` — single source of truth for all spoke commands |
+| `references/scan-report-schema.md` | JSON schema for scan reports written to `.bestest/reports/scan-<timestamp>.json` |
+| `references/schema-contract.md` | Versioning policy for all bestest schema artifacts with `schemaVersion` field validation |
+| `references/metrics-schema.md` | Complete reference for `.bestest/state/metrics.json` — cross-spoke metrics store with update protocols and spoke responsibility matrix |
+| `references/error-codes.md` | Error code catalog (E001–E017+) used by validate-skill.sh for structured diagnostic reporting |
+
+### Generation Guides (3)
+| File | Description |
+|------|-------------|
+| `references/ai-generation-guide.md` | 7-phase AI test generation pipeline (JS/TS) — shared generation principles |
+| `references/python-generation-guide.md` | Python-specific generation guide: pytest quality standards, scoring rubrics, and design patterns |
+| `references/go-generation-guide.md` | Go-specific generation guide: testing package quality standards, testify patterns, and scoring rubrics |
+
+### Generation Sub-Files — JS/TS (6)
+| File | Description |
+|------|-------------|
+| `references/generate/phase1-target-detail.md` | Detailed targeting heuristics and path validation rules for JS/TS |
+| `references/generate/phase4-generation-detail.md` | Complex test generation patterns and advanced mocking for JS/TS |
+| `references/generate/phase5-compilation.md` | Compilation verification with auto-fix patterns and retry loop (JS/TS) |
+| `references/generate/phase6-execution.md` | Execution verification, failure analysis, and fix-and-rerun loop (JS/TS) |
+| `references/generate/phase7-quality-audit.md` | Quality scoring rubric, anti-pattern detection, and flakiness testing (JS/TS) |
+| `references/generate/error-handling.md` | Error scenarios with trigger conditions and prescribed responses (JS/TS) |
+
+### Generation Sub-Files — Python (6)
+| File | Description |
+|------|-------------|
+| `references/generate/python/phase1-target-detail.md` | Path validation, targeting modes, virtualenv detection, and pytest plugin detection |
+| `references/generate/python/phase4-generation-detail.md` | Mocking patterns, factory functions, parametrize examples, and full test file example |
+| `references/generate/python/phase5-compilation.md` | Compilation verification logic for generated Python tests |
+| `references/generate/python/phase6-execution.md` | Execution verification, failure analysis, fix-and-rerun loop, and coverage delta |
+| `references/generate/python/phase7-quality-audit.md` | Assertion quality scoring, anti-pattern detection, and flakiness testing (Python) |
+| `references/generate/python/error-handling.md` | All error handling scenarios for the Python generate spoke |
+
+### Generation Sub-Files — Java (6)
+| File | Description |
+|------|-------------|
+| `references/generate/java/phase1-target-detail.md` | Targeting heuristics, path validation, and preflight environment checks for Java |
+| `references/generate/java/phase4-generation-detail.md` | Mocking patterns, @ParameterizedTest, @Nested classes, and test data builders |
+| `references/generate/java/phase5-compilation.md` | 3-stage compilation pipeline with cascade error deduplication (Java) |
+| `references/generate/java/phase6-execution.md` | Execution verification, failure analysis, and fix-and-rerun loop (Java) |
+| `references/generate/java/phase7-quality-audit.md` | Assertion quality rubric, anti-pattern detection, and stability testing (Java) |
+| `references/generate/java/error-handling.md` | Error scenarios for the Java generate spoke with trigger conditions |
+
+### Generation Sub-Files — Go (6)
+| File | Description |
+|------|-------------|
+| `references/generate/go/phase1-target-detail.md` | Targeting modes, path validation, Go naming conventions, and shared test helpers |
+| `references/generate/go/phase4-generation-detail.md` | Mocking patterns, table-driven test patterns, and full generation example (Go) |
+| `references/generate/go/phase5-compilation.md` | 3-stage verification pipeline: go vet, go build, and test compilation |
+| `references/generate/go/phase6-execution.md` | Execution verification, failure analysis, and fix-and-rerun loop (Go) |
+| `references/generate/go/phase7-quality-audit.md` | Quality scoring against Go generation guide rubric and stability testing |
+| `references/generate/go/error-handling.md` | All error scenarios for the Go generate spoke |
+
+### Templates (6)
+| File | Description |
+|------|-------------|
+| `references/templates/vitest-config-ts.md` | Complete vitest.config.ts templates for 4 stack variants |
+| `references/templates/jest-config-ts.md` | Standard Jest configuration for existing Jest projects |
+| `references/templates/playwright-config-ts.md` | Playwright config templates for 3 project variants |
+| `references/templates/stryker-conf.md` | Stryker mutation testing configs for 2 test runner variants |
+| `references/templates/supertest-helpers.md` | Reusable API test helper patterns for supertest |
+| `references/templates/testing-md.md` | TESTING.md template with project documentation structure |
+
+### Migration (1)
+| File | Description |
+|------|-------------|
+| `references/migration-rules.md` | Transformation rule catalog for jest→vitest, junit4→junit5, cypress→playwright |
+
+### Reference Infrastructure (4)
+| File | Description |
+|------|-------------|
+| `references/quick_reference.md` | On-demand quick reference extracted from SKILL.md for reduced token loading *(created by T02)* |
+| `references/pre-flight-protocol.md` | Shared validation pattern referenced by all generate spokes *(created by T03)* |
+| `references/dot-bestest-schema.md` | Full `.bestest/` directory tree documentation *(created by T04)* |
+| `references/parallel-dispatch.md` | Agent-agnostic parallel dispatch protocol for generate with 5+ targets *(created by S01)* |
+
+</reference_index>
 <success_criteria>
 
 ## Successful Invocation
@@ -189,5 +317,4 @@ If the StackProfile produces unexpected results:
 - Check `evidence` arrays for the exact files/fields that triggered each detection
 - The orchestrator logs its routing decision (which command matched, which spoke loaded)
 - Downstream failures can be traced back to routing issues via these logs
-
 </success_criteria>
