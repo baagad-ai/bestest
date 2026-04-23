@@ -21,6 +21,9 @@ If .bestest/ exists:
   Print: "A .bestest/ directory already exists. This suggests testing infrastructure has been set up before."
   Print: "Run /bestest doctor to validate your existing setup, or delete .bestest/ to start fresh."
   Exit. No files created or modified.
+
+Note: If the user explicitly wants to re-init on a brownfield repo (e.g., to change handling mode from coexist to migrate),
+they must delete .bestest/ first. The init spoke does not modify an existing .bestest/ directory.
 ```
 
 ### 2. Check for project manifest
@@ -103,6 +106,129 @@ If no supported ecosystem is detected (no `package.json`, `requirements.txt`, `p
 
 ---
 
+## Phase 1.5 — Test Inventory (Brownfield)
+
+This phase runs ONLY when brownfield conditions are detected. If Phase 1 produces a greenfield StackProfile (no existing test infrastructure), skip directly to Phase 2.
+
+### Brownfield Detection Trigger
+
+Set `brownfield = true` in the StackProfile when ANY of these conditions hold:
+
+1. `testFrameworks.existing` is non-null or non-empty (a test framework was already detected)
+2. Test files exist matching common patterns:
+   - JS/TS: `test/**/*.{test,spec}.{js,ts,jsx,tsx}`, `tests/**/*.{test,spec}.{js,ts,jsx,tsx}`, `__tests__/**/*.{js,ts,jsx,tsx}`, `*.test.{js,ts}`, `*.spec.{js,ts}`
+   - Python: `test_*.py`, `*_test.py`, `tests/**/*.py`
+   - Java: `src/test/java/**/*Test.java`, `src/test/java/**/*IT.java`
+   - Go: `*_test.go`
+3. Framework config files exist:
+   - JS/TS: `.mocharc.{js,json,yml,yaml,cjs}`, `jasmine.json`, `ava.config.{js,cjs,mjs}`, `.taprc`, `karma.conf.{js,ts,coffee}`
+   - Python: `[tool.nose2]` in `pyproject.toml`, `unittest.cfg`
+4. `testFrameworks.legacyDetected` is `true` (set by Phase 5.5 of the detection engine)
+
+If `brownfield` is `false`, skip this entire phase and proceed to Phase 2.
+
+### Test Inventory Scan
+
+When `brownfield = true`, compute a lightweight test inventory snapshot by scanning for test files:
+
+```
+For each ecosystem detected:
+
+JS/TS:
+  Count files matching:
+    - test/**/*.test.{js,ts,jsx,tsx}
+    - test/**/*.spec.{js,ts,jsx,tsx}
+    - tests/**/*.test.{js,ts,jsx,tsx}
+    - tests/**/*.spec.{js,ts,jsx,tsx}
+    - __tests__/**/*.{js,ts,jsx,tsx}
+    - *.test.{js,ts,jsx,tsx} (root-level)
+    - *.spec.{js,ts,jsx,tsx} (root-level)
+  Group by detected framework when possible:
+    - Files in directories referenced by .mocharc → attributed to Mocha
+    - Files matching Ava pattern (no describe/it) → attributed to Ava
+    - Default → unattributed
+
+Python:
+  Count files matching:
+    - test_*.py (any directory)
+    - *_test.py (any directory)
+    - tests/**/*.py
+
+Java:
+  Count files matching:
+    - src/test/java/**/*Test.java
+    - src/test/java/**/*IT.java
+
+Go:
+  Count files matching:
+    - **/*_test.go
+```
+
+Store the result in `StackProfile.testInventory`:
+
+```json
+{
+  "totalFiles": 47,
+  "unit": 32,
+  "integration": 12,
+  "e2e": 3,
+  "byFramework": {
+    "mocha": 25,
+    "jasmine": 10,
+    "unknown": 12
+  },
+  "uncovered": {
+    "estimatedPercentage": 65
+  }
+}
+```
+
+The `uncovered.estimatedPercentage` is computed by comparing the number of source files in the primary source directories against test files. A rough heuristic: `100 - (testFiles / sourceFiles * 100)`, capped at 0–100.
+
+### Existing Config Capture
+
+When `brownfield = true`, capture the existing test configuration from the repo. Store in `StackProfile.existingConfig`:
+
+```json
+{
+  "frameworks": [
+    { "name": "mocha", "configPath": ".mocharc.js", "version": "10.2.0" },
+    { "name": "jasmine", "configPath": "spec/support/jasmine.json", "version": null }
+  ],
+  "scripts": {
+    "test": "mocha --recursive",
+    "test:watch": "mocha --watch",
+    "test:coverage": "nyc mocha"
+  },
+  "setupFiles": ["test/setup.js", "test/helpers.js"],
+  "transformers": ["@babel/register"]
+}
+```
+
+Source these fields from:
+- `frameworks`: from Phase 5.5 legacy framework detection
+- `scripts`: from `package.json` `"scripts"` section (JS/TS) or `pyproject.toml` scripts (Python)
+- `setupFiles`: from framework config files (e.g., `.mocharc.js` `require` field)
+- `transformers`: from framework config files (e.g., `.babelrc`, `tsconfig.json`)
+
+### Brownfield Mode Pre-Selection
+
+Based on the test inventory and legacy framework detection, pre-select a handling mode recommendation:
+
+| Condition | Recommended Mode | Rationale |
+|-----------|-----------------|-----------|
+| Total test files > 30 AND legacy framework detected | **coexist** | Large suites have high migration cost; coexistence enables gradual migration |
+| Total test files 10–30 AND simple config (no custom reporters/loaders) | **migrate** | Medium suites with simple config can be migrated incrementally |
+| Total test files < 10 | **replace** | Small test count means migration is cheap |
+| Karma detected (any count) | **replace** | Karma is deprecated; recommend migration regardless |
+| node:test detected (any count) | **coexist** | Stdlib runner cannot be removed; only coexistence is viable |
+| tap detected (any count) | **coexist** | TAP protocol is fundamentally different; coexistence preferred |
+| Multiple legacy frameworks detected | **coexist** | Multi-framework repos need careful handling; coexist is safest |
+
+This pre-selection is presented to the user in Phase 3 HITL gate as a recommendation. The user makes the final choice.
+
+---
+
 ## Phase 2 — Recommend Framework
 
 Run the framework decision engine from `references/framework-decisions.md`. Select the language-appropriate decision tree based on the primary language in the StackProfile and execute it. The decision tree is deterministic: the same StackProfile always produces the same recommendation.
@@ -115,6 +241,20 @@ Populate these fields in the StackProfile:
 - `testFrameworks.recommended` — the recommended test runner
 - `e2eFramework.recommended` — the recommended E2E runner (or null for API-only)
 - `coverage.recommended` — the recommended coverage provider
+
+### Brownfield Framework Selection
+
+If `brownfield = true`, the framework recommendation must account for existing infrastructure:
+
+1. Run the language-appropriate decision tree as normal.
+2. Then consult the brownfield decision branch:
+   - **JS/TS**: Follow Step 2.5 in `references/js-ts-decision-tree.md` which handles Mocha, Jasmine, Ava, tap, node:test, and Karma with threshold-based coexistence mode selection.
+   - **Python**: If nose2 is detected, recommend pytest (coexist mode) — nose2 tests are unittest-compatible and pytest can discover them.
+   - **Java**: If JUnit 4 is detected alongside JUnit 5, use JUnit 5 with Vintage Engine (coexist mode).
+   - **Go**: Go testing is stdlib — no brownfield conflict possible. Standard recommendation applies.
+3. The decision tree's brownfield branch may override the framework recommendation. For example, a large Mocha suite on a Vite project still gets Vitest recommended, but the handling mode is set to `coexist` rather than `replace`.
+4. Set `brownfield = true` on the StackProfile (it may already be true from Phase 1.5).
+5. The `init_type` field (`greenfield`, `brownfield-coexist`, `brownfield-migrate`, `brownfield-replace`) is NOT set here — it is set during the Phase 3 HITL gate when the user confirms their handling mode.
 
 ### ADR Generation
 
@@ -170,6 +310,44 @@ Display the following summary to the user:
 - **Dual-framework migration**: [if conflict detected] "Migration from [both frameworks] to [recommended] as primary. Estimated effort: [low/medium/high] based on test file count and dual-config complexity."
 ```
 
+### Brownfield Section (show ONLY when `brownfield = true`)
+
+When the repo has existing test infrastructure, display an additional section after the standard recommendation:
+
+```
+## Existing Test Infrastructure Detected
+
+- **Legacy Frameworks**: [from StackProfile.testFrameworks.legacyFrameworks — list names and confidence scores]
+- **Test Inventory**: [from StackProfile.testInventory]
+  - Total test files: [totalFiles]
+  - Breakdown: [unit] unit, [integration] integration, [e2e] E2E
+  - By framework: [byFramework breakdown]
+  - Estimated uncovered source: [uncovered.estimatedPercentage]%
+- **Existing Config**: [from StackProfile.existingConfig]
+  - Config files: [list frameworks[].configPath]
+  - Test scripts: [list scripts]
+  - Setup files: [list setupFiles]
+
+### Handling Mode
+
+The recommended approach for your existing test suite:
+
+- **Recommended Mode**: [pre-selected mode from Phase 1.5 — coexist/migrate/replace]
+- **Rationale**: [why this mode was chosen — e.g., "Large Mocha test suite (45 files) — coexistence enables gradual migration"]
+
+Choose how to handle existing tests:
+
+| Mode | What Happens | Best When |
+|------|-------------|-----------|
+| **coexist** | Keep existing tests + framework. Add bestest-recommended framework alongside. New tests use bestest framework. | Large existing suites (>30 files), complex configs, or node:test/tap (cannot be removed) |
+| **migrate** | Keep existing tests initially, but create a migration plan to convert them to the bestest-recommended framework over time. | Medium suites (10-30 files) with simple configs that can be incrementally converted |
+| **replace** | Remove legacy framework dependencies and configs. Rewrite all tests for the bestest-recommended framework. | Small suites (<10 files), deprecated frameworks (Karma), or clean-slate desired |
+
+⚠️ **Coexist mode**: Existing test files are never modified. The legacy framework config is preserved. bestest adds its own config alongside.
+⚠️ **Migrate mode**: A migration plan is generated at `.bestest/migration-plan.md`. Existing tests are preserved until explicitly migrated one batch at a time.
+⚠️ **Replace mode**: Legacy framework configs are backed up to `.bestest/backup/` before removal. Existing test files are rewritten. This is destructive — ensure you have a clean git state.
+```
+
 ### User Prompt
 
 After presenting the summary, prompt:
@@ -178,14 +356,21 @@ After presenting the summary, prompt:
 "Approve this recommendation? (yes / modify / cancel)"
 ```
 
+If `brownfield = true`, also prompt:
+
+```
+"Handling mode for existing tests? (coexist / migrate / replace) [recommended: {mode}]"
+```
+
 ### Response Handling
 
-- **yes**: Proceed to Phase 4 (Scaffold). Use the recommended values as-is.
+- **yes**: Proceed to Phase 4 (Scaffold). Use the recommended values as-is. If `brownfield = true`, use the user's chosen handling mode (or the recommended default if they approved without specifying).
 - **modify**: Allow the user to override specific values:
   - `--framework <vitest|jest>` — override the test framework
   - `--coverage <v8|istanbul>` — override the coverage provider
   - `--environment <node|jsdom|happy-dom>` — override the default test environment
   - `--e2e <playwright|cypress|none>` — override or skip E2E framework
+  - `--mode <coexist|migrate|replace>` — override the brownfield handling mode (only when `brownfield = true`)
   After any override, re-run Phase 2 logic with the modified inputs to update the ADR and StackProfile, then re-present the updated recommendation for confirmation.
 - **cancel**: Exit cleanly. Do not create any files or directories. Print: "Init cancelled. No files were created. Run /bestest init again when ready."
 
@@ -200,6 +385,104 @@ If the user cancels, ensure no artifacts remain:
 ## Phase 4 — Scaffold
 
 Create the `.bestest/` directory structure and populate it with configuration files. All files use templates from `references/templates/` with `{{variable}}` placeholders filled from the StackProfile. The complete config schema contract is defined in `references/config-schema.md` — consult it for field types, valid values, and defaults when filling templates.
+
+### Brownfield Scaffold Behavior
+
+The scaffold phase behaves differently based on the handling mode selected in Phase 3:
+
+**Coexist mode (`brownfield-coexist`):**
+- Create `.bestest/` with the bestest-recommended framework config (e.g., `vitest.config.ts`)
+- Do NOT modify or remove existing framework config files (`.mocharc.js`, `jasmine.json`, etc.)
+- Do NOT modify existing test scripts in `package.json` — add new scripts alongside (e.g., `test:bestest`)
+- Preserve legacy framework dependencies — do not remove them from `package.json`
+- Set `config.state.init_type` to `"brownfield-coexist"`
+- Set `config.state.existing_frameworks_preserved` to the list of legacy framework names (e.g., `["mocha"]`)
+- In `config.yaml`, add a `brownfield` section:
+
+```yaml
+brownfield:
+  mode: coexist
+  preserved_frameworks:
+    - name: mocha
+      config_path: .mocharc.js
+      test_pattern: "test/**/*.test.js"
+  new_framework:
+    config_path: vitest.config.ts
+    test_pattern: "src/**/*.{test,spec}.{ts,tsx}"
+```
+
+- Add a note to `TESTING.md` about the dual-framework setup and how new tests should use the bestest framework.
+
+**Migrate mode (`brownfield-migrate`):**
+- Create `.bestest/` with the bestest-recommended framework config
+- Preserve existing framework config files (they're needed until migration completes)
+- Create `.bestest/migration-plan.md` with a batch migration schedule:
+  ```markdown
+  # Migration Plan: Mocha → Vitest
+
+  ## Summary
+  - Total test files: 47
+  - Estimated batches: 5 (10 files per batch)
+  - Estimated effort: Medium
+
+  ## Batches
+  1. Batch 1: `test/unit/utils/` (8 files) — utility functions, low risk
+  2. Batch 2: `test/unit/services/` (12 files) — service layer, medium risk
+  3. Batch 3: `test/unit/controllers/` (10 files) — controller tests, medium risk
+  4. Batch 4: `test/integration/` (12 files) — integration tests, high risk
+  5. Batch 5: `test/e2e/` (5 files) — E2E tests, high risk
+
+  ## Per-file Migration Steps
+  For each file:
+  1. Copy from Mocha pattern to Vitest pattern (describe/it → describe/it, usually identical)
+  2. Replace `assert`/`chai.expect` with Vitest `expect`
+  3. Replace Mocha hooks with Vitest equivalents (same API for describe/it/beforeEach/afterEach)
+  4. Update imports (remove Mocha-specific imports)
+  5. Run both old and new tests to verify equivalence
+  6. Remove old test file
+
+  Run `/bestest migrate` to execute this plan.
+  ```
+- Set `config.state.init_type` to `"brownfield-migrate"`
+- Set `config.state.existing_frameworks_preserved` to `[]` (frameworks will be removed during migration)
+- Add existing test runner script to `package.json` as `test:legacy` (if it conflicts with the new `test` script)
+
+**Replace mode (`brownfield-replace`):**
+- Back up existing framework config files to `.bestest/backup/` before any modifications:
+  ```
+  .bestest/backup/
+  └── pre-replace/
+      ├── .mocharc.js          # Original Mocha config
+      ├── test/setup.js        # Original setup file
+      └── package.json.diff    # Diff of removed dependencies
+  ```
+- Create `.bestest/` with the bestest-recommended framework config
+- Remove legacy framework config files from the repo root (they've been backed up)
+- Remove legacy framework dependencies from `package.json` (or equivalent)
+- Do NOT rewrite existing test files during init — that is the generate spoke's job. Mark them in the test inventory for the generate spoke to handle.
+- Set `config.state.init_type` to `"brownfield-replace"`
+- Set `config.state.existing_frameworks_preserved` to `[]`
+
+**Greenfield mode (default):**
+- Standard scaffold behavior — no special handling needed
+- Set `config.state.init_type` to `"greenfield"`
+- Set `config.state.existing_frameworks_preserved` to `[]`
+
+### Brownfield Detection Gate
+
+Before scaffolding, apply this deterministic check:
+
+```
+Set brownfield = true when ANY of:
+  1. StackProfile.testFrameworks.legacyDetected == true
+  2. StackProfile.testFrameworks.existing is non-null and non-empty
+  3. testInventory.totalFiles > 0
+
+If brownfield AND no handling mode was selected in Phase 3:
+  Default to "coexist" (safest option — no destructive action)
+  Print: "No handling mode selected. Defaulting to coexist mode (safest — existing tests are preserved)."
+  Print: "To change mode, re-run /bestest init and select migrate or replace."
+```
 
 ### Directory Structure
 
@@ -450,6 +733,30 @@ If Context7 is unavailable or returns no results:
 ## Phase 5 — Install Dependencies
 
 Build the dependency list from the framework recommendation and present it to the user before installing.
+
+### Brownfield Dependency Diff
+
+If `brownfield = true`, compute the dependency diff before presenting:
+
+```
+1. List all dependencies the bestest-recommended framework requires (standard lists below).
+2. For each dependency, check if it already exists in the project's manifest:
+   - JS/TS: Check package.json devDependencies and dependencies
+   - Python: Check requirements.txt, pyproject.toml [project.dependencies], or poetry.lock
+   - Java: Check build.gradle dependencies block or pom.xml <dependencies>
+   - Go: Check go.mod require directives
+3. Only include dependencies that are NOT already installed.
+4. In coexist/migrate mode: also list dependencies that will be KEPT (existing framework deps).
+5. In replace mode: list dependencies that will be REMOVED (legacy framework deps).
+
+Present the diff to the user:
+  "Dependencies to ADD: [list of new deps]"
+  "Dependencies ALREADY INSTALLED (no action needed): [list]"
+  "Dependencies to REMOVE (replace mode only): [list of legacy deps]"
+  "Dependencies to PRESERVE (coexist/migrate mode): [list of legacy deps]"
+```
+
+This ensures the install phase is idempotent — re-running init on a brownfield repo won't reinstall existing packages.
 
 ### Dependency Lists by Framework
 
@@ -736,6 +1043,43 @@ If the install command fails:
 
 ## Phase 6 — Validation
 
+### Brownfield Coexistence Verification
+
+If `brownfield = true`, add these checks after the standard validation:
+
+```
+Coexistence checks (coexist and migrate modes):
+  1. Verify existing framework config files are still present and unmodified:
+     - For each entry in StackProfile.existingConfig.frameworks:
+       Check that configPath still exists
+       Check that its content is unchanged from pre-init snapshot
+  2. Verify existing test scripts in package.json are preserved:
+     - For each entry in StackProfile.existingConfig.scripts:
+       Check that the script still exists in package.json
+  3. Verify the bestest-recommended framework config is also present:
+     - vitest.config.ts or jest.config.ts (JS/TS) exists and is valid
+     - pyproject.toml [tool.pytest.ini_options] exists (Python)
+  4. Print coexistence summary:
+     "✅ Existing [mocha] config preserved: .mocharc.js"
+     "✅ Existing test scripts preserved: test, test:watch"
+     "✅ New [vitest] config created: vitest.config.ts"
+     "✅ Run 'npm test' for legacy tests, 'npx vitest' for new tests"
+
+Replace mode checks:
+  1. Verify legacy framework config files have been REMOVED from repo root:
+     - For each entry in StackProfile.existingConfig.frameworks:
+       Check that configPath no longer exists at repo root
+  2. Verify backups exist in .bestest/backup/pre-replace/:
+     - For each removed config file, verify backup exists
+  3. Verify legacy dependencies have been removed from package.json:
+     - Check that legacy framework packages are no longer in devDependencies
+  4. Print replace summary:
+     "✅ Legacy [mocha] config backed up to .bestest/backup/pre-replace/.mocharc.js"
+     "✅ Legacy [mocha] dependency removed from package.json"
+     "✅ New [vitest] config created: vitest.config.ts"
+     "ℹ️ Existing test files are preserved but may need updates — run /bestest generate --untested"
+```
+
 ### State File Corruption Handling
 
 Before reading any `.bestest/state/*.json` file during validation, apply this pre-read validation:
@@ -821,6 +1165,19 @@ Print a completion summary:
 
 ```
 ## bestest init complete
+
+[Brownfield-only section — show when brownfield = true]
+### Existing Test Infrastructure
+- **Handling Mode**: [coexist/migrate/replace]
+- **Legacy Frameworks**: [list preserved or removed frameworks]
+- **Test Inventory**: [totalFiles] existing test files ([unit] unit, [integration] integration, [e2e] E2E)
+- **Preserved Config**: [list preserved config paths — coexist/migrate only]
+- **Backed Up Config**: [list backed up config paths — replace only]
+- **Next Steps for Legacy Tests**:
+  - [coexist] "Existing tests continue to work. Run `npm test` for legacy tests, `npx vitest` for new tests."
+  - [migrate] "Run `/bestest migrate` to start migrating legacy tests in batches."
+  - [replace] "Run `/bestest generate --untested` to create new tests replacing legacy ones."
+[End brownfield section]
 
 ### Created Files
 | File | Purpose |
@@ -941,6 +1298,35 @@ Exit.
 "Init will create new files but will not modify existing ones."
 "Consider committing your changes before proceeding for a clean rollback point."
 ```
+
+### 8. Brownfield: Existing Tests Fail After Init
+
+**Trigger**: In replace mode, existing test files may reference the removed legacy framework and fail to run.
+
+**Response**: This is expected behavior. Print:
+```
+"Note: Some existing test files may reference the removed [legacy] framework."
+"These files are preserved for reference but will not run until updated."
+"Run /bestest generate --untested to generate replacement tests."
+"Legacy config backups are at .bestest/backup/pre-replace/."
+```
+Do NOT attempt to fix or rewrite the tests during init — that is the generate spoke's responsibility.
+
+### 9. Brownfield: Config Conflict on Coexist
+
+**Trigger**: In coexist mode, the bestest framework config (e.g., `vitest.config.ts`) would conflict with the existing config (e.g., both use the same test file pattern).
+
+**Response**: Adjust the bestest config to use a separate test file pattern that doesn't overlap with the legacy framework's pattern:
+```
+"Warning: Test file pattern overlap detected."
+"[bestest pattern] and [legacy pattern] would match the same files."
+"Adjusting bestest config to use: [non-overlapping pattern]"
+"Legacy tests will continue to use: [legacy pattern]"
+```
+Common adjustments:
+- If legacy uses `test/**/*.test.js`, set bestest to `src/**/*.{test,spec}.{ts,tsx}`
+- If legacy uses `*.spec.js`, set bestest to `*.test.ts`
+- If both patterns overlap, scope bestest to `src/` directory
 
 ---
 
