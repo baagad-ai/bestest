@@ -14,6 +14,7 @@ Complete reference for the `.bestest/` directory tree — what creates each file
 │   └── ADR-001-test-framework.md      # Framework selection decision record
 ├── state/
 │   ├── stack-profile.json             # Detected technology stack
+│   ├── metrics.json                   # Continuous test health metrics (all spokes)
 │   └── migration-backup.json          # Migration state checkpoint (spoke-migrate only)
 └── reports/
     ├── scan-<timestamp>.json          # Scan reports (spoke-scan)
@@ -123,6 +124,20 @@ These fields are set during init and are immutable — they record the init-time
 | **Contains** | Original config snapshot, migration progress, completed steps, rollback data |
 | **Safe to delete** | Yes — but doing so prevents resuming an interrupted migration. Safe to delete after migration completes successfully. |
 
+#### `.bestest/state/metrics.json`
+
+| Attribute | Detail |
+|-----------|--------|
+| **Created by** | `spoke-init` (Phase 4 — Scaffold) |
+| **Updated by** | All state-changing spokes: `spoke-scan`, `spoke-run`, `spoke-fix`, `spoke-generate`, `spoke-migrate`, `spoke-doctor`, `spoke-coverage`, `spoke-report`, `spoke-config` |
+| **Read by** | All operational spokes (for trend data), `spoke-doctor` (health checks), `spoke-report` (dashboard), S05 dashboard widget |
+| **Schema** | Defined in `references/metrics-schema.md` |
+| **schemaVersion** | `"1.0"` — set per `references/schema-contract.md`. Consumers must check schemaVersion before parsing. |
+| **Contains** | Health score, coverage trends, test counts, flakiness signals, run history, module breakdown, slowest tests, failure heat map, activity log |
+| **Lifecycle** | Created by init with defaults. Continuously updated by every state-changing spoke. Bounded arrays evict oldest entries (see metrics-schema.md for maxLength defaults). |
+| **Corruption handling** | Pre-read validation: if parse fails, recreating with defaults + current spoke's data (graceful degradation). Never aborts the spoke. |
+| **Safe to delete** | Yes — any state-changing spoke will recreate it with defaults on next invocation. Historical trend data will be lost. |
+
 ### `.bestest/reports/`
 
 | Attribute | Detail |
@@ -192,14 +207,14 @@ Which spokes create or modify files inside `.bestest/`:
 
 | Spoke | config.yaml | state/ | reports/ | adrs/ | Root files |
 |-------|-------------|--------|----------|-------|------------|
-| **spoke-init** | ✅ creates | ✅ creates `stack-profile.json` | ✅ creates directory | ✅ creates ADR-001 | ✅ TESTING.md, framework config |
-| **spoke-scan** | ✅ updates `state.last_scan` | — | ✅ `scan-<ts>.json`, ephemeral files | — | — |
-| **spoke-run** | ✅ updates `state.last_run` | — | ✅ `run-<ts>.json`, ephemeral files | — | — |
-| **spoke-generate** | ✅ updates `state.last_generate` | — | — | — | ✅ creates test files |
-| **spoke-fix** | ✅ updates `state.last_fix` | — | ✅ `fix-<ts>.json`, `fix-verify.json` | — | ✅ modifies test files |
-| **spoke-doctor** | ✅ updates `state.last_doctor` | — | ✅ `doctor-<ts>.json` | — | — |
-| **spoke-report** | — | — | ✅ `report-<ts>.md` | — | — |
-| **spoke-config** | ✅ updates (set/reset) | — | — | — | — |
+| **spoke-init** | ✅ creates | ✅ creates `stack-profile.json`, `metrics.json` | ✅ creates directory | ✅ creates ADR-001 | ✅ TESTING.md, framework config |
+| **spoke-scan** | ✅ updates `state.last_scan` | ✅ updates `metrics.json` | ✅ `scan-<ts>.json`, ephemeral files | — | — |
+| **spoke-run** | ✅ updates `state.last_run` | ✅ updates `metrics.json` | ✅ `run-<ts>.json`, ephemeral files | — | — |
+| **spoke-generate** | ✅ updates `state.last_generate` | ✅ updates `metrics.json` | — | — | ✅ creates test files |
+| **spoke-fix** | ✅ updates `state.last_fix` | ✅ updates `metrics.json` | ✅ `fix-<ts>.json`, `fix-verify.json` | — | ✅ modifies test files |
+| **spoke-doctor** | ✅ updates `state.last_doctor` | ✅ updates `metrics.json` | ✅ `doctor-<ts>.json` | — | — |
+| **spoke-report** | — | ✅ updates `metrics.json` | ✅ `report-<ts>.md` | — | — |
+| **spoke-config** | ✅ updates (set/reset) | ✅ updates `metrics.json` | — | — | — |
 | **spoke-expand** | ✅ adds test type blocks | — | — | — | ✅ framework config updates, helper files |
 | **spoke-ci** | ✅ updates `ci.*` | — | — | — | ✅ CI pipeline file |
 | **spoke-migrate** | ✅ updates framework fields | ✅ `migration-backup.json` | ✅ `migration-<ts>.json` | — | ✅ dependency changes |
@@ -211,19 +226,19 @@ Which spokes create or modify files inside `.bestest/`:
 
 Which spokes read files inside `.bestest/`:
 
-| Spoke | config.yaml | stack-profile.json | reports/* | adrs/* |
-|-------|-------------|--------------------|-----------|--------|
-| **spoke-scan** | ✅ | ✅ (enriches analysis) | ✅ (historical comparison) | — |
-| **spoke-run** | ✅ | ✅ (framework routing) | — | — |
-| **spoke-generate** | ✅ | ✅ (framework patterns) | ✅ (scan reports for untested files) | — |
-| **spoke-fix** | ✅ | ✅ | ✅ (`run-*.json` for failures) | — |
-| **spoke-doctor** | ✅ | ✅ | ✅ (all report types) | ✅ (ADR-001 existence) |
-| **spoke-report** | ✅ | ✅ | ✅ (all report types) | — |
-| **spoke-config** | ✅ | ✅ (smart defaults for reset) | — | — |
-| **spoke-expand** | ✅ | ✅ (framework-aware scaffolding) | — | — |
-| **spoke-ci** | ✅ | ✅ (language detection) | — | — |
-| **spoke-migrate** | ✅ | ✅ | ✅ (run reports for validation) | — |
-| **spoke-coverage** | ✅ | — | ✅ (run + scan reports, raw coverage) | — |
+| Spoke | config.yaml | stack-profile.json | metrics.json | reports/* | adrs/* |
+|-------|-------------|--------------------|--------------|----------|--------|
+| **spoke-scan** | ✅ | ✅ (enriches analysis) | ✅ (trend data) | ✅ (historical comparison) | — |
+| **spoke-run** | ✅ | ✅ (framework routing) | ✅ (run history) | — | — |
+| **spoke-generate** | ✅ | ✅ (framework patterns) | ✅ (test counts) | ✅ (scan reports for untested files) | — |
+| **spoke-fix** | ✅ | ✅ | ✅ (failure heat map) | ✅ (`run-*.json` for failures) | — |
+| **spoke-doctor** | ✅ | ✅ | ✅ (health score) | ✅ (all report types) | ✅ (ADR-001 existence) |
+| **spoke-report** | ✅ | ✅ | ✅ (all metrics) | ✅ (all report types) | — |
+| **spoke-config** | ✅ | ✅ (smart defaults for reset) | ✅ (target sync) | — | — |
+| **spoke-expand** | ✅ | ✅ (framework-aware scaffolding) | — | — | — |
+| **spoke-ci** | ✅ | ✅ (language detection) | — | — | — |
+| **spoke-migrate** | ✅ | ✅ | ✅ (run history) | ✅ (run reports for validation) | — |
+| **spoke-coverage** | ✅ | — | ✅ (coverage trends) | ✅ (run + scan reports, raw coverage) | — |
 
 ---
 

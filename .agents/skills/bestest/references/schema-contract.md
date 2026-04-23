@@ -20,6 +20,7 @@ Patches (documentation-only changes) do not increment the version.
 | `stack-profile.json` | Top-level `schemaVersion` | `1.3` |
 | `scan-report.json` | Top-level `schemaVersion` | `1.2` |
 | `run-results.json` | Top-level `schemaVersion` | `1.0` |
+| `metrics.json` | Top-level `schemaVersion` | `1.0` |
 | `config.yaml` | `version` (top-level) | `1.0` |
 
 ### Version History
@@ -46,6 +47,18 @@ Patches (documentation-only changes) do not increment the version.
 | Version | Date | Change |
 |---------|------|--------|
 | 1.0 | 2025-04 | Initial versioned schema. Added `schemaVersion` field to run-results.json shape. |
+
+#### run-results-schema
+
+| Version | Date | Change |
+|---------|------|--------|
+| 1.0 | 2025-04 | Initial versioned schema. Added `schemaVersion` field to run-results.json shape. |
+
+#### metrics-schema
+
+| Version | Date | Change |
+|---------|------|--------|
+| 1.0 | 2025-04 | Initial schema. Metrics store for continuous test health aggregation across all spokes. |
 
 #### config-schema
 
@@ -85,6 +98,9 @@ Every spoke that reads a structured artifact must validate `schemaVersion` befor
 | `spoke-coverage` | `run-results.json` schemaVersion + `config.yaml` version | Warn on unknown minor. Error on MAJOR mismatch. |
 | `spoke-doctor` | `config.yaml` version + `stack-profile.json` schemaVersion | Warn on unknown minor. Error on MAJOR mismatch. |
 | `spoke-config` | `config.yaml` version | Warn if > known version. Do not overwrite newer versions. |
+| `spoke-report` | `metrics.json` schemaVersion | Warn on unknown minor. Error on MAJOR mismatch. |
+| `spoke-doctor` | `metrics.json` schemaVersion + `config.yaml` version + `stack-profile.json` schemaVersion | Warn on unknown minor. Error on MAJOR mismatch. |
+| `spoke-coverage` | `metrics.json` schemaVersion + `run-results.json` schemaVersion + `config.yaml` version | Warn on unknown minor. Error on MAJOR mismatch. |
 
 ## Breaking vs Non-Breaking Changes
 
@@ -106,6 +122,6 @@ Every spoke that reads a structured artifact must validate `schemaVersion` befor
 
 ## Cross-Reference
 
-- Schema shapes: `references/stack-profile-schema.md`, `references/scan-report-schema.md`, `references/config-schema.md`
+- Schema shapes: `references/stack-profile-schema.md`, `references/scan-report-schema.md`, `references/config-schema.md`, `references/metrics-schema.md`
 - Consuming spokes: `references/spoke-scan.md`, `references/spoke-run.md`, `references/spoke-generate.md`, `references/spoke-fix.md`, `references/spoke-coverage.md`, `references/spoke-doctor.md`, `references/spoke-config.md`
 - Prompt injection defense: `references/context3-helper.md` (L4 schema validation)

@@ -218,6 +218,7 @@ Runtime state managed by bestest. **DO NOT EDIT** — these fields are automatic
 | `state.last_generate` | string or null | `null` | ISO 8601 timestamp of last `bestest generate` execution |
 | `state.last_run` | string or null | `null` | ISO 8601 timestamp of last `bestest run` execution |
 | `state.last_doctor` | string or null | `null` | ISO 8601 timestamp of last `bestest doctor` execution |
+| `state.last_metrics` | string or null | `null` | ISO 8601 timestamp of last metrics.json update (written by every state-changing spoke). See `references/metrics-schema.md`. |
 | `state.init_type` | string | `"greenfield"` | How the project was initialized: `"greenfield"` (no existing test infrastructure), `"brownfield-coexist"` (existing tests kept alongside bestest), `"brownfield-migrate"` (existing tests being migrated to bestest-recommended framework), `"brownfield-replace"` (existing tests replaced). Set during init, immutable after. |
 | `state.existing_frameworks_preserved` | string[] | `[]` | List of legacy framework names that were detected during init and are being preserved (coexist mode). Only populated when `state.init_type` is `"brownfield-coexist"`. Example: `["mocha", "jasmine"]`. Empty for greenfield and non-coexist brownfield inits. |
 | `state.version` | string | `"1.0"` | Config schema version for migration support |
@@ -392,6 +393,7 @@ state:
   last_generate: null
   last_run: null
   last_doctor: null
+  last_metrics: null
   version: "1.0"
 ```
 
@@ -484,6 +486,7 @@ state:
   last_generate: null
   last_run: null
   last_doctor: null
+  last_metrics: null
   version: "1.0"
 ```
 
@@ -577,6 +580,7 @@ state:
   last_generate: null
   last_run: null
   last_doctor: null
+  last_metrics: null
   version: "1.0"
 ```
 
@@ -686,6 +690,7 @@ state:
   last_generate: null
   last_run: null
   last_doctor: null
+  last_metrics: null
   version: "1.0"
 ```
 
@@ -791,6 +796,7 @@ state:
   last_generate: null
   last_run: null
   last_doctor: null
+  last_metrics: null
   version: "1.0"
 ```
 
@@ -908,5 +914,6 @@ state:
   last_generate: null
   last_run: null
   last_doctor: null
+  last_metrics: null
   version: "1.0"
 ```
