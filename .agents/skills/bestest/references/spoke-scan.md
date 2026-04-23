@@ -1015,6 +1015,38 @@ Write the scan report to disk, update TESTING.md with current results, update co
 
 ---
 
+## Metrics Update
+
+After Phase 8 completes and all artifacts are written, update `.bestest/state/metrics.json` per the shared protocol in `references/metrics-schema.md`. The scan spoke provides the richest data for test inventory, flakiness detection, module-level coverage, and slowest test identification.
+
+### Protocol
+
+1. **Read `.bestest/state/metrics.json`** — If the file does not exist, treat as first-time creation with defaults from `metrics-schema.md`.
+2. **Parse** — If parsing fails (corruption), log a warning and reinitialize with defaults plus current scan data. **Never abort the spoke** — metrics are observability, not a gate.
+3. **Validate `schemaVersion`** — Warn if MAJOR version differs; proceed if MINOR differs.
+4. **Merge spoke-specific data** (see field mapping below).
+5. **Recalculate derived values** — `overallFlakeRate` from updated flaky test data.
+6. **Write back** — Atomic write (write to temp file, then rename).
+7. **Update `config.yaml`** — Set `state.last_metrics` to current ISO 8601 timestamp.
+
+### Fields Updated by spoke-scan
+
+| Metrics Section | Source Data | Merge Logic |
+|----------------|------------|-------------|
+| `tests` | Scan report `summary` | Replace `total`, `passing`, `failing`, `skipped` with scan totals. Update `byType` from `testTypes` counts (`unit`, `integration`, `e2e`). |
+| `flakiness.flakyTests[]` | Scan report `flakyTests[]` | Replace entire array with current scan's flaky test findings. Each entry: `{ file, name, failPassRatio, signals[], lastSeen }`. Compute `failPassRatio` from historical data if available (≥0.3 threshold for inclusion); use 0.3 as default for newly flagged tests. |
+| `flakiness.overallFlakeRate` | `flakyTests` count / `tests.total` | Recalculate: `count(flakyTests) / max(tests.total, 1)`. |
+| `modules.entries[]` | Scan report `testInventory[]` + per-file coverage | Build one entry per module/directory: `{ path, tests, passing, coverage }`. Aggregate test counts and coverage from testInventory and per-file coverage data. Replace entire array (scan provides the most complete module picture). |
+| `slowest.tests[]` | Phase 3 test execution timing data | If Phase 3 ran tests, replace with top-10 slowest tests sorted by `duration_ms`. Each entry: `{ file, name, duration_ms }`. If Phase 3 was skipped (coverage disabled), leave `slowest` unchanged. |
+| `activity[]` | Scan summary | Append `{ timestamp, spoke: "spoke-scan", action: "scan", summary: "{totalTests} tests scanned, {antiPatternCount} anti-patterns, {flakyCount} flaky ({coveragePct}% coverage)" }`. Evict oldest entries exceeding `activityMaxLength` (200). |
+| `lastUpdated` | Current time | Set to current ISO 8601 timestamp. |
+
+### Bounded Array Eviction
+
+All arrays use FIFO eviction: append new entry to end, then remove from beginning if length exceeds `*maxLength`. See `metrics-schema.md` → Bounded Array Eviction for the canonical algorithm.
+
+---
+
 ## Error Handling
 
 ### 1. No Tests Found

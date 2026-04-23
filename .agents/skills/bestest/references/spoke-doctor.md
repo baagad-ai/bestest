@@ -1341,6 +1341,48 @@ Assemble all dimension scores and the composite score into a structured health r
 
 ---
 
+## Metrics Update
+
+After Phase 11 completes and all artifacts are written, update `.bestest/state/metrics.json` per the shared protocol in `references/metrics-schema.md`. The doctor spoke is focused on health score aggregation — it writes the most authoritative `healthScore` snapshot and an activity log entry.
+
+### Protocol
+
+1. **Read `.bestest/state/metrics.json`** — If the file does not exist, treat as first-time creation with defaults from `metrics-schema.md`.
+2. **Parse** — If parsing fails (corruption), log a warning and reinitialize with defaults plus current doctor data. **Never abort the spoke** — metrics are observability, not a gate.
+3. **Validate `schemaVersion`** — Warn if MAJOR version differs; proceed if MINOR differs.
+4. **Merge spoke-specific data** (see field mapping below).
+5. **Write back** — Atomic write (write to temp file, then rename).
+6. **Update `config.yaml`** — Set `state.last_metrics` to current ISO 8601 timestamp.
+
+### Fields Updated by spoke-doctor
+
+| Metrics Section | Source Data | Merge Logic |
+|----------------|------------|-------------|
+| `healthScore.overall` | Composite score from Phase 11 | Replace with `healthScore / 100` (doctor scores 0–100, metrics uses 0.0–1.0). Round to 2 decimal places. |
+| `healthScore.breakdown.coverage` | Coverage Trend dimension score | Replace with `dimensionScore / 100` if dimension is `scored`; set to `null` if `skipped` or `not_configured`. |
+| `healthScore.breakdown.flakiness` | Flaky Test Budget dimension score | Replace with `dimensionScore / 100` if `scored`; set to `null` if `skipped`. |
+| `healthScore.breakdown.passRate` | Not directly measured by doctor | Leave unchanged (populated by spoke-run). |
+| `healthScore.breakdown.freshness` | Current time vs `lastUpdated` | Set to 1.0 (just updated). |
+| `healthScore.breakdown.mutation` | Not measured by doctor | Leave unchanged (remains `null` unless mutation testing is configured). |
+| `activity[]` | Doctor summary | Append `{ timestamp, spoke: "spoke-doctor", action: "doctor", summary: "Health score: {score}/100 ({status}) — {count} dimensions scored" }`. Evict oldest entries exceeding `activityMaxLength` (200). |
+| `lastUpdated` | Current time | Set to current ISO 8601 timestamp. |
+
+### Health Score Derivation
+
+The doctor's composite score (0–100) maps to the metrics `healthScore.overall` (0.0–1.0) via simple division:
+
+```
+metrics.healthScore.overall = doctorReport.healthScore / 100
+```
+
+Per-dimension scores that were `scored` map to breakdown fields via the same division. Dimensions that were `skipped` or `not_configured` map to `null` and are excluded from the overall average per the formula in `metrics-schema.md`.
+
+### Bounded Array Eviction
+
+All arrays use FIFO eviction: append new entry to end, then remove from beginning if length exceeds `*maxLength`. See `metrics-schema.md` → Bounded Array Eviction for the canonical algorithm.
+
+---
+
 ## Error Handling
 
 ### 1. No `.bestest/` directory

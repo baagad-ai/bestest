@@ -1556,6 +1556,44 @@ Write the run report to disk, update config state, and print a console summary.
 
 ---
 
+## Metrics Update
+
+After Phase 6 completes and all artifacts are written, update `.bestest/state/metrics.json` per the shared protocol in `references/metrics-schema.md`. The run spoke writes the highest volume of metrics data — run history, test results, coverage snapshots, slowest tests, and failure tracking.
+
+### Protocol
+
+1. **Read `.bestest/state/metrics.json`** — If the file does not exist, treat as first-time creation with defaults from `metrics-schema.md`.
+2. **Parse** — If parsing fails (corruption), log a warning and reinitialize with defaults plus current run data. **Never abort the spoke** — metrics are observability, not a gate.
+3. **Validate `schemaVersion`** — Warn if MAJOR version differs; proceed if MINOR differs.
+4. **Merge spoke-specific data** (see field mapping below).
+5. **Recalculate derived values** — `healthScore` (passRate, coverage ratio, freshness), `overallFlakeRate`.
+6. **Write back** — Atomic write (write to temp file, then rename).
+7. **Update `config.yaml`** — Set `state.last_metrics` to current ISO 8601 timestamp.
+
+### Fields Updated by spoke-run
+
+| Metrics Section | Source Data | Merge Logic |
+|----------------|------------|-------------|
+| `tests` | `run-results.json` summary | Replace `total`, `passing`, `failing`, `skipped` with latest run counts. Update `byType` if suite filter provides type breakdown. |
+| `runs.total` | Cumulative | Increment by 1. |
+| `runs.history[]` | `run-results.json` | Append entry: `{ timestamp, spoke: "spoke-run", total, passed, failed, skipped, duration_ms, coverage }`. Evict oldest entries exceeding `historyMaxLength` (100). |
+| `coverage.current` | `run-results.json` coverage block | Replace with latest coverage snapshot (`lines`, `branches`, `functions`, `statements`). |
+| `coverage.trend[]` | `coverage.current` after update | Append new coverage snapshot with timestamp. Evict oldest entries exceeding `trendMaxLength` (50). |
+| `healthScore.breakdown.coverage` | `coverage.current.lines / coverage.target` | Recalculate. Cap at 1.0. Skip if coverage not collected. |
+| `healthScore.breakdown.passRate` | `tests.passing / max(tests.total, 1)` | Recalculate. |
+| `healthScore.breakdown.freshness` | Current time vs `lastUpdated` | Set to 1.0 (just updated). |
+| `healthScore.overall` | Average of non-null breakdown scores | Recalculate. |
+| `slowest.tests[]` | Per-test `durationMs` from parsed results | Replace with top-10 slowest tests from this run (sort descending by `duration_ms`, take first `maxLength` entries). Each entry: `{ file, name, duration_ms }`. |
+| `failures.heatMap[]` | Failed test files | For each failed test file: increment `count` if already in heatMap and update `lastFailed`; otherwise append new entry. Evict entries exceeding `maxLength` (20) by removing lowest-count entries first. |
+| `activity[]` | Run summary | Append `{ timestamp, spoke: "spoke-run", action: "run", summary: "{passed} passed, {failed} failed (coverage {pct}%)" }`. Evict oldest entries exceeding `activityMaxLength` (200). |
+| `lastUpdated` | Current time | Set to current ISO 8601 timestamp. |
+
+### Bounded Array Eviction
+
+All arrays use FIFO eviction: append new entry to end, then remove from beginning if length exceeds `*maxLength`. See `metrics-schema.md` → Bounded Array Eviction for the canonical algorithm.
+
+---
+
 ## Error Handling
 
 ### 1. No Tests Found
