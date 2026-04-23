@@ -1,4 +1,4 @@
-name: Validate Bestest Skill
+name: Validate Bestest Plugin
 
 on:
   push:
@@ -19,5 +19,5 @@ jobs:
 
       - name: Run validation script
         run: |
-          chmod +x "$SKILL_DIR/scripts/validate-skill.sh"
-          "$SKILL_DIR/scripts/validate-skill.sh"
+          chmod +x "$SKILL_DIR/scripts/validate-plugin.sh"
+          "$SKILL_DIR/scripts/validate-plugin.sh"

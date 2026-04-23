@@ -154,7 +154,7 @@ If the user specifies an unrecognized command:
 
 ## Spoke Loading
 
-Read the spoke file from the skill directory. The path is relative to `~/.agents/skills/bestest/`. Load only the spoke file for the requested command — do not load all spokes.
+Read the spoke file from the plugin directory. The path is relative to `~/.agents/skills/bestest/`. Load only the spoke file for the requested command — do not load all spokes.
 
 </routing>
 

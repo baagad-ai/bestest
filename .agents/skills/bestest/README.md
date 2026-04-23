@@ -4,7 +4,7 @@ Enterprise-grade testing architect skill for AI coding agents. Detects your stac
 
 ## What It Does
 
-**bestest** is a skill for [GSD/pi](https://github.com/anthropics/gsd-pi) that turns an AI agent into a testing architect. Instead of writing individual tests by hand, you describe what you need and bestest handles strategy, scaffolding, generation, and verification.
+**bestest** is a plugin for [GSD/pi](https://github.com/anthropics/gsd-pi) that turns an AI agent into a testing architect. Instead of writing individual tests by hand, you describe what you need and bestest handles strategy, scaffolding, generation, and verification.
 
 - **Stack detection** — Identifies languages, frameworks, build tools, and existing test infrastructure from 80+ detection signals.
 - **Framework recommendation** — Deterministic decision trees for JS/TS (Vitest/Jest), Python (pytest), Java (JUnit 5), and Go.

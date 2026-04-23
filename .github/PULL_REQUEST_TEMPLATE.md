@@ -12,7 +12,7 @@ Brief description of what this PR does and why.
 
 ## Validation
 
-- [ ] Ran `bash .agents/skills/bestest/scripts/validate-skill.sh` — all checks pass
+- [ ] Ran `bash .agents/skills/bestest/scripts/validate-plugin.sh` — all checks pass
 - [ ] Tested the change against a real project (describe below)
 - [ ] No new lint or formatting issues introduced
 

@@ -70,7 +70,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conv
 
 ### Added
 
-- Initial release of the bestest skill.
+- Initial release of the bestest plugin.
 - Stack detection engine with 80+ signals across 12 categories.
 - Framework decision trees for JS/TS, Python, Java, and Go.
 - Command spokes: `init`, `config`, `scan`, `generate`, `run`, `fix`, `coverage`, `report`, `doctor`, `expand`, `migrate`, `ci`.
@@ -79,3 +79,4 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conv
 - StackProfile schema with confidence scores and evidence arrays.
 - Migration support: Jest → Vitest, JUnit 4 → JUnit 5, Cypress → Playwright.
 - CI pipeline generation for GitHub Actions, GitLab CI, and Jenkins.
+itLab CI, and Jenkins.

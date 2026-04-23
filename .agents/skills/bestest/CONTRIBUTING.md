@@ -142,7 +142,7 @@ In SKILL.md `<routing>` section:
 
 ## Testing Your Changes
 
-There is no automated test suite for the skill itself. Validate changes by:
+There is no automated test suite for the plugin itself. Validate changes by:
 
 1. **Grep checks** — Verify all referenced files exist: `grep -o 'references/[a-z0-9-]*.md' SKILL.md | sort -u | while read f; do test -f "$HOME/.agents/skills/bestest/$f" && echo "OK $f" || echo "MISSING $f"; done`
 2. **Routing consistency** — Every spoke in the routing table should appear in the reference_index and vice versa.

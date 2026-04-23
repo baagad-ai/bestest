@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# validate-skill.sh — Comprehensive consistency checker for the bestest skill
+# validate-plugin.sh — Comprehensive consistency checker for the bestest plugin
 # Checks 7 domains: routing↔index, index↔disk, spoke existence, detection engine,
 # schema field coverage, template completeness, SKILL.md integrity.
 # Exit 0 if all pass (or only warnings), exit 1 if any critical failure.

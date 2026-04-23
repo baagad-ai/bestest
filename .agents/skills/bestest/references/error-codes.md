@@ -7,7 +7,7 @@ Error code taxonomy for `scripts/validate-skill.sh`. Each code represents one di
 | Severity | Meaning | CI Behavior |
 |----------|---------|-------------|
 | **critical** | Structural breakage — missing files, broken cross-references, or incomplete schema coverage that will cause runtime failures. | **Blocks CI** (exit 1) |
-| **warning** | Degraded quality — empty sections, low content, or informational gaps that reduce skill effectiveness but do not cause failures. | **Informational** (logged, exit 0) |
+| **warning** | Degraded quality — empty sections, low content, or informational gaps that reduce plugin effectiveness but do not cause failures. | **Informational** (logged, exit 0) |
 
 ## Quick Reference Table
 
@@ -258,7 +258,7 @@ These codes verify that the main SKILL.md file has valid frontmatter and all req
 
 ## Usage in Validation Script
 
-The validation script (`scripts/validate-skill.sh`) should:
+The validation script (`scripts/validate-plugin.sh`) should:
 
 1. **Load this file** and parse the error code table for the check catalog.
 2. **Run checks sequentially** by domain (structural → schema → detection → template → SKILL.md).
@@ -278,3 +278,4 @@ The validation script (`scripts/validate-skill.sh`) should:
 - Detection engine: `references/detection-engine.md`
 - Detection signals: `references/detection-signals.md`
 - Templates directory: `references/templates/`
+

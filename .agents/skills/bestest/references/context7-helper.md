@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Fetch version-specific framework documentation at execution time. Context7 is a dependency, not a feature — the skill fetches live docs automatically, falling back to static references when unavailable.
+Fetch version-specific framework documentation at execution time. Context7 is a dependency, not a feature — the plugin fetches live docs automatically, falling back to static references when unavailable.
 
 ## Pattern
 
