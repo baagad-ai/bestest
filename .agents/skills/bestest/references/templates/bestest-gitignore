@@ -1,0 +1,13 @@
+# bestest state and cache
+.bestest/state/
+.bestest/reports/
+.bestest/cache/
+
+# Generated test artifacts (tracked separately)
+# bestest scan/generate output in reports/ is informational only
+
+# Keep these tracked files (NOT ignored):
+# .bestest/config.yaml
+# .bestest/TESTING.md
+# .bestest/adrs/
+# .bestest/vitest.config.ts (or jest.config.ts)

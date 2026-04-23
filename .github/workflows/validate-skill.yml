@@ -1,0 +1,23 @@
+name: Validate Bestest Skill
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout skill
+        uses: actions/checkout@v4
+        with:
+          path: '.agents/skills/bestest'
+
+      - name: Run validation script
+        run: |
+          chmod +x "$HOME/.agents/skills/bestest/scripts/validate-skill.sh"
+          "$HOME/.agents/skills/bestest/scripts/validate-skill.sh"
