@@ -52,6 +52,17 @@ go.mod                                 # Framework config (Go projects)
 | **Lifecycle** | Created once by init. Updated in place by operational spokes (timestamps, CI settings). Safe to edit manually. Reset via `/bestest config reset`. |
 | **Safe to delete** | No — deleting config.yaml requires re-running `/bestest init` or manual reconstruction. |
 
+#### Brownfield State in `config.yaml`
+
+When `spoke-init` runs on a brownfield repo (existing test infrastructure detected), two additional fields are written to the `state` section:
+
+| Field | Description |
+|-------|-------------|
+| `state.init_type` | One of `"greenfield"`, `"brownfield-coexist"`, `"brownfield-migrate"`, or `"brownfield-replace"`. Determines how operational spokes interact with existing tests. In coexist mode, scan/generate spokes treat legacy tests as first-class citizens alongside bestest-managed tests. |
+| `state.existing_frameworks_preserved` | Array of legacy framework names preserved during init (e.g., `["mocha"]`, `["jest", "jasmine"]`). Only populated when `init_type` is `"brownfield-coexist"`. Empty for other init types. |
+
+These fields are set during init and are immutable — they record the init-time decision about how to handle existing test infrastructure. Changing brownfield mode requires re-running init.
+
 ### `.bestest/.gitignore`
 
 | Attribute | Detail |
@@ -98,6 +109,7 @@ go.mod                                 # Framework config (Go projects)
 | **Schema** | Defined in `references/stack-profile-schema.md` |
 | **schemaVersion** | `"1.3"` — set per `references/schema-contract.md`. Consumers must check schemaVersion before parsing. |
 | **Contains** | Languages (with confidence scores), build tool, frameworks, package manager, test frameworks (existing/recommended), E2E framework, coverage provider, monorepo status, CI provider |
+| **Brownfield fields** | When `brownfield` is `true`, the profile also contains: `testInventory` (file counts by type for gap analysis), `existingConfig` (captured legacy configuration), and `testFrameworks.legacyDetected`/`legacyFrameworks`/`inventory` from Phase 5.5 detection |
 | **Lifecycle** | Created once by init. Represents a point-in-time snapshot — does not auto-update if the project changes. Re-run init (after deleting .bestest/) to regenerate. |
 | **Safe to delete** | No — most spokes will emit a warning and operate with reduced capability. |
 

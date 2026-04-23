@@ -38,10 +38,94 @@ Has "next" in dependencies or next.config.* exists?
 │         Coverage: V8 provider
 │         Config file: vitest.config.ts (with Next.js plugin)
 │
-└─ NO → Proceed to Step 3
+└─ NO → Proceed to Step 2.5
 ```
 
-### Step 3: Check for Existing Jest
+### Step 2.5: Check for Legacy Test Frameworks (Brownfield Detection)
+
+```
+Has any legacy test framework been detected by Phase 5.5?
+(Mocha, Jasmine, Ava, tap, node:test, Karma)
+
+├─ YES → Determine handling mode based on test inventory size and framework depth:
+
+│         **Mocha detected?**
+│         ├─ Has >30 test files? → Coexist mode
+│         │     Recommend: Vitest alongside Mocha
+│         │     Rationale: Large Mocha test suites have significant migration cost.
+│         │     Coexistence allows gradual migration. New tests use Vitest, existing
+│         │     tests continue running via Mocha. Config: separate vitest.config.ts,
+│         │     Mocha config preserved as-is.
+│         │     Coverage: V8 provider for Vitest tests, Mocha tests excluded from
+│         │     bestest coverage tracking initially.
+│         │
+│         ├─ Has 10-30 test files with simple config? → Present migration option
+│         │     Check: Does .mocharc use custom reporters, parallel mode, or file watches?
+│         │     If simple config (just spec paths + maybe a reporter) → Offer full migration
+│         │       - Vitest supports Mocha-style describe/it natively
+│         │       - chai assertions → expect (mechanical transform)
+│         │       - Mocha hooks (before/after/beforeEach/afterEach) → Vitest equivalents
+│         │     If complex config (custom loaders, programmatic API, browser testing) → Coexist
+│         │
+│         └─ Has <10 test files? → Replace mode
+│               Recommend: Full migration to Vitest
+│               Rationale: Small test count means migration is cheap. Vitest is
+│               a superset of Mocha's API. The describe/it/beforeEach patterns
+│               transfer directly. Remove Mocha dependency, install Vitest.
+│
+│         **Jasmine detected?**
+│         ├─ Has >20 test files? → Coexist mode
+│         │     Recommend: Vitest alongside Jasmine
+│         │     Rationale: Jasmine's assertion API differs significantly from Jest/Vitest
+│         │     (expect(x).toBe(y) vs expect(x).toEqual(y) patterns differ).
+│         │     Large suites require careful migration of matchers.
+│         │
+│         ├─ Has 5-20 test files? → Present migration option
+│         │     Check: Custom matchers (jasmine.addMatchers)? Custom reporters?
+│         │     If standard matchers only → Offer full migration
+│         │     If heavy custom matchers → Coexist
+│         │
+│         └─ Has <5 test files? → Replace mode
+│               Recommend: Full migration to Vitest
+│
+│         **Ava detected?**
+│         ├─ Any test count → Coexist or Replace
+│         │     Ava's concurrent-by-default model differs from Vitest/Jest.
+│         │     Ava uses `test()` not `describe/it`. Migration requires test structure changes.
+│         │     For <15 files → Replace mode (structural changes are manageable)
+│         │     For >=15 files → Coexist mode (migrate incrementally)
+│         │
+│         **tap/node:test detected?**
+│         ├─ Any test count → Coexist mode preferred
+│         │     tap and node:test use TAP protocol, fundamentally different from Jest/Vitest.
+│         │     Coexistence is cleaner than migration. New tests go to Vitest.
+│         │     node:test is stdlib — no migration possible, only coexistence.
+│         │
+│         **Karma detected?**
+│         ├─ Any test count → Replace mode
+│         │     Karma is deprecated. Recommend migration regardless of test count.
+│         │     Karma tests run in real browsers; migrate to Vitest with jsdom/happy-dom
+│         │     for unit tests, Playwright for browser-level tests.
+│         │
+│         **Brownfield mode selection:**
+│         ├─ Coexist → StackProfile.brownfield = true, config.state.init_type = "brownfield-coexist"
+│         │             config.state.existing_frameworks_preserved = ["mocha"] (etc.)
+│         │             Existing test files untouched, new tests use Vitest
+│         ├─ Migrate → StackProfile.brownfield = true, config.state.init_type = "brownfield-migrate"
+│         │             Migration plan generated, tests converted incrementally
+│         └─ Replace → StackProfile.brownfield = true, config.state.init_type = "brownfield-replace"
+│                       Legacy framework removed, all tests rewritten for Vitest
+│
+│         **testInventory snapshot** (computed for all brownfield inits):
+│         - Count existing test files by framework (by pattern matching)
+│         - Estimate uncovered source (by comparing test dirs to source dirs)
+│         - Store in StackProfile.testInventory for scan/generate spoke gap analysis
+│
+│         Coverage: V8 provider (Vitest primary)
+│         Config file: vitest.config.ts (alongside preserved legacy config)
+│
+└─ NO → Proceed to Step 3
+```
 
 ```
 Has jest.config.* or "jest" in devDependencies?
@@ -179,6 +263,14 @@ Determine coverage provider based on test framework:
 | Nx monorepo | Vitest Workspace | Playwright | V8 | `vitest.workspace.ts` |
 | Turborepo monorepo | Vitest Workspace | Playwright | V8 | `vitest.workspace.ts` |
 | No framework detected | Vitest | Playwright (if frontend) | V8 | `vitest.config.ts` |
+| **Existing Mocha (>30 tests)** | **Vitest (coexist)** | Playwright (if frontend) | V8 | `vitest.config.ts` + `.mocharc.*` preserved |
+| **Existing Mocha (<10 tests)** | **Vitest (replace)** | Playwright (if frontend) | V8 | `vitest.config.ts` |
+| **Existing Jasmine (>20 tests)** | **Vitest (coexist)** | Playwright (if frontend) | V8 | `vitest.config.ts` + `jasmine.json` preserved |
+| **Existing Jasmine (<5 tests)** | **Vitest (replace)** | Playwright (if frontend) | V8 | `vitest.config.ts` |
+| **Existing Ava (<15 tests)** | **Vitest (replace)** | Playwright (if frontend) | V8 | `vitest.config.ts` |
+| **Existing Ava (>=15 tests)** | **Vitest (coexist)** | Playwright (if frontend) | V8 | `vitest.config.ts` + `ava.config.*` preserved |
+| **Existing tap/node:test** | **Vitest (coexist)** | Playwright (if frontend) | V8 | `vitest.config.ts` |
+| **Existing Karma** | **Vitest (replace)** | Playwright | V8 | `vitest.config.ts` |
 
 ## ADR Template
 

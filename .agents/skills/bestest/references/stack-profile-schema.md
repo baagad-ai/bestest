@@ -26,8 +26,14 @@ The StackProfile is the primary output of the detection engine. It captures the 
   "testFrameworks": {
     "existing": "string[] | null",
     "recommended": "string",
-    "conflicts": "object | null"
+    "conflicts": "object | null",
+    "legacyDetected": false,
+    "legacyFrameworks": [],
+    "inventory": {}
   },
+  "brownfield": false,
+  "testInventory": {},
+  "existingConfig": {},
   "e2eFramework": {
     "existing": "string | null",
     "recommended": "string | null"
@@ -91,6 +97,27 @@ Application frameworks detected: `next.js`, `remix`, `express`, `fastify`, `djan
 | `existing` | string[] \| null | Currently configured test runner(s). Always an array, even for single framework: `["vitest"]`, `["pytest"]`, `["junit5"]`, `["go_testing"]`. Multiple competing frameworks: `["vitest", "jest"]`, `["junit4", "junit5"]`. Null if none detected. Single strings were valid in schema <1.3; consumers should normalize legacy string values to a single-element array. |
 | `recommended` | string | Best-fit test runner for this stack based on the decision tree |
 | `conflicts` | object \| null | Populated when multi-framework conflict detected by the category-based algorithm in detection-engine.md Phase 5. Shape: `{ "type": "same-category-competing" \| "legacy-modern-coexistence", "category": "unit" \| "e2e" \| "bdd" \| "mock", "frameworks": string[], "recommendation": string, "rationale": string }`. Null when no conflict. |
+| `legacyDetected` | boolean | `true` when Phase 5.5 of the detection engine finds one or more legacy test frameworks (Mocha, Jasmine, Ava, tap, node:test, Karma, nose2). Signals the init spoke to activate brownfield handling (coexist/migrate/replace). Defaults to `false`. |
+| `legacyFrameworks` | array | Array of detected legacy framework objects. Each entry: `{ "name": "mocha" \| "jasmine" \| "ava" \| "tap" \| "node:test" \| "karma" \| "nose2", "confidence": number, "evidence": string[] }`. Empty when no legacy frameworks detected. |
+| `inventory` | object \| null | Lightweight test inventory snapshot computed by Phase 5.5 when legacy frameworks are detected. Shape: `{ "totalFiles": number, "byPattern": { "glob_pattern": count }, "byDirectory": { "directory_path": count } }`. Used by scan/generate spokes for gap analysis. Null when no legacy frameworks detected. |
+
+### `brownfield`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `brownfield` | boolean | `true` when the init spoke is running on a brownfield repo — one with existing test infrastructure. Set when any legacy framework is detected OR when `testFrameworks.existing` contains a framework the init spoke didn't install. Defaults to `false`. This is the primary flag the init spoke checks to enter brownfield mode. |
+
+### `testInventory`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `testInventory` | object | Summary of existing test files in the repository. Computed during detection Phase 5.5 when `brownfield` is `true`. Shape: `{ "totalFiles": number, "unit": number, "integration": number, "e2e": number, "byFramework": { "framework_name": count }, "uncovered": { "estimatedPercentage": number } }`. Empty object `{}` for greenfield repos. Consumed by the scan spoke for gap analysis and the generate spoke for targeting untested code. |
+
+### `existingConfig`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `existingConfig` | object | Captures the existing test configuration that the init spoke found, so downstream spokes can understand what was already in place. Shape: `{ "frameworks": { "name": string, "configPath": string \| null, "version": string \| null }[], "scripts": { "test": string \| null, "test:watch": string \| null, "test:coverage": string \| null }, "setupFiles": string[], "transformers": string[] }`. Empty object `{}` for greenfield repos. The init spoke populates this from Phase 5.5 detections. |
 
 ### `e2eFramework`
 
@@ -278,8 +305,14 @@ Confidence scores are additive: multiple corroborating signals increase the scor
       "frameworks": ["vitest", "jest"],
       "recommendation": "vitest",
       "rationale": "Vitest is the recommended primary — native TS/ESM, faster transforms, Jest-compatible API allows gradual migration."
-    }
+    },
+    "legacyDetected": false,
+    "legacyFrameworks": [],
+    "inventory": null
   },
+  "brownfield": false,
+  "testInventory": {},
+  "existingConfig": {},
   "e2eFramework": { "existing": null, "recommended": "playwright" },
   "ciProvider": "github-actions",
   "monorepo": { "detected": false, "tool": null },
@@ -288,6 +321,76 @@ Confidence scores are additive: multiple corroborating signals increase the scor
   "databases": [],
   "messageQueues": [],
   "coverage": { "provider": "v8", "recommended": "v8" }
+}
+```
+
+### Brownfield (Existing Mocha)
+
+```json
+{
+  "schemaVersion": "1.3",
+  "selectedLanguage": null,
+  "languages": [
+    { "name": "javascript", "confidence": 0.92, "evidence": ["package.json", "src/**/*.js"] }
+  ],
+  "runtime": { "node": "18.x", "python": null, "jvm": null, "go": null },
+  "buildTool": "webpack",
+  "frameworks": ["express"],
+  "testFrameworks": {
+    "existing": ["mocha"],
+    "recommended": "vitest",
+    "conflicts": {
+      "type": "legacy-modern-coexistence",
+      "category": "unit",
+      "frameworks": ["mocha", "vitest"],
+      "recommendation": "vitest",
+      "rationale": "Mocha is legacy; Vitest offers faster transforms, Jest-compatible API, and built-in coverage. Coexistence mode recommended for gradual migration."
+    },
+    "legacyDetected": true,
+    "legacyFrameworks": [
+      { "name": "mocha", "confidence": 0.88, "evidence": [".mocharc.yml", "devDependencies.mocha", "scripts.test references mocha"] }
+    ],
+    "inventory": {
+      "totalFiles": 42,
+      "byPattern": {
+        "test/**/*.test.js": 28,
+        "test/**/*.spec.js": 14
+      },
+      "byDirectory": {
+        "test/unit": 22,
+        "test/integration": 20
+      }
+    }
+  },
+  "brownfield": true,
+  "testInventory": {
+    "totalFiles": 42,
+    "unit": 22,
+    "integration": 20,
+    "e2e": 0,
+    "byFramework": { "mocha": 42 },
+    "uncovered": { "estimatedPercentage": 65 }
+  },
+  "existingConfig": {
+    "frameworks": [
+      { "name": "mocha", "configPath": ".mocharc.yml", "version": "10.2.0" }
+    ],
+    "scripts": {
+      "test": "mocha --recursive test/",
+      "test:watch": null,
+      "test:coverage": null
+    },
+    "setupFiles": ["test/setup.js"],
+    "transformers": []
+  },
+  "e2eFramework": { "existing": null, "recommended": null },
+  "ciProvider": "github-actions",
+  "monorepo": { "detected": false, "tool": null },
+  "packageManager": "npm",
+  "frontend": null,
+  "databases": ["mongodb"],
+  "messageQueues": [],
+  "coverage": { "provider": null, "recommended": "v8" }
 }
 ```
 
