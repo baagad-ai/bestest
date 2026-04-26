@@ -6,33 +6,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conv
 
 ---
 
-## [1.4.0] — 2026-04-23
-
-### Added
-
-- Brownfield init: 3-mode model (coexist/migrate/replace) for existing test infrastructure (S02).
-- Metrics store: `.bestest/state/metrics.json` with continuous updates from 11 spokes (S03).
-- Three-tier HITL gate model (auto/provisional/manual) replaces binary gates (S04).
-- Structured extraction protocol hardens generation pipeline against injection (S04).
-- Self-contained HTML health dashboard with Lucide icons, 9 widgets, dark/light mode (S05).
-- JUnit XML emission for CI integration via spoke-run (S05).
-- Mocha + Jasmine generation/fix/run support for JS/TS (S06).
-- TestNG generation/fix/run/detection support for Java (S06).
-- `validate-plugin.sh` with 275 structural checks (S01+S06).
-
-### Changed
-
-- Plugin terminology: prose 'skill' → 'plugin' across all files (S06).
-- Reference index externalized to dedicated file (S04).
-- Pre-flight checks consolidated (S04).
-
-### Fixed
-
-- CI workflow fixed and passing with validate-plugin.yml (S01).
-- 6 stale references cleaned up (S07).
-
----
-
 ## [1.3.0] — 2026-04-23
 
 ### Added
@@ -50,8 +23,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conv
 - `pre-flight-protocol.md`: shared validation patterns reference (271 lines) (S06).
 - `dot-bestest-schema.md`: complete `.bestest/` directory tree documentation (251 lines) (S06).
 - `error-codes.md`: error taxonomy (E001–E025, 5 domains) (S07).
-- `validate-plugin.sh`: 266 automated consistency checks across 7 domains (S07).
-- GitHub Actions CI workflow for automated plugin validation (S07).
+- `validate-skill.sh`: 266 automated consistency checks across 7 domains (S07).
+- GitHub Actions CI workflow for automated skill validation (S07).
 
 ---
 
@@ -97,7 +70,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conv
 
 ### Added
 
-- Initial release of the bestest plugin.
+- Initial release of the bestest skill.
 - Stack detection engine with 80+ signals across 12 categories.
 - Framework decision trees for JS/TS, Python, Java, and Go.
 - Command spokes: `init`, `config`, `scan`, `generate`, `run`, `fix`, `coverage`, `report`, `doctor`, `expand`, `migrate`, `ci`.
@@ -106,4 +79,3 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conv
 - StackProfile schema with confidence scores and evidence arrays.
 - Migration support: Jest → Vitest, JUnit 4 → JUnit 5, Cypress → Playwright.
 - CI pipeline generation for GitHub Actions, GitLab CI, and Jenkins.
-itLab CI, and Jenkins.
