@@ -605,6 +605,64 @@ Exit. Do not guess a template.
 
 ---
 
+## Metrics Update
+
+This spoke writes to `.bestest/state/metrics.json` following the shared metrics-update protocol defined in `references/metrics-schema.md`.
+
+### Sections Updated
+
+`coverage.target` (if changed), `activity`
+
+### Field Mapping
+
+| Field | Source | Update Rule |
+|-------|--------|-------------|
+| `coverage.target` | From config.yaml coverage.target | Set from config if changed |
+| `activity[]` | Current spoke invocation metadata | Append entry, evict oldest if over maxLength |
+
+### Update Protocol
+
+Follow this 7-step protocol on every invocation:
+
+```
+1. Read .bestest/state/metrics.json
+2. Parse as JSON
+3. If parse fails (corruption):
+   a. Log warning: "metrics.json corrupted — recreating with defaults"
+   b. Initialize fresh metrics with schemaVersion "1.0" and default values
+   c. Continue with step 5 (do NOT abort the spoke)
+4. Validate schemaVersion — warn if MAJOR differs, proceed if MINOR differs
+5. Merge spoke-specific data:
+   - Update lastUpdated to current ISO 8601 timestamp
+   - Update only this spoke's sections (listed above), leave others unchanged
+   - Append to bounded arrays (history, trend, activity), evicting oldest when over maxLength
+   - Recalculate derived values (healthScore, overallFlakeRate, etc.)
+6. Write back to .bestest/state/metrics.json (atomic write: write to temp file, then rename)
+7. Update config.yaml state.last_metrics with current timestamp
+```
+
+### Activity Log Entry
+
+Append an entry to the `activity` array:
+
+```json
+{
+  "timestamp": "<current ISO 8601>",
+  "spoke": "spoke-config",
+  "action": "config",
+  "summary": "<human-readable one-line summary>"
+}
+```
+
+### Graceful Degradation
+
+- **File missing:** Treated as first-time creation. Write this spoke's section with defaults for all others.
+- **Parse failure:** Log warning, recreate with defaults + current spoke's data. **Never abort the spoke** — metrics are observability, not a gate.
+- **schemaVersion mismatch (MAJOR):** Log warning, attempt to read known fields, write back with current schema version.
+- **schemaVersion mismatch (MINOR):** Proceed normally. Unrecognized fields are preserved (pass-through).
+
+
+
 ## Downstream
 
 - The `scan` spoke reads config.yaml for paths, coverage settings, and framework to determine analysis scope — supports Python/Java/Go framework branches
