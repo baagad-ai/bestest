@@ -115,6 +115,12 @@ while IFS= read -r filepath; do
     "echo '$INDEX_REFS' | grep -qF '$rel'"
 done <<< "$(find "$SKILL_DIR/references" -name '*.md' -not -path '*/templates/*' -not -name 'error-codes.md' | sort)"
 
+# E004b: pipeline-shared.md must be referenced by all 4 generate spokes
+for spoke in spoke-generate.md spoke-generate-python.md spoke-generate-java.md spoke-generate-go.md; do
+  check "Generate spoke '$spoke' references pipeline-shared.md" "E004b" "critical" \
+    "grep -q 'pipeline-shared' '$SKILL_DIR/references/$spoke'"
+done
+
 # ─── Domain 3: Spoke Existence & Non-Empty ────────────────────────────────
 echo "── Domain 3: Spoke Existence & Non-Empty ──"
 

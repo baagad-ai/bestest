@@ -285,14 +285,14 @@ All reference files are relative to `~/.agents/skills/bestest/`.
 |------|-------------|
 | `references/migration-rules.md` | Transformation rule catalog for jest→vitest, junit4→junit5, cypress→playwright |
 
-### Reference Infrastructure (4)
+### Reference Infrastructure (5)
 | File | Description |
 |------|-------------|
 | `references/quick_reference.md` | On-demand quick reference extracted from SKILL.md for reduced token loading *(created by T02)* |
 | `references/pre-flight-protocol.md` | Shared validation pattern referenced by all generate spokes *(created by T03)* |
 | `references/dot-bestest-schema.md` | Full `.bestest/` directory tree documentation *(created by T04)* |
 | `references/parallel-dispatch.md` | Agent-agnostic parallel dispatch protocol for generate with 5+ targets *(created by S01)* |
-
+| `references/generate/pipeline-shared.md` | Shared generation pipeline sections (parallel dispatch, priority scoring, HITL gate, error handling, downstream reference) referenced by all 4 generate spokes |
 </reference_index>
 <success_criteria>
 
