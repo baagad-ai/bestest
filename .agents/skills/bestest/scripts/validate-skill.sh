@@ -212,6 +212,21 @@ check "schema-contract.md documents 'Version Policy'" "E012" "critical" \
 check "schema-contract.md documents version table with artifact versions" "E012" "critical" \
   "grep -q 'stack-profile' '$SC' && grep -q 'scan-report' '$SC' && grep -q 'run-results' '$SC'"
 
+# E012b: metrics-schema.md exists and is non-empty
+MS="$SKILL_DIR/references/metrics-schema.md"
+check "metrics-schema.md exists and is non-empty" "E012b" "critical" \
+  "[ -s '$MS' ]"
+
+# E012c: metrics-schema.md documents required top-level fields
+for field in schemaVersion healthScore coverage tests runs activity; do
+  check "metrics-schema.md documents '$field' field" "E012c" "critical" \
+    "grep -q '$field' '$MS'"
+done
+
+# E012d: schema-contract.md contains metrics.json in its version table
+check "schema-contract.md contains metrics.json in version table" "E012d" "critical" \
+  "grep -q 'metrics.json' '$SC'"
+
 # ─── Domain 6: Template Completeness ──────────────────────────────────────
 echo "── Domain 6: Template Completeness ──"
 
