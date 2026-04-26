@@ -420,3 +420,4 @@ This schema is consumed by:
 - **Generate spoke** (`references/spoke-generate.md`) — Reads gaps and anti-patterns to prioritize generation
 - **TESTING.md** — Updated with a human-readable summary derived from this report
 - **Config state** (`state.last_scan`) — Updated to the report's `timestamp` value after successful scan
+- **Metrics store** (`references/metrics-schema.md`) — Scan results feed into `metrics.json` via spoke-scan's metrics-update protocol (tests, flakiness, modules, slowest, activity sections)

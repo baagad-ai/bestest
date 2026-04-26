@@ -245,8 +245,8 @@ Which spokes create or modify files inside `.bestest/`:
 | **spoke-config** | ✅ updates (set/reset) | ✅ updates `metrics.json` | — | — | — | — |
 | **spoke-expand** | ✅ adds test type blocks | — | — | — | ✅ framework config updates, helper files | — |
 | **spoke-ci** | ✅ updates `ci.*` | — | — | — | ✅ CI pipeline file | — |
-| **spoke-migrate** | ✅ updates framework fields | ✅ `migration-backup.json` | ✅ `migration-<ts>.json` | — | ✅ dependency changes | — |
-| **spoke-coverage** | — | — | — | — | — | — |
+| **spoke-migrate** | ✅ updates framework fields | ✅ `migration-backup.json`, ✅ updates `metrics.json` | ✅ `migration-<ts>.json` | — | ✅ dependency changes | — |
+| **spoke-coverage** | — | ✅ updates `metrics.json` | — | — | — | — |
 
 ---
 

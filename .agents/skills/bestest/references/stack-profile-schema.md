@@ -459,3 +459,13 @@ Confidence scores are additive: multiple corroborating signals increase the scor
   "coverage": { "provider": null, "recommended": "go_cover" }
 }
 ```
+
+---
+
+## Cross-Reference
+
+- Schema contract: `references/schema-contract.md` (versioning policy)
+- Config schema: `references/config-schema.md` (coverage.target field)
+- Metrics store: `references/metrics-schema.md` (coverage trends, module breakdown, run history)
+- Directory schema: `references/dot-bestest-schema.md` (file lifecycle and spoke matrices)
+- Detection engine: `references/detection-engine.md` (how StackProfile fields are populated)
