@@ -6,6 +6,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conv
 
 ---
 
+## [1.4.0] — 2026-04-26
+
+### Added
+
+- Parallel dispatch architecture (`parallel-dispatch.md`): agent-agnostic 6-platform cascade for multi-agent test generation (S02).
+- UX command spokes: `spoke-help.md`, `spoke-explain.md`, `spoke-status.md`, `spoke-version.md` — interactive skill self-service commands (S03).
+- Documentation reconciliation: deployed/repo parity + pre-flight protocol references synced across both copies (S04).
+- Shared pipeline extraction: `pipeline-shared.md` — 7-phase skeleton eliminating ~60% duplication across language branches (S05).
+- Metrics schema integration: `metrics-schema.md` + spoke responsibility matrix across all schema files and spokes (S06).
+- `validate-skill.sh` expanded to 304 automated checks across 7 validation domains (S07).
+
+### Changed
+
+- Maturity score improved from 4.3 → 4.4/5.0 (all dimensions ≥ 4.2) per structured 5-dimension re-audit.
+
+---
+
 ## [1.3.0] — 2026-04-23
 
 ### Added
