@@ -1,8 +1,4 @@
-
-# ── GSD baseline (auto-generated) ──
-.gsd
-.gsd-id
-.bg-shell/
+# ── OS / Editor ──
 .DS_Store
 Thumbs.db
 *.swp
@@ -11,9 +7,13 @@ Thumbs.db
 .idea/
 .vscode/
 *.code-workspace
+
+# ── Environment ──
 .env
 .env.*
 !.env.example
+
+# ── Dependencies / Build ──
 node_modules/
 .next/
 dist/
@@ -24,10 +24,32 @@ __pycache__/
 venv/
 target/
 vendor/
+
+# ── Runtime artifacts ──
 *.log
 coverage/
 .cache/
 tmp/
 
-# ── GSD baseline (auto-generated) ──
+# ── GSD (development tooling — not part of the skill) ──
+.gsd/
+.gsd-id
+.bg-shell/
 .mcp.json
+
+# ── Tool-specific configs ──
+.claude/
+.kiro/
+
+# ── Internal / development-only artifacts ──
+.recovered-context/
+.planning/
+.audits/
+docs/plans/
+
+# ── GSD milestone verification scripts ──
+scripts/verify-*.sh
+
+# ── Root-level audit artifacts ──
+skill-audit-*.md
+skills-lock.json
