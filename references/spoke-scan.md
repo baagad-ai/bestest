@@ -550,6 +550,16 @@ Update `summary`:
 
 `coverage` object with aggregate metrics. `testInventory` entries updated with status and lastRun. `summary` finalized with passed/failed/skipped counts. Per-file coverage map held in memory for Phase 6.
 
+### Ephemeral File Lifecycle
+
+The raw framework output files (`vitest-run.json`, `jest-run.json`, `coverage.json`, `go-coverage.out`) are **ephemeral intermediate artifacts** — they exist solely for parsing within this Phase 3 execution. They are:
+
+- **Overwritten** on every scan or run invocation (not preserved across executions)
+- **Not part of the spoke contract** — downstream spokes must consume `scan-*.json` or `run-*.json` reports instead
+- **Preserved on disk** after parsing for debugging purposes, but their contents are stale after the spoke completes
+
+Do not rely on these files in other spokes. They are implementation details of the test execution phase.
+
 ---
 
 ## Phase 4 — Analyze Test Quality
@@ -903,14 +913,15 @@ Cross-reference source files with test files to identify untested or under-teste
 
 ## Phase 7 — Generate Report
 
-Write the scan report to disk, update TESTING.md with current results, update config state, and print a console summary.
+Write the scan report to disk, write a companion run-results.json (so downstream spokes can consume test execution data without re-running tests), update TESTING.md with current results, update config state, and present an auto-chain HITL gate.
 
 ### Execution Steps
 
-1. **Assemble the report** — Combine all data collected in Phases 1-6 into the final report structure following `references/scan-report-schema.md`:
+1. **Assemble the scan report** — Combine all data collected in Phases 1-6 into the final report structure following `references/scan-report-schema.md`:
 
    ```json
    {
+     "schemaVersion": "1.2",
      "timestamp": "<ISO 8601 of scan completion>",
      "configSnapshot": "<from Phase 1>",
      "summary": "<from Phase 2, finalized in Phase 3>",
@@ -926,13 +937,55 @@ Write the scan report to disk, update TESTING.md with current results, update co
 
 > **Human review gate:** Before writing the scan report, present a brief summary of findings to the user. Include: total files scanned, top 3 anti-patterns found, coverage percentage, and top 5 coverage gaps. Wait for user acknowledgment before writing the report file.
 
-2. **Write JSON report** — Write the report to `.bestest/reports/scan-<timestamp>.json`:
+2. **Write JSON scan report** — Write the report to `.bestest/reports/scan-<timestamp>.json`:
 
    - Timestamp format: `YYYYMMDDTHHmmssZ` (compact ISO 8601, e.g., `scan-20240715T143045Z.json`)
    - Ensure the `.bestest/reports/` directory exists before writing.
    - **Never overwrite or delete existing reports.** All prior reports are preserved for trend analysis. If a report with the same timestamp exists (extremely unlikely), append a `-2` suffix.
 
-   **Note:** Report rotation is applied after this step (see Step 6). The new report is always written first; only older reports are candidates for deletion.
+3. **Write companion run-results.json** — If Phase 3 executed tests (even partially), write a companion `run-<timestamp>.json` (using the same timestamp) alongside the scan report. This is critical for spoke-chain continuity: the fix spoke consumes `run-*.json` files, and without this companion artifact, fix would require re-running the entire test suite.
+
+   The companion run report uses the identical `run-results.json` schema from `spoke-run.md` Phase 4, populated from data already collected during scan's Phase 3:
+
+   ```json
+   {
+     "schemaVersion": "1.0",
+     "timestamp": "<same timestamp as scan report>",
+     "configSnapshot": "<from Phase 1>",
+     "framework": {
+       "name": "<from config.yaml>",
+       "version": "<detected in Phase 1>"
+     },
+     "language": "<from config.yaml>",
+     "suiteFilter": "all",
+     "execution": {
+       "startTime": "<from Phase 3>",
+       "endTime": "<from Phase 3>",
+       "durationMs": "<computed>",
+       "exitCode": "<from Phase 3>",
+       "timedOut": "<from Phase 3>"
+     },
+     "summary": {
+       "totalTests": "<from testInventory sum>",
+       "passed": "<from testInventory status counts>",
+       "failed": "<from testInventory status counts>",
+       "skipped": "<from testInventory status counts>",
+       "todo": 0,
+       "totalTestFiles": "<testInventory length>",
+       "passedFiles": "<count where status=passed>",
+       "failedFiles": "<count where status=failed>"
+     },
+     "tests": "<built from Phase 3 framework output parsing>",
+     "coverage": "<from Phase 3 coverage parsing>",
+     "errors": "<from Phase 3 error collection>",
+     "raw_output": null,
+     "companionTo": "scan-<timestamp>.json"
+   }
+   ```
+
+   **Why this matters:** Scan's Phase 3 already runs the full test suite with coverage. Without this companion file, the fix spoke cannot see test execution results and would require a full `/bestest run` to re-execute the same tests. The companion file eliminates this redundant execution.
+
+   **When to skip this step:** If Phase 3 was skipped entirely (coverage disabled AND no tests found), or if Phase 3 fell back to static analysis mode without actually running tests, do not write a companion run report. Only write it when real test execution occurred.
 
 3. **Update TESTING.md** — Read `TESTING.md` at the repo root. Update it with current scan results by filling template placeholders from `references/templates/testing-md.md`:
 
@@ -985,17 +1038,63 @@ Write the scan report to disk, update TESTING.md with current results, update co
    - {gaps with hasTest=false} source files have no tests at all
    - Critical gaps: {count by priority=critical} | High: {count by priority=high}
 
-   ### Report
-   - Written to: .bestest/reports/scan-{timestamp}.json
+   ### Reports
+   - Scan report: .bestest/reports/scan-{timestamp}.json
+   - Run results: .bestest/reports/run-{timestamp}.json (companion)
    - TESTING.md updated with current results
-
-   ### Next Steps
-   - Review critical anti-patterns and flaky tests first
-   - Run /bestest generate --target <source-file> to create tests for uncovered modules
-   - Run /bestest scan again after changes to track improvement
    ```
 
-6. **Rotate old reports** — After writing the new report, apply the configured retention policy to prevent unbounded report accumulation:
+6. **Auto-chain HITL gate** — After printing the console summary, present an auto-chain gate offering to invoke downstream spokes based on what the scan found. This gate only runs when actionable items were detected.
+
+   **When failures exist** (`summary.failed > 0`):
+   ```
+   ### Next Steps — Fix Failures
+
+   {summary.failed} test(s) failed. Run results are ready for diagnosis.
+
+   Options:
+     1. /bestest fix              — Diagnose and fix all failing tests (Recommended)
+     2. /bestest fix --flaky      — Address flaky test detection
+     3. Skip                      — Review the report and decide later
+
+   Which option? [1-3]:
+   ```
+
+   **When coverage gaps exist** (`gaps.length > 0` and no failures, or after fix):
+   ```
+   ### Next Steps — Address Coverage Gaps
+
+   Found {gaps.length} coverage gaps ({critical + high} critical/high priority).
+
+   Options:
+     1. /bestest generate --untested    — Generate tests for all {untestedFiles} untested files
+     2. /bestest generate --critical    — Generate tests for {critical + high} critical/high priority gaps
+     3. Skip                            — Review the report and decide later
+
+   Which option? [1-3]:
+   ```
+
+   **When both failures AND gaps exist**, present the fix option first (failures take priority over gaps):
+   ```
+   ### Next Steps
+
+   {summary.failed} test(s) failed, and {gaps.length} coverage gaps found.
+
+   Options:
+     1. /bestest fix                    — Fix failing tests first (Recommended)
+     2. /bestest generate --untested    — Generate tests for uncovered modules
+     3. Skip                            — Review the report and decide later
+
+   Which option? [1-3]:
+   ```
+
+   **When all tests pass and coverage meets target**, skip the auto-chain gate entirely. Print:
+   ```
+   ✓ All tests passing. Coverage meets target ({coverage.lines.pct}% ≥ {coverage.target}%).
+   Run /bestest report for a full summary, or /bestest doctor for a health check.
+   ```
+
+7. **Rotate old reports** — After writing the new report (and companion), apply the configured retention policy to prevent unbounded report accumulation:
 
    ```
    Read config.yaml → reports.max_retained (default: 50)
@@ -1006,14 +1105,15 @@ Write the scan report to disk, update TESTING.md with current results, update co
      Print: "Rotated {N} old scan reports (retention limit: {max_retained})"
    ```
 
-   The rotation only deletes `scan-*.json` files — it never touches `coverage-*.json`, `vitest-run.json`, or other report artifacts. The newest report (just written) is never deleted, even if `max_retained` is 1.
+   The rotation only deletes `scan-*.json` files — it never touches `run-*.json`, `coverage-*.json`, `vitest-run.json`, or other report artifacts. The newest report (just written) is never deleted, even if `max_retained` is 1.
 
 ### Output
 
 - `.bestest/reports/scan-<timestamp>.json` — full scan report
+- `.bestest/reports/run-<timestamp>.json` — companion run results (when Phase 3 executed tests)
 - `TESTING.md` at repo root — updated with scan results
 - `.bestest/config.yaml` — `state.last_scan` updated
-- Console output with summary
+- Console output with summary and auto-chain gate
 
 ---
 

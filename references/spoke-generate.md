@@ -246,6 +246,29 @@ Bad:  test('works'), test('handles error'), test('test1')
 
 > **On-demand load:** When execution verification is needed, read `references/generate/phase6-execution.md`. Run tests, analyze failures, and apply the fix-and-rerun loop defined there.
 
+### Write Companion Run Report
+
+After execution verification completes (whether tests pass or fail), write a `run-<timestamp>.json` to `.bestest/reports/` using the same schema as spoke-run Phase 4. This ensures downstream spokes (especially fix) can consume the test execution results from generation verification without requiring a separate `/bestest run`.
+
+**When to write:**
+- Phase 6 ran test execution (i.e., `generation.verify_pass` is `true` in config)
+- Tests were actually executed (not skipped due to compilation failure)
+
+**What to include:**
+- `schemaVersion`: "1.0"
+- `timestamp`: Generation completion timestamp
+- `framework`: From config
+- `language`: From config
+- `suiteFilter`: "generated" (to distinguish from full suite runs)
+- `execution`: Timing and exit code from Phase 6 test run
+- `summary`: Pass/fail counts from the verification run
+- `tests[]`: Per-file results for generated tests only
+- `coverage`: If collected during verification
+- `errors[]`: Any errors from failed verification runs
+- `companionTo`: "generate" (marks this as generation-related, not a full suite run)
+
+**When to skip:** If `generation.verify_pass` is `false`, or if tests could not be executed (compilation failure), skip writing the companion run report.
+
 ---
 
 ## Phase 7 — Quality Audit
@@ -267,6 +290,7 @@ After successful completion, the following artifacts exist:
 | Artifact | Location | Purpose |
 |----------|----------|---------|
 | Generated test files | Configured test directory (per `paths.test`) | Test files matching naming convention (e.g., `pricing.test.ts`) |
+| Run report (companion) | `.bestest/reports/run-<timestamp>.json` | Execution results from verification phase, consumable by fix/coverage/report |
 | Updated reports | `.bestest/reports/` | Coverage metrics and quality scores |
 | Updated TESTING.md | Repo root | New test inventory reflecting generated tests |
 | Updated config state | `.bestest/config.yaml` | `state.last_generate` timestamp updated |

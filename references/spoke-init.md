@@ -838,37 +838,83 @@ Print a completion summary:
 | .bestest/reports/ | Directory for scan and coverage reports |
 | TESTING.md | Living test documentation (repo root) |
 | [vitest.config.ts or jest.config.ts] | Framework configuration (repo root) |
+```
+
+---
+
+## Phase 7 — Validation Run (Optional)
+
+Offer to execute a validation run to verify the entire pipeline works end-to-end. This is an optional step that catches configuration issues before the user invests in writing tests.
+
+### HITL Gate
+
+```
+### Validation Run
+
+Would you like to run a quick validation to verify the setup works end-to-end?
+
+Options:
+  1. Yes — Run /bestest run to execute tests and verify the pipeline (Recommended)
+  2. Skip — Everything is set up. You can run /bestest run or /bestest scan later.
+
+Which option? [1-2]:
+```
+
+### If user selects "Yes"
+
+Invoke `/bestest run`. This validates:
+- Framework is correctly installed and configured
+- Test discovery finds test files matching the configured pattern
+- Coverage collection works with the configured provider
+- Reports are written to `.bestest/reports/` correctly
+- Config state is updated after execution
+
+### If the validation run fails
+
+```
+Print: "⚠ Validation run encountered an issue."
+Print: "  The setup is complete but the test framework may need additional configuration."
+Print: "  Run /bestest doctor to diagnose the issue."
+Print: ""
+Print: "  Common causes:"
+Print: "    - Missing coverage provider (npm install --save-dev @vitest/coverage-v8)"
+Print: "    - No test files yet (run /bestest generate --untested to create initial tests)"
+Print: "    - Framework config needs adjustment (check .bestest/config.yaml paths)"
+```
+
+Do not block on failure — the init is still considered successful. The validation run is a best-effort smoke test.
+
+### If user selects "Skip"
+
+Continue to the Next Steps section. No validation is performed.
 
 ### Next Steps
 
 **JS/TS projects:**
 1. Review `.bestest/config.yaml` and adjust coverage targets or paths if needed.
-2. Run `npx vitest` (or `npx jest`) to verify the framework is installed and working.
+2. Run `/bestest run` to execute tests and verify the framework is working. This produces the run report that other commands consume.
 3. Run `/bestest scan` to audit your current test coverage and identify gaps.
 4. Run `/bestest generate --untested` to generate tests for uncovered source files.
 
 **Python projects:**
 1. Review `.bestest/config.yaml` and adjust coverage targets or paths if needed.
-2. Run `pytest --co` to verify pytest discovers tests correctly.
-3. Run `pytest --cov -v` to verify coverage collection works.
-4. Run `/bestest scan` to audit your current test coverage and identify gaps.
-5. Run `/bestest generate --untested` to generate tests for uncovered source files.
+2. Run `/bestest run` to execute tests and verify coverage collection works.
+3. Run `/bestest scan` to audit your current test coverage and identify gaps.
+4. Run `/bestest generate --untested` to generate tests for uncovered source files.
 
 **Java projects:**
 1. Review `.bestest/config.yaml` and adjust coverage targets or paths if needed.
-2. Run `./gradlew test` (Gradle) or `./mvnw test` (Maven) to verify JUnit 5 is configured correctly.
-3. Run `./gradlew jacocoTestReport` (Gradle) or `./mvnw jacoco:report` (Maven) to verify JaCoCo coverage collection works.
-4. Run `/bestest scan` to audit your current test coverage and identify gaps.
-5. Run `/bestest generate --untested` to generate tests for uncovered source files.
+2. Run `/bestest run` to execute tests and verify JUnit 5 is configured correctly.
+3. Run `/bestest scan` to audit your current test coverage and identify gaps.
+4. Run `/bestest generate --untested` to generate tests for uncovered source files.
 ```
 
 **Go projects:**
 ```
 1. Review `.bestest/config.yaml` and adjust coverage targets or paths if needed.
-2. Run `go test ./...` to verify Go testing is configured correctly.
-3. Run `go test -cover ./...` to verify coverage collection works.
-4. Run `/bestest scan` to audit your current test coverage and identify gaps.
-5. Run `/bestest generate --untested` to generate tests for uncovered source files.
+2. Run `/bestest run` to execute tests and verify Go testing is configured correctly.
+3. Run `/bestest scan` to audit your current test coverage and identify gaps.
+4. Run `/bestest generate --untested` to generate tests for uncovered source files.
 ```
 
 ---

@@ -777,6 +777,16 @@ Run the constructed CLI command with timeout management and output capture. This
 - `stderr`: captured stderr string
 - Raw framework JSON output at `.bestest/reports/vitest-run.json` or `.bestest/reports/jest-run.json`
 
+### Ephemeral File Lifecycle
+
+The raw framework output files (`vitest-run.json`, `jest-run.json`, `coverage.json`, `go-coverage.out`) are **ephemeral intermediate artifacts** — they exist solely for parsing within this execution. They are:
+
+- **Overwritten** on every run or scan invocation (not preserved across executions)
+- **Not part of the spoke contract** — downstream spokes must consume `run-*.json` reports instead
+- **Preserved on disk** after parsing for debugging purposes, but their contents are stale after the spoke completes
+
+Do not rely on these files in other spokes. They are implementation details of the test execution phase.
+
 ---
 
 ## Phase 4 — Parse Results
@@ -1538,13 +1548,56 @@ Write the run report to disk, update config state, and print a console summary.
 
    ### Next Steps
    {If failures exist:}
-   - Run /bestest fix to diagnose and repair failing tests
-   - Run /bestest fix --flaky to address flaky test detection
-   {If coverage below target:}
-   - Run /bestest coverage to analyze coverage gaps
-   - Run /bestest generate --untested to create tests for uncovered modules
-   {If all passed:}
-   - All tests passing. Run /bestest scan for a deeper quality analysis.
+   ```
+
+5. **Auto-chain HITL gate** — After printing the console summary, if failures were detected, present an auto-chain gate offering to invoke the fix spoke. This replaces the static "Next Steps" text with an interactive choice.
+
+   **When failures exist** (`summary.failed > 0`):
+   ```
+   ### Next Steps — Fix Failures
+
+   {summary.failed} test(s) failed. Run report saved.
+
+   Options:
+     1. /bestest fix              — Diagnose and fix all failing tests (Recommended)
+     2. /bestest fix --flaky      — Address flaky test detection
+     3. Skip                      — Review the report and decide later
+
+   Which option? [1-3]:
+   ```
+
+   **When coverage is below target** (`coverage.lines.pct < coverage.target` and no failures):
+   ```
+   ### Next Steps — Improve Coverage
+
+   Coverage is below target ({coverage.lines.pct}% < {coverage.target}%).
+
+   Options:
+     1. /bestest coverage         — Analyze coverage gaps in detail
+     2. /bestest generate --untested — Generate tests for uncovered modules
+     3. Skip                      — Review the report and decide later
+
+   Which option? [1-3]:
+   ```
+
+   **When both failures AND low coverage**, present the fix option first:
+   ```
+   ### Next Steps
+
+   {summary.failed} test(s) failed, and coverage is below target ({coverage.lines.pct}% < {coverage.target}%).
+
+   Options:
+     1. /bestest fix              — Fix failing tests first (Recommended)
+     2. /bestest coverage         — Analyze coverage gaps
+     3. Skip                      — Review the report and decide later
+
+   Which option? [1-3]:
+   ```
+
+   **When all tests pass and coverage meets target**, skip the auto-chain gate entirely. Print:
+   ```
+   ✓ All {summary.totalTests} tests passing. Coverage meets target ({coverage.lines.pct}% ≥ {coverage.target}%).
+   Run /bestest scan for a deeper quality analysis, or /bestest report for a full summary.
    ```
 
 ### Output Table
@@ -1809,7 +1862,7 @@ The run report feeds into the fix, coverage, and report spokes. This section doc
 
 ### Fix Spoke Expectations
 
-The fix spoke (`references/spoke-fix.md`) expects the following from the run report:
+The fix spoke (`workflows/spoke-fix.md`) expects the following from the run report:
 
 1. **The `errors` array contains actionable failure data** — each failed test has `filePath`, `testName`, and `message` populated.
 2. **`tests[].cases[]` provides per-test detail** — the fix spoke reads error messages at the individual test level to generate targeted fixes.
@@ -1819,7 +1872,7 @@ The fix spoke (`references/spoke-fix.md`) expects the following from the run rep
 
 ### Coverage Spoke Expectations
 
-The coverage spoke (`references/spoke-coverage.md`) expects:
+The coverage spoke (`workflows/spoke-coverage.md`) expects:
 
 1. **`coverage.collected` is `true`** — if false, the coverage spoke falls back to the most recent scan report for coverage data.
 2. **`coverage` field follows the Istanbul metric shape** — `lines`, `branches`, `functions`, `statements` each with `total`, `covered`, `pct`.
@@ -1827,7 +1880,7 @@ The coverage spoke (`references/spoke-coverage.md`) expects:
 
 ### Report Spoke Expectations
 
-The report spoke (`references/spoke-report.md`) expects:
+The report spoke (`workflows/spoke-report.md`) expects:
 
 1. **Multiple run reports exist** for trend analysis — the report spoke reads all `run-*.json` files from `.bestest/reports/`.
 2. **Each report is self-contained** — no cross-references to other files needed to render a single run's results.

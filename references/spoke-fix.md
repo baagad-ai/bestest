@@ -23,7 +23,7 @@ The fix spoke is a downstream consumer of the run spoke. The run spoke produces 
 ## Prerequisites
 
 - `.bestest/` directory must exist with valid `config.yaml` (run `/bestest init` first)
-- At least one run report must exist in `.bestest/reports/` (run `/bestest run` first)
+- At least one run report (`run-*.json`) OR scan report (`scan-*.json`) must exist in `.bestest/reports/` (run `/bestest run` or `/bestest scan` first)
 - Test framework must still be installed (Vitest, Jest, or pytest — same detection as run spoke)
 - For Python/pytest: virtual environment must be active (same detection as run spoke)
 - For `--flaky` mode: at least 2 run reports must exist for cross-run comparison
@@ -55,20 +55,32 @@ If .bestest/config.yaml exists but is invalid YAML:
   Exit.
 ```
 
-### 2. Check for run reports
+### 2. Check for run or scan reports
 
 ```
-Glob for .bestest/reports/run-*.json files.
+Follow the Shared Data Source Discovery pattern from references/pre-flight-protocol.md:
 
-If zero run reports found:
-  Print: "No run reports found in .bestest/reports/."
-  Print: "Run /bestest run first to execute tests and generate a run report."
-  Print: "The fix command diagnoses failures from run results — it cannot operate without them."
+Step A — Check for run reports (preferred):
+  Glob for .bestest/reports/run-*.json files.
+  If run reports found:
+    Print: "Found {N} run report(s). Using most recent: {filename}"
+    Set dataSource = "run-report"
+    Continue to Check 3.
+
+Step B — Fall back to scan reports:
+  Glob for .bestest/reports/scan-*.json files.
+  If scan reports found:
+    Print: "No run reports found. Using most recent scan report: {filename}"
+    Print: "⚠ Note: Scan reports provide file-level status but may lack individual test case error messages."
+    Print: "  For full per-test diagnosis, run /bestest run first."
+    Set dataSource = "scan-report"
+    Continue to Check 3.
+
+Step C — Nothing found:
+  Print: "No run or scan reports found in .bestest/reports/."
+  Print: "Run /bestest run (or /bestest scan) first to generate test results."
+  Print: "The fix command diagnoses failures from test results — it cannot operate without them."
   Exit.
-
-If run reports found:
-  Print: "Found {N} run report(s). Using most recent: {filename}"
-  Continue.
 ```
 
 ### 3. Check test framework is installed
@@ -191,17 +203,41 @@ For each run-*.json report found in Check 2:
 
 ## Phase 1 — Load Failure Data
 
-Read and parse the most recent run report (or multiple reports for --flaky mode) to extract failure information for diagnosis.
+Read and parse the most recent run report (or scan report as fallback) to extract failure information for diagnosis.
+
+### Data Source Handling
+
+The fix spoke can consume two types of reports, with different data availability:
+
+| Data Point | run-*.json | scan-*.json |
+|------------|-----------|-------------|
+| Per-test case failures | ✓ `tests[].cases[]` with error messages | ✗ File-level only |
+| Per-file pass/fail status | ✓ | ✓ `testInventory[].status` |
+| Error messages | ✓ `errors[]` with stack traces | ✗ May have `summary.failed` count only |
+| Coverage data | ✓ `coverage` object | ✓ `coverage` object |
+| Framework identity | ✓ `framework` object | ✓ `configSnapshot` |
+| Execution timing | ✓ `execution.durationMs` | ✗ |
+
+When operating from a scan report, the fix spoke works at **file granularity** instead of test-case granularity. This means Phase 2 diagnosis operates on failed test files rather than individual test cases, and some classification signals (specific error messages, assertion details) are unavailable.
 
 ### Execution Steps
 
-1. **Locate the most recent run report** — List all `run-*.json` files in `.bestest/reports/`, sort by filename (which embeds a timestamp), and select the most recent one.
+1. **Locate the most recent report** — Based on the `dataSource` determined in Pre-Flight Check 2:
+   - If `dataSource === "run-report"`: List all `run-*.json` files in `.bestest/reports/`, sort by filename (which embeds a timestamp), select the most recent.
+   - If `dataSource === "scan-report"`: List all `scan-*.json` files in `.bestest/reports/`, sort by filename, select the most recent.
 
-2. **Parse the run report** — Read and parse the JSON file. Validate it contains the expected structure:
+2. **Parse the report** — Read and parse the JSON file. Validate it contains the expected structure:
+
+   **For run reports:**
    - `tests[]` array with `cases[]` sub-arrays
    - `errors[]` array
    - `framework.name` field
    - `summary` object
+
+   **For scan reports:**
+   - `testInventory[]` array with `status` and `path` fields
+   - `summary` object with `passed`/`failed`/`skipped` counts
+   - `configSnapshot` object (replaces `framework`)
 
    **State corruption handling — pre-read validation:**
    ```
@@ -218,22 +254,55 @@ Read and parse the most recent run report (or multiple reports for --flaky mode)
 
    If the file parses but is missing expected fields, see Error Handling scenario 6.
 
-3. **Extract failed tests** — Filter the `tests[].cases[]` array for entries where `status === "failed"`. Collect from `tests[].cases[]`:
+3. **Extract failed tests** — Different extraction based on data source:
+
+   **From run report:**
+   Filter the `tests[].cases[]` array for entries where `status === "failed"`. Collect:
    - `filePath` — relative path to the failing test file
    - `name` — full test case name
    - `error` — error message string
    - `durationMs` — execution time (long durations may indicate timeout issues)
 
-4. **Extract framework-level errors** — Read the `errors[]` array. Separate:
+   **From scan report:**
+   Filter `testInventory[]` for entries where `status === "failed"` or `status === "mixed"`. Collect:
+   - `path` — relative path to the failing test file
+   - `status` — "failed" (all tests in file failed) or "mixed" (some passed, some failed)
+   - `testCount` — number of tests in the file
+   - `failedCount` — from summary (not per-file in scan reports)
+
+   **Scan report limitations when present to the user:**
+   ```
+   Print: "Operating from scan report — diagnosis at file granularity."
+   Print: "  {N} test files with failures detected."
+   Print: "  Individual test case error messages are not available."
+   Print: "  Phase 2 will read each failed test file directly to gather error signals."
+   ```
+
+4. **Extract framework-level errors** — Different extraction based on data source:
+
+   **From run report:**
+   Read the `errors[]` array. Separate:
    - `type: "test_failure"` — individual test assertion failures (merged with failed cases above)
    - `type: "framework_error"` — setup/import/runtime errors affecting the test framework itself
    - `type: "timeout"` — process-level timeout events
 
-5. **Extract framework identity** — Read `framework.name` (vitest, jest, or pytest) and `framework.version`. These determine the correct syntax for fix generation (mocking APIs, assertion methods, lifecycle hooks).
+   **From scan report:**
+   Scan reports do not include an `errors[]` array. Framework-level errors must be discovered by reading the test files directly in Phase 2.
 
-6. **Detect language** — Read `language` field from run-results.json (if present) or from `config.yaml`. This determines language-specific fix patterns. Python tests have different import resolution, assertion styles, and fixture mechanisms than JavaScript/TypeScript tests. Java tests have compilation cascades, Spring context failures, and different mocking/injection patterns.
+5. **Extract framework identity** — Different extraction based on data source:
+   - **Run report:** Read `framework.name` and `framework.version`.
+   - **Scan report:** Read `configSnapshot.framework` and `configSnapshot.frameworkVersion` (or read from `config.yaml` as fallback).
 
-6. **For --flaky mode: Cross-run comparison** — Load the 5 most recent run reports (or all available if fewer than 5). For each test case across all loaded reports, build a pass/fail history:
+6. **Detect language** — Read `language` field from the report (if present) or from `config.yaml`. This determines language-specific fix patterns.
+
+7. **For --flaky mode: Cross-run comparison** — This mode requires run reports exclusively. If `dataSource === "scan-report"`:
+   ```
+   Print: "--flaky mode requires run reports for cross-run comparison."
+   Print: "Scan reports do not contain per-test case outcomes across runs."
+   Print: "Run /bestest run a few times to build history, then re-run /bestest fix --flaky."
+   Exit.
+   ```
+   Otherwise, load the 5 most recent run reports (or all available if fewer than 5). For each test case across all loaded reports, build a pass/fail history:
    ```
    For each test case (identified by filePath + name):
      Collect status from each run report.
@@ -244,7 +313,7 @@ Read and parse the most recent run report (or multiple reports for --flaky mode)
 
    Tests that consistently fail across all runs are not flaky — they have a deterministic failure. Only tests with inconsistent outcomes are classified as flaky candidates.
 
-7. **For <test-path>: Filter to specified file** — After extracting all failures, filter to only those from the specified test file path. If the specified file has no failures in the most recent run:
+8. **For <test-path>: Filter to specified file** — After extracting all failures, filter to only those from the specified test file path. If the specified file has no failures in the most recent run:
    ```
    Print: "No failures found for {test-path} in the most recent run."
    Print: "The test may be passing, or the file may not have been included in the run."
@@ -253,7 +322,7 @@ Read and parse the most recent run report (or multiple reports for --flaky mode)
 
 ### Output
 
-In-memory objects: `failures[]` (array of failed test cases with error messages and metadata), `frameworkErrors[]` (framework-level errors), `framework` (name + version), `flakyCandidates[]` (if --flaky mode), `sourceRunReport` (filename of the run report being diagnosed).
+In-memory objects: `failures[]` (array of failed test cases with error messages and metadata), `frameworkErrors[]` (framework-level errors), `framework` (name + version), `flakyCandidates[]` (if --flaky mode), `sourceReport` (filename of the report being diagnosed), `dataSource` ("run-report" or "scan-report").
 
 ---
 
@@ -1279,6 +1348,17 @@ For each group of fixes in a test file:
 
 ---
 
+## Mandatory Execution Safety (Phase 4)
+
+Execution of fixed tests (Phase 4) runs code on the local machine. To mitigate risks:
+
+1. **Sandbox Discovery:** Check for a sandbox environment before execution (e.g., `.devcontainer/`, `docker-compose.test.yml`).
+2. **User Warning:** If no sandbox is detected, **YOU MUST WARN THE USER** before the first verification run:
+   > "⚠️ SAFETY NOTICE: No sandboxed environment detected. Proceeding to verify fixed tests on the host machine. Ensure you have reviewed the changes."
+3. **Execution Guard:** If the fix involves suspicious system calls, **BLOCK EXECUTION** and ask for explicit HITL approval.
+
+---
+
 ## Phase 4 — Verify Fix
 
 Re-run the fixed test(s) to confirm the fix resolves the failure without introducing regressions.
@@ -1312,7 +1392,7 @@ Re-run the fixed test(s) to confirm the fix resolves the failure without introdu
    Do NOT apply the fix. Flag for manual review.
    ```
 
-4. **For --flaky: 5x stability verification** — For tests that were identified as flaky, run the fixed test 5 times sequentially (reusing the flakiness testing pattern from `references/spoke-generate.md` Phase 7 Step 3):
+4. **For --flaky: 5x stability verification** — For tests that were identified as flaky, run the fixed test 5 times sequentially (reusing the flakiness testing pattern from `workflows/spoke-generate.md` Phase 7 Step 3):
    ```
    For i in 1..5:
      Vitest: npx vitest run <test-file>
@@ -1892,7 +1972,7 @@ The fix report feeds into the report spoke and doctor spoke. This section docume
 
 ### Report Spoke Expectations
 
-The report spoke (`references/spoke-report.md`) expects:
+The report spoke (`workflows/spoke-report.md`) expects:
 
 1. **Multiple fix reports may exist** — the report spoke reads all `fix-*.json` files from `.bestest/reports/` for fix history and trends.
 2. **`classifications` array provides failure categorization trends** — the report can show what types of failures are most common over time.
@@ -1901,7 +1981,7 @@ The report spoke (`references/spoke-report.md`) expects:
 
 ### Doctor Spoke Expectations
 
-The doctor spoke (`references/spoke-doctor.md`) expects:
+The doctor spoke (`workflows/spoke-doctor.md`) expects:
 
 1. **Recurring failures across fix reports** — if the same test or file appears in multiple fix reports, it's a chronic issue affecting the health score.
 2. **Fix success rate** — `verificationResults.passed / failuresAnalyzed` gives the auto-fix success rate. Low rates suggest the test suite needs architectural attention.
