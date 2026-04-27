@@ -40,6 +40,7 @@ tmp/
 # ── Tool-specific configs ──
 .claude/
 .kiro/
+.agents/
 
 # ── Internal / development-only artifacts ──
 .recovered-context/

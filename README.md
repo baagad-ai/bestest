@@ -52,7 +52,7 @@ bestest works with any AI coding agent that loads skills from `~/.agents/skills/
 git clone https://github.com/prajwalmishra/bestest.git
 
 # Copy to your agent's skills directory
-cp -r bestest/.agents/skills/bestest/ ~/.agents/skills/bestest/
+cp -r bestest/ ~/.agents/skills/bestest/
 ```
 
 ### Use
