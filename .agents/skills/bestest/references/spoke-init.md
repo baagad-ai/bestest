@@ -435,6 +435,10 @@ Use `references/templates/testing-md.md`. Fill placeholders:
 
 Copy `references/templates/bestest-gitignore` verbatim. No placeholder substitution needed.
 
+#### `.bestest/dashboard.html`
+
+Copy `references/templates/dashboard.html` to `.bestest/dashboard.html`. No placeholder substitution needed. The dashboard is a self-contained HTML file that reads `.bestest/state/metrics.json` and renders health gauges, coverage trends, and flaky test alerts. It updates automatically as a side-effect of `scan`, `run`, and `doctor` commands.
+
 ### Context7 Integration
 
 Before generating `vitest.config.ts` or `jest.config.ts`, attempt to fetch current framework documentation:

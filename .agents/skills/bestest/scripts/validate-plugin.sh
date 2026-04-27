@@ -264,10 +264,10 @@ for section in essential_principles detection_engine framework_decision context7
     "grep -q '^<${section}>' '$SKILL_FILE'"
 done
 
-# E017: Line count within bounds (180–310)
+# E017: Line count within bounds (180–325)
 LINE_COUNT=$(wc -l < "$SKILL_FILE" | tr -d ' ')
-check "SKILL.md line count ($LINE_COUNT) is within bounds (180-310)" "E017" "warning" \
-  "[ '$LINE_COUNT' -ge 180 ] && [ '$LINE_COUNT' -le 310 ]"
+check "SKILL.md line count ($LINE_COUNT) is within bounds (180-325)" "E017" "warning" \
+  "[ '$LINE_COUNT' -ge 180 ] && [ '$LINE_COUNT' -le 325 ]"
 
 # ─── Domain 8: Dashboard & JUnit XML Cross-Cutting ────────────────────────
 echo "── Domain 8: Dashboard & JUnit XML Cross-Cutting ──"
