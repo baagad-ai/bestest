@@ -4,7 +4,7 @@
 
 **The testing architect for AI coding agents**
 
-[![CI](https://github.com/prajwalmishra/bestest/actions/workflows/validate-plugin.yml/badge.svg)](https://github.com/prajwalmishra/bestest/actions/workflows/validate-plugin.yml)
+[![CI](https://github.com/baagad-ai/bestest/actions/workflows/validate-plugin.yml/badge.svg)](https://github.com/baagad-ai/bestest/actions/workflows/validate-plugin.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.4.0-brightgreen.svg)](CHANGELOG.md)
 
@@ -20,7 +20,7 @@
 
 bestest is an AI-native testing skill that architects your entire testing layer — not just generates a test file and hopes for the best.
 
-It's a **74-file, ~31K-line specification** that lives inside your AI coding agent and handles strategy, framework selection, test generation, CI pipelines, flaky test management, framework migration, and living documentation. All version-controlled in your repo.
+It's a **99-file, ~40K-line specification** that lives inside your AI coding agent and handles strategy, framework selection, test generation, CI pipelines, flaky test management, framework migration, and living documentation. All version-controlled in your repo.
 
 ```
 Other tools:  "Write a test for X"  →  a test file (maybe compiles, maybe passes)
@@ -43,13 +43,13 @@ bestest:      Detect stack → Pick framework → Generate → Compile → Run �
 
 ### Prerequisites
 
-bestest works with any AI coding agent that loads skills from `~/.agents/skills/` — including [GSD/pi](https://github.com/nicosql/gsd-pi), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor](https://cursor.com), and others.
+bestest works with any AI coding agent that loads skills from a local directory — including [GSD/pi](https://github.com/nicosql/gsd-pi) (an agent harness with auto-mode), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor](https://cursor.com), and others.
 
 ### Install
 
 ```bash
 # Clone the repo
-git clone https://github.com/prajwalmishra/bestest.git
+git clone https://github.com/baagad-ai/bestest.git
 
 # Copy to your agent's skills directory
 cp -r bestest/ ~/.agents/skills/bestest/
@@ -135,7 +135,7 @@ SKILL.md (orchestrator — routing, principles, reference index)
 │   ├── spoke-ci.md                   ← /bestest ci
 │   └── ... (19 spokes total)
 └── scripts/
-    └── validate-plugin.sh            ← 304 consistency checks
+    └── validate-skill.sh             ← 304 consistency checks
 ```
 
 ### The 7-Phase Generation Pipeline

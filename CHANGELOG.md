@@ -6,20 +6,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conv
 
 ---
 
-## [1.4.0] — 2026-04-26
+## [1.4.0] — 2026-04-27
 
 ### Added
 
-- Parallel dispatch architecture (`parallel-dispatch.md`): agent-agnostic 6-platform cascade for multi-agent test generation (S02).
-- UX command spokes: `spoke-help.md`, `spoke-explain.md`, `spoke-status.md`, `spoke-version.md` — interactive skill self-service commands (S03).
-- Documentation reconciliation: deployed/repo parity + pre-flight protocol references synced across both copies (S04).
-- Shared pipeline extraction: `pipeline-shared.md` — 7-phase skeleton eliminating ~60% duplication across language branches (S05).
-- Metrics schema integration: `metrics-schema.md` + spoke responsibility matrix across all schema files and spokes (S06).
-- `validate-skill.sh` expanded to 304 automated checks across 7 validation domains (S07).
+- Parallel dispatch architecture (`parallel-dispatch.md`): agent-agnostic 6-platform cascade for multi-agent test generation.
+- UX command spokes: `spoke-help.md`, `spoke-explain.md`, `spoke-status.md`, `spoke-version.md` — interactive skill self-service commands.
+- Documentation reconciliation: deployed/repo parity + pre-flight protocol references synced across both copies.
+- Shared pipeline extraction: `pipeline-shared.md` — 7-phase skeleton eliminating ~60% duplication across language branches.
+- Metrics schema integration: `metrics-schema.md` + spoke responsibility matrix across all schema files and spokes.
+- `validate-skill.sh` expanded to 304 automated checks across 7 validation domains.
 
 ### Changed
 
 - Maturity score improved from 4.3 → 4.4/5.0 (all dimensions ≥ 4.2) per structured 5-dimension re-audit.
+
+### Fixed
+
+- Repair 9 systemic workflow handoff breakages across spokes.
+- Scan now writes companion run report for downstream consumption.
+- Fix now accepts scan reports as fallback data source.
+- Auto-chain HITL gates on scan and run spokes to offer fix/coverage.
+- Init recommends `/bestest run` instead of raw test runners.
 
 ---
 
@@ -27,21 +35,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conv
 
 ### Added
 
-- Confidence scoring algorithm (noisy-OR) in detection-engine.md (S02).
-- Generalized conflict detection (category-based per-ecosystem) (S02).
-- Path validation ordering fix (traversal → canonicalize → boundary) (S02).
-- Language persistence in StackProfile (selectedLanguage field) (S02).
-- Schema version contract (schema-contract.md) with validation in 10 consuming spokes (S04).
-- Generate spoke decomposition: 4 hub files (≤415 lines) + 24 on-demand sub-files (S05).
-- Security hardening: content boundary markers (`BEGIN_UNTRUSTED_SOURCE`) in 9 spokes (S03).
-- Taint notice positioned before Context7 fetch in all 6 fetching spokes (S03).
-- Complete reference_index: 67 entries across 12 categories (S06).
-- `quick_reference.md` extracted for on-demand loading (~68 lines saved) (S06).
-- `pre-flight-protocol.md`: shared validation patterns reference (271 lines) (S06).
-- `dot-bestest-schema.md`: complete `.bestest/` directory tree documentation (251 lines) (S06).
-- `error-codes.md`: error taxonomy (E001–E025, 5 domains) (S07).
-- `validate-skill.sh`: 266 automated consistency checks across 7 domains (S07).
-- GitHub Actions CI workflow for automated skill validation (S07).
+- Confidence scoring algorithm (noisy-OR) in detection-engine.md.
+- Generalized conflict detection (category-based per-ecosystem).
+- Path validation ordering fix (traversal → canonicalize → boundary).
+- Language persistence in StackProfile (selectedLanguage field).
+- Schema version contract (schema-contract.md) with validation in 10 consuming spokes.
+- Generate spoke decomposition: 4 hub files (≤415 lines) + 24 on-demand sub-files.
+- Security hardening: content boundary markers (`BEGIN_UNTRUSTED_SOURCE`) in 9 spokes.
+- Taint notice positioned before Context7 fetch in all 6 fetching spokes.
+- Complete reference_index: 67 entries across 12 categories.
+- `quick_reference.md` extracted for on-demand loading (~68 lines saved).
+- `pre-flight-protocol.md`: shared validation patterns reference (271 lines).
+- `dot-bestest-schema.md`: complete `.bestest/` directory tree documentation (251 lines).
+- `error-codes.md`: error taxonomy (E001–E025, 5 domains).
+- `validate-skill.sh`: 266 automated consistency checks across 7 domains.
+- GitHub Actions CI workflow for automated skill validation.
 
 ---
 

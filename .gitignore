@@ -46,7 +46,7 @@ tmp/
 .recovered-context/
 .planning/
 .audits/
-docs/plans/
+docs/
 
 # ── GSD milestone verification scripts ──
 scripts/verify-*.sh

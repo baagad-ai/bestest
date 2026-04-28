@@ -8,7 +8,7 @@ Thank you for contributing to **bestest**, the enterprise-grade testing architec
 
 - **Reference files are loaded on demand.** SKILL.md lists them in the `reference_index` but only loads the spoke needed for the current command. Keep spokes self-contained.
 - **Schema versions must be bumped** when the JSON shape of `stack-profile-schema.md` or `scan-report-schema.md` changes. Add the new version to CHANGELOG.md.
-- **All file paths are relative to `~/.agents/skills/bestest/`.** Never use absolute paths in spoke references.
+- **All file paths are relative to the skill root directory** (wherever bestest is installed). Never use absolute paths in spoke references.
 
 ---
 
@@ -135,26 +135,27 @@ In SKILL.md `<routing>` section:
 
 - **Markdown tables** for structured data (field descriptions, error handling, routing).
 - **Fenced code blocks** with `json` or `typescript` language tags for all code examples.
-- **Relative paths** — always reference files relative to `~/.agents/skills/bestest/`.
+- **Relative paths** — always reference files relative to the skill root directory.
 - **Self-contained spokes** — each spoke file must work when loaded alone, without needing other spoke files.
 
 ---
 
 ## Testing Your Changes
 
-There is no automated test suite for the skill itself. Validate changes by:
+Validate changes using the built-in validation scripts:
 
-1. **Grep checks** — Verify all referenced files exist: `grep -o 'references/[a-z0-9-]*.md' SKILL.md | sort -u | while read f; do test -f "$HOME/.agents/skills/bestest/$f" && echo "OK $f" || echo "MISSING $f"; done`
-2. **Routing consistency** — Every spoke in the routing table should appear in the reference_index and vice versa.
-3. **Schema validation** — Ensure example JSON in schema docs is valid JSON.
-4. **Dry run** — Invoke `/bestest <your-command>` in a test repo and verify the spoke loads and produces expected output.
+1. **Run `scripts/validate-plugin.sh`** — 298 automated checks covering file structure, cross-references, schema compliance, and content completeness.
+2. **Run `scripts/validate-skill.sh`** — 304 automated consistency checks across 7 validation domains.
+3. **Routing consistency** — Every spoke in the routing table should appear in the reference_index and vice versa.
+4. **Schema validation** — Ensure example JSON in schema docs is valid JSON.
+5. **Dry run** — Invoke `/bestest <your-command>` in a test repo and verify the spoke loads and produces expected output.
 
 ---
 
 ## Project Structure
 
 ```
-.agents/skills/bestest/
+bestest/
 ├── SKILL.md                          # Orchestrator — command routing, principles, reference index
 ├── README.md                         # Skill documentation
 ├── CONTRIBUTING.md                   # This file
@@ -202,7 +203,6 @@ There is no automated test suite for the skill itself. Validate changes by:
 │   ├── framework-decisions.md
 │   ├── migration-rules.md
 │   ├── ai-generation-guide.md
-│   ├── js-ts-generation-guide.md
 │   ├── python-generation-guide.md
 │   ├── go-generation-guide.md
 │   │
@@ -219,6 +219,6 @@ There is no automated test suite for the skill itself. Validate changes by:
 │       └── ...
 │
 └── scripts/
-    ├── validate-skill.sh             # 288+ automated consistency checks
-    └── verify-m005-s05.sh            # S05 verification script
+    ├── validate-plugin.sh            # 298 automated integrity checks
+    └── validate-skill.sh             # 304 automated consistency checks
 ```
