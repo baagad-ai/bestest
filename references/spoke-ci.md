@@ -308,35 +308,35 @@ Build the stage configuration for the generated pipeline. Each stage is a self-c
 
    | Language | Framework | Command |
    |----------|-----------|---------|
-   | JS/TS | Vitest | `npx vitest run --reporter=verbose 'src/**/*.test.{ts,tsx}'` |
-   | JS/TS | Jest | `npx jest --testPathPattern='(unit|src)' --verbose` |
-   | Python | pytest | `pytest tests/unit/ -m unit -v --tb=short` |
+   | JS/TS | Vitest | `npx vitest run --reporter=verbose --reporter=junit --outputFile=.bestest/reports/junit-js.xml 'src/**/*.test.{ts,tsx}'` |
+   | JS/TS | Jest | `JEST_JUNIT_OUTPUT_DIR=.bestest/reports npx jest --testPathPattern='(unit|src)' --reporters=default --reporters=jest-junit --verbose` |
+   | Python | pytest | `pytest tests/unit/ -m unit -v --tb=short --junitxml=.bestest/reports/junit-python.xml` |
    | Java | Gradle | `./gradlew test --no-daemon` |
    | Java | Maven | `./mvnw test -Dgroups="unit"` |
-   | Go | testing | `go test -short -v ./...` |
+   | Go | testing | `gotestsum --junitfile .bestest/reports/junit-go.xml -- -short -v ./...` |
 
    **Medium stage commands** (integration, retry=flakyRetries):
 
    | Language | Framework | Command |
    |----------|-----------|---------|
-   | JS/TS | Vitest | `npx vitest run --reporter=verbose 'tests/integration/**'` |
-   | JS/TS | Jest | `npx jest --testPathPattern='integration' --verbose` |
-   | Python | pytest | `pytest tests/integration/ -m integration -v --tb=short` |
+   | JS/TS | Vitest | `npx vitest run --reporter=verbose --reporter=junit --outputFile=.bestest/reports/junit-js-integration.xml 'tests/integration/**'` |
+   | JS/TS | Jest | `JEST_JUNIT_OUTPUT_DIR=.bestest/reports npx jest --testPathPattern='integration' --reporters=default --reporters=jest-junit --verbose` |
+   | Python | pytest | `pytest tests/integration/ -m integration -v --tb=short --junitxml=.bestest/reports/junit-python-integration.xml` |
    | Java | Gradle | `./gradlew integrationTest --no-daemon` |
    | Java | Maven | `./mvnw verify -Dgroups="integration"` |
-   | Go | testing | `go test -v -tags=integration ./integration/...` |
+   | Go | testing | `gotestsum --junitfile .bestest/reports/junit-go-integration.xml -- -v -tags=integration ./integration/...` |
 
    **Slow stage commands** (E2E, retry=flakyRetries):
 
    | Language | Framework | Command |
    |----------|-----------|---------|
-   | JS/TS | Vitest | `npx vitest run --reporter=verbose 'e2e/**'` |
-   | JS/TS | Jest | `npx jest --testPathPattern='e2e' --verbose` |
-   | JS/TS | Playwright | `npx playwright test` |
-   | Python | pytest | `pytest tests/e2e/ -m e2e -v --tb=short` |
+   | JS/TS | Vitest | `npx vitest run --reporter=verbose --reporter=junit --outputFile=.bestest/reports/junit-js-e2e.xml 'e2e/**'` |
+   | JS/TS | Jest | `JEST_JUNIT_OUTPUT_DIR=.bestest/reports npx jest --testPathPattern='e2e' --reporters=default --reporters=jest-junit --verbose` |
+   | JS/TS | Playwright | `npx playwright test --reporter=junit,line` |
+   | Python | pytest | `pytest tests/e2e/ -m e2e -v --tb=short --junitxml=.bestest/reports/junit-python-e2e.xml` |
    | Java | Gradle | `./gradlew e2eTest --no-daemon` |
    | Java | Maven | `./mvnw verify -Dgroups="e2e"` |
-   | Go | testing | `go test -v -tags=e2e ./e2e/...` |
+   | Go | testing | `gotestsum --junitfile .bestest/reports/junit-go-e2e.xml -- -v -tags=e2e ./e2e/...` |
 
    **Quality stage commands** (mutation/nightly, no retries):
 
@@ -346,7 +346,7 @@ Build the stage configuration for the generated pipeline. Each stage is a self-c
    | Python | mutmut | `mutmut run --paths-to-mutate=src/` |
    | Java | Gradle | `./gradlew pitest` |
    | Java | Maven | `./mvnw org.pitest:pitest-maven:mutationCoverage` |
-   | Go | testing | `go test -v -race -coverprofile=coverage.out ./...` |
+   | Go | testing | `gotestsum --junitfile .bestest/reports/junit-go-nightly.xml -- -v -race -coverprofile=coverage.out ./...` |
 
 4. **Build stage configurations**:
 
@@ -531,7 +531,40 @@ Select the base template for the detected provider, inject language-specific com
      Replace: "retry(3)" with "retry({flakyRetries + 1})" in retry blocks
    ```
 
-6. **Apply Context7 syntax corrections** — If Phase 2 produced template adjustments:
+6. **Inject JUnit XML report configuration** — Add JUnit XML output to all test commands and report declarations to each job:
+
+   ```
+   If config.ci.junit.enabled is false (default: true):
+     Skip this step. No JUnit XML flags or report declarations are injected.
+
+   For each detected language in each stage:
+     Ensure the test command includes the per-language JUnit XML output flags
+     (see Phase 3 command tables — commands already include JUnit XML flags).
+
+   For each test job in the assembled pipeline, add the per-provider report declaration:
+
+     If provider == "github-actions":
+       For each test-running job:
+         Add a step: "Upload JUnit XML" using actions/upload-artifact@v4
+         Add a companion job: "test-report-{lang}" using mikepenz/action-junit-report@v4
+         Both steps use `if: always()` to run even on test failure
+
+     If provider == "gitlab-ci":
+       For each test-running job:
+         Add artifacts.when: always
+         Add artifacts.reports.junit: pointing to the JUnit XML output path
+
+     If provider == "jenkins":
+       For each test-running stage:
+         Add junit post-step pointing to the JUnit XML output path
+         Add archiveArtifacts for .bestest/reports/**/*
+
+   Ensure mkdir -p .bestest/reports is included as a pre-step in each job.
+   ```
+
+   **Vitest multi-reporter note:** When injecting JUnit XML for Vitest, use `--reporter=verbose --reporter=junit` (two separate flags). Vitest supports multiple reporters simultaneously — `--reporter=verbose` produces console output and `--reporter=junit` writes the XML file. The `--outputFile` flag specifies the JUnit XML destination.
+
+7. **Apply Context7 syntax corrections** — If Phase 2 produced template adjustments:
 
    ```
    For each adjustment in templateAdjustments[]:
@@ -539,7 +572,7 @@ Select the base template for the detected provider, inject language-specific com
      Print: "Applied syntax update: {deprecated} → {replacement}"
    ```
 
-7. **Handle working directory injection** — For monorepo setups:
+8. **Handle working directory injection** — For monorepo setups:
 
    ```
    For each language with a non-root workingDirectory:
@@ -559,7 +592,7 @@ Select the base template for the detected provider, inject language-specific com
          dir('{workingDirectory}') { ... }
    ```
 
-8. **Generate multi-language coverage gate** — For projects with 2+ languages, add a weighted coverage aggregation step:
+9. **Generate multi-language coverage gate** — For projects with 2+ languages, add a weighted coverage aggregation step:
 
    ```
    If len(languages) > 1 AND coverageEnabled:
@@ -1065,6 +1098,16 @@ For single-language projects, the per-job coverage gate from the template is suf
 Jobs for languages not present in the project are **removed** during Phase 4, not just conditionally skipped. This keeps the generated pipeline clean and avoids CI runner time wasted on no-op jobs.
 
 The base templates include conditional execution rules (GitHub Actions: `hashFiles`, GitLab CI: `exists:`, Jenkins: `when`) as a safety net, but the spoke removes undetected language jobs entirely for clarity.
+
+### JUnit XML Aggregation for Multi-Language
+
+When multiple languages are detected, each language job produces its own JUnit XML report. The CI pipeline aggregates these for unified dashboard visibility:
+
+- **GitHub Actions:** Each language gets a dedicated `test-report-{lang}` job using `mikepenz/action-junit-report@v4`. These annotation jobs run in parallel after their corresponding test jobs complete. Each reports against a specific JUnit XML file from `.bestest/reports/`.
+- **GitLab CI:** Each language job declares its own `artifacts:reports:junit:` path. GitLab automatically aggregates all JUnit reports from the pipeline into the unified **Tests** tab — no extra configuration needed.
+- **Jenkins:** Each parallel stage includes a `junit` post-step. Jenkins aggregates all test results from the pipeline into a single test trend view.
+
+All JUnit XML files follow the naming convention `junit-{lang}[-stage].xml` in `.bestest/reports/` to avoid collisions between languages and stages.
 
 ---
 
