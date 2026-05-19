@@ -5,6 +5,12 @@ Run generated tests, analyze failures, and fix tests (never source code) in a co
 ## Execution
 
 ```
+# Global iteration budget check
+global_iterations += 1
+if global_iterations > generation.max_iterations (default: 10):
+  Emit diagnostic summary (see Global Iteration Budget in references/generate/pipeline-shared.md).
+  Halt. Do not proceed with this phase.
+
 If generation.verify_pass is true:
   Run generated tests using the build tool.
 

@@ -5,6 +5,19 @@ Go's strict compilation rules mean every generated test must pass `go vet`, `go 
 ## Execution
 
 ```
+# Global iteration budget check
+global_iterations += 1
+if global_iterations > generation.max_iterations (default: 10):
+  Emit diagnostic summary (see Global Iteration Budget in references/generate/pipeline-shared.md).
+  Halt. Do not proceed with this phase.
+
+# Recompilation guard
+if generation.recompilation_guard is true:
+  phase5_entry_count[<test-file>] += 1
+  if phase5_entry_count[<test-file>] > 2 AND file has no successful Phase 6 pass:
+    Print: "Recompilation guard: deferring {file} for manual review (entered Phase 5 {count} times without Phase 6 success)."
+    Skip to next file.
+
 If generation.verify_compilation is true:
   Run three-stage verification on each generated test file.
 
