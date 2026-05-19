@@ -56,7 +56,9 @@ fast-js:
   before_script:
     - npm ci
   script:
-    - npx vitest run --reporter=verbose src/**/*.test.{ts,tsx} --coverage
+    # JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+    - mkdir -p .bestest/reports
+    - npx vitest run --reporter=verbose --reporter=junit --outputFile=.bestest/reports/junit-js.xml src/**/*.test.{ts,tsx} --coverage
     - COVERAGE=$(cat coverage/coverage-summary.json | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).total.lines.pct))")
     - echo "JS/TS Coverage: ${COVERAGE}%"
     - test $(echo "$COVERAGE >= $COVERAGE_THRESHOLD" | bc -l) -eq 1
@@ -64,6 +66,8 @@ fast-js:
   artifacts:
     paths:
       - coverage/
+    reports:
+      junit: .bestest/reports/junit-js.xml
 
 fast-python:
   stage: fast
@@ -83,7 +87,9 @@ fast-python:
   before_script:
     - pip install --cache-dir=.cache/pip -r requirements.txt pytest pytest-cov 2>/dev/null || pip install pytest pytest-cov
   script:
-    - pytest tests/unit/ -m unit -v --tb=short --cov --cov-report=json:coverage.json
+    # JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+    - mkdir -p .bestest/reports
+    - pytest tests/unit/ -m unit -v --tb=short --cov --cov-report=json:coverage.json --junitxml=.bestest/reports/junit-python.xml
     - COVERAGE=$(python -c "import json; print(json.load(open('coverage.json'))['totals']['percent_covered'])")
     - echo "Python Coverage: ${COVERAGE}%"
     - test $(echo "$COVERAGE >= $COVERAGE_THRESHOLD" | bc -l) -eq 1
@@ -91,6 +97,8 @@ fast-python:
   artifacts:
     paths:
       - coverage.json
+    reports:
+      junit: .bestest/reports/junit-python.xml
 
 fast-java:
   stage: fast
@@ -117,6 +125,8 @@ fast-java:
   artifacts:
     paths:
       - build/reports/jacoco/
+    reports:
+      junit: build/test-results/**/*.xml
 
 fast-go:
   stage: fast
@@ -135,7 +145,10 @@ fast-go:
   variables:
     GOPATH: "$CI_PROJECT_DIR/.go"
   script:
-    - go test -short -v -coverprofile=coverage.out -covermode=atomic ./...
+    # JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+    - mkdir -p .bestest/reports
+    - go install gotest.tools/gotestsum@latest
+    - gotestsum --junitfile .bestest/reports/junit-go.xml -- -short -v -coverprofile=coverage.out -covermode=atomic ./...
     - COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
     - echo "Go Coverage: ${COVERAGE}%"
     - test $(echo "$COVERAGE >= $COVERAGE_THRESHOLD" | bc -l) -eq 1
@@ -143,6 +156,8 @@ fast-go:
   artifacts:
     paths:
       - coverage.out
+    reports:
+      junit: .bestest/reports/junit-go.xml
 
 # ============================================================================
 # Stage 2: Medium — Integration Tests
@@ -168,7 +183,9 @@ medium-js:
   before_script:
     - npm ci
   script:
-    - npx vitest run --reporter=verbose "tests/integration/**"
+    # JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+    - mkdir -p .bestest/reports
+    - npx vitest run --reporter=verbose --reporter=junit --outputFile=.bestest/reports/junit-js-integration.xml "tests/integration/**"
 
 medium-python:
   stage: medium
@@ -191,7 +208,9 @@ medium-python:
   before_script:
     - pip install --cache-dir=.cache/pip -r requirements.txt pytest 2>/dev/null || pip install pytest
   script:
-    - pytest tests/integration/ -m integration -v --tb=short
+    # JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+    - mkdir -p .bestest/reports
+    - pytest tests/integration/ -m integration -v --tb=short --junitxml=.bestest/reports/junit-python-integration.xml
 
 medium-java:
   stage: medium
@@ -227,7 +246,10 @@ medium-go:
     GOPATH: "$CI_PROJECT_DIR/.go"
   <<: *retry-flaky
   script:
-    - go test -v -tags=integration ./integration/... ./itest/...
+    # JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+    - mkdir -p .bestest/reports
+    - go install gotest.tools/gotestsum@latest
+    - gotestsum --junitfile .bestest/reports/junit-go-integration.xml -- -v -tags=integration ./integration/... ./itest/...
 
 # ============================================================================
 # Stage 3: Slow — E2E Tests
@@ -327,7 +349,13 @@ quality-go-nightly:
   variables:
     GOPATH: "$CI_PROJECT_DIR/.go"
   script:
-    - go test -v -race -coverprofile=coverage-nightly.out -covermode=atomic ./...
+    # JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+    - mkdir -p .bestest/reports
+    - go install gotest.tools/gotestsum@latest
+    - gotestsum --junitfile .bestest/reports/junit-go-nightly.xml -- -v -race -coverprofile=coverage-nightly.out -covermode=atomic ./...
     - COVERAGE=$(go tool cover -func=coverage-nightly.out | grep total | awk '{print $3}' | tr -d '%')
     - echo "Go Nightly Coverage: ${COVERAGE}%"
     - test $(echo "$COVERAGE >= $COVERAGE_THRESHOLD" | bc -l) -eq 1
+  artifacts:
+    reports:
+      junit: .bestest/reports/junit-go-nightly.xml

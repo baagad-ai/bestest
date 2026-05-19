@@ -49,8 +49,10 @@ pipeline {
                     steps {
                         checkout scm
                         sh 'npm ci'
+                        // JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+                        sh 'mkdir -p .bestest/reports'
                         sh '''
-                            npx vitest run --reporter=verbose src/**/*.test.{ts,tsx} --coverage
+                            npx vitest run --reporter=verbose --reporter=junit --outputFile=.bestest/reports/junit-js.xml src/**/*.test.{ts,tsx} --coverage
 
                             COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
                             echo "JS/TS Coverage: ${COVERAGE}%"
@@ -64,6 +66,8 @@ pipeline {
                     post {
                         always {
                             archiveArtifacts artifacts: 'coverage/**', allowEmptyArchive: true
+                            junit '.bestest/reports/junit-js.xml'
+                            archiveArtifacts artifacts: '.bestest/reports/**', allowEmptyArchive: true
                         }
                     }
                 }
@@ -73,8 +77,10 @@ pipeline {
                     steps {
                         checkout scm
                         sh 'pip install -r requirements.txt pytest pytest-cov 2>/dev/null || pip install pytest pytest-cov'
+                        // JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+                        sh 'mkdir -p .bestest/reports'
                         sh '''
-                            pytest tests/unit/ -m unit -v --tb=short --cov --cov-report=json:coverage.json
+                            pytest tests/unit/ -m unit -v --tb=short --cov --cov-report=json:coverage.json --junitxml=.bestest/reports/junit-python.xml
 
                             COVERAGE=$(python -c "import json; print(json.load(open('coverage.json'))['totals']['percent_covered'])")
                             echo "Python Coverage: ${COVERAGE}%"
@@ -88,6 +94,8 @@ pipeline {
                     post {
                         always {
                             archiveArtifacts artifacts: 'coverage.json', allowEmptyArchive: true
+                            junit '.bestest/reports/junit-python.xml'
+                            archiveArtifacts artifacts: '.bestest/reports/**', allowEmptyArchive: true
                         }
                     }
                 }
@@ -108,6 +116,7 @@ pipeline {
                         always {
                             archiveArtifacts artifacts: 'build/reports/jacoco/**', allowEmptyArchive: true
                             junit 'build/test-results/**/*.xml'
+                            archiveArtifacts artifacts: '.bestest/reports/**', allowEmptyArchive: true
                         }
                     }
                 }
@@ -116,8 +125,11 @@ pipeline {
                     agent { label 'go' }
                     steps {
                         checkout scm
+                        // JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+                        sh 'mkdir -p .bestest/reports'
+                        sh 'go install gotest.tools/gotestsum@latest'
                         sh '''
-                            go test -short -v -coverprofile=coverage.out -covermode=atomic ./...
+                            gotestsum --junitfile .bestest/reports/junit-go.xml -- -short -v -coverprofile=coverage.out -covermode=atomic ./...
 
                             COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
                             echo "Go Coverage: ${COVERAGE}%"
@@ -131,6 +143,8 @@ pipeline {
                     post {
                         always {
                             archiveArtifacts artifacts: 'coverage.out', allowEmptyArchive: true
+                            junit '.bestest/reports/junit-go.xml'
+                            archiveArtifacts artifacts: '.bestest/reports/**', allowEmptyArchive: true
                         }
                     }
                 }
@@ -147,8 +161,16 @@ pipeline {
                     steps {
                         checkout scm
                         sh 'npm ci'
+                        // JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+                        sh 'mkdir -p .bestest/reports'
                         retry(3) {
-                            sh 'npx vitest run --reporter=verbose "tests/integration/**"'
+                            sh 'npx vitest run --reporter=verbose --reporter=junit --outputFile=.bestest/reports/junit-js-integration.xml "tests/integration/**"'
+                        }
+                    }
+                    post {
+                        always {
+                            junit '.bestest/reports/junit-js-integration.xml'
+                            archiveArtifacts artifacts: '.bestest/reports/**', allowEmptyArchive: true
                         }
                     }
                 }
@@ -158,8 +180,16 @@ pipeline {
                     steps {
                         checkout scm
                         sh 'pip install -r requirements.txt pytest 2>/dev/null || pip install pytest'
+                        // JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+                        sh 'mkdir -p .bestest/reports'
                         retry(3) {
-                            sh 'pytest tests/integration/ -m integration -v --tb=short'
+                            sh 'pytest tests/integration/ -m integration -v --tb=short --junitxml=.bestest/reports/junit-python-integration.xml'
+                        }
+                    }
+                    post {
+                        always {
+                            junit '.bestest/reports/junit-python-integration.xml'
+                            archiveArtifacts artifacts: '.bestest/reports/**', allowEmptyArchive: true
                         }
                     }
                 }
@@ -184,8 +214,17 @@ pipeline {
                     agent { label 'go' }
                     steps {
                         checkout scm
+                        // JUnit XML output path aligns with ci.junit.outputPath from .bestest/config.yaml
+                        sh 'mkdir -p .bestest/reports'
+                        sh 'go install gotest.tools/gotestsum@latest'
                         retry(3) {
-                            sh 'go test -v -tags=integration ./integration/... ./itest/...'
+                            sh 'gotestsum --junitfile .bestest/reports/junit-go-integration.xml -- -v -tags=integration ./integration/... ./itest/...'
+                        }
+                    }
+                    post {
+                        always {
+                            junit '.bestest/reports/junit-go-integration.xml'
+                            archiveArtifacts artifacts: '.bestest/reports/**', allowEmptyArchive: true
                         }
                     }
                 }
