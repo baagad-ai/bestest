@@ -878,6 +878,8 @@ Exit. Cannot proceed without coverage data.
 
 This spoke writes to `.bestest/state/metrics.json` following the shared metrics-update protocol defined in `references/metrics-schema.md`.
 
+Before reading metrics.json, acquire the concurrency lock per `references/pre-flight-protocol.md` → Concurrency Lock Protocol. The lock must be held for the entire read-modify-write cycle (Steps 0–8). If the lock cannot be acquired, log a warning and proceed with a best-effort write.
+
 ### Sections Updated
 
 `coverage`, `healthScore`, `modules`, `activity`
@@ -895,9 +897,13 @@ This spoke writes to `.bestest/state/metrics.json` following the shared metrics-
 
 ### Update Protocol
 
-Follow this 7-step protocol on every invocation:
+Follow this protocol on every invocation:
 
 ```
+0. Acquire lock on .bestest/state/.metrics.lock
+   - Use flock with 5-second timeout (primary) or mkdir-based fallback
+   - If lock cannot be acquired, proceed anyway with a warning (best-effort)
+   - For the full lock acquisition and release protocol, see references/pre-flight-protocol.md → Concurrency Lock Protocol
 1. Read .bestest/state/metrics.json
 2. Parse as JSON
 3. If parse fails (corruption):
@@ -912,6 +918,9 @@ Follow this 7-step protocol on every invocation:
    - Recalculate derived values (healthScore, overallFlakeRate, etc.)
 6. Write back to .bestest/state/metrics.json (atomic write: write to temp file, then rename)
 7. Update config.yaml state.last_metrics with current timestamp
+8. Release lock on .bestest/state/.metrics.lock
+   - flock: released automatically when the subshell/process exits
+   - mkdir: remove the lock directory with rm -rf
 ```
 
 ### Activity Log Entry

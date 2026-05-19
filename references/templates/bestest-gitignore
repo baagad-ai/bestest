@@ -3,6 +3,9 @@
 .bestest/reports/
 .bestest/cache/
 
+# Advisory lock files (ephemeral concurrency artifacts)
+*.lock
+
 # Generated test artifacts (tracked separately)
 # bestest scan/generate output in reports/ is informational only
 

@@ -135,6 +135,8 @@ Present the generation results to the user for review before committing.
 
 ## Config State Update
 
+Before updating config.yaml, acquire the config lock (`.bestest/.config.lock`) per `references/pre-flight-protocol.md` → Concurrency Lock Protocol. Acquire config lock before metrics lock when both are needed (ordered locking prevents deadlock).
+
 ```
 Update .bestest/config.yaml:
   state:

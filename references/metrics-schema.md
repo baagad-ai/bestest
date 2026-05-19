@@ -273,6 +273,10 @@ Every state-changing spoke follows this shared protocol when writing to `metrics
 ### Protocol Steps
 
 ```
+0. Acquire lock on .bestest/state/.metrics.lock
+   - Use flock with 5-second timeout (primary) or mkdir-based fallback
+   - If lock cannot be acquired, proceed anyway with a warning (best-effort)
+   - For the full lock acquisition and release protocol, see references/pre-flight-protocol.md → Concurrency Lock Protocol.
 1. Read .bestest/state/metrics.json
 2. Parse as JSON
 3. If parse fails (corruption):
@@ -287,7 +291,12 @@ Every state-changing spoke follows this shared protocol when writing to `metrics
    - Recalculate derived values (healthScore, overallFlakeRate, etc.)
 6. Write back to .bestest/state/metrics.json (atomic write: write to temp file, then rename)
 7. Update config.yaml state.last_metrics with current timestamp
+8. Release lock on .bestest/state/.metrics.lock
+   - flock: released automatically when the subshell/process exits
+   - mkdir: remove the lock directory with rm -rf
 ```
+
+> **Important:** When using `flock`, the entire read-modify-write cycle (Steps 0–8) **must execute in a single shell invocation** (typically a subshell) so the lock is held for the full duration. Splitting the steps across separate shell commands would release the lock between reads and writes, defeating the purpose. See `references/pre-flight-protocol.md` → Concurrency Lock Protocol for the copy-paste shell template.
 
 ### Spoke Responsibility Matrix
 

@@ -10,12 +10,14 @@ Complete reference for the `.bestest/` directory tree — what creates each file
 .bestest/
 ├── config.yaml                        # Main test configuration
 ├── dashboard.html                     # Self-contained health dashboard (spoke-init)
-├── .gitignore                         # Ignores state/, reports/, and cache
+├── .config.lock                       # Advisory lock file for config.yaml concurrency control
+├── .gitignore                         # Ignores state/, reports/, cache/, and lock files
 ├── adrs/
 │   └── ADR-001-test-framework.md      # Framework selection decision record
 ├── state/
 │   ├── stack-profile.json             # Detected technology stack
 │   ├── metrics.json                   # Continuous test health metrics (all spokes)
+│   ├── .metrics.lock                  # Advisory lock file for metrics.json concurrency control
 │   └── migration-backup.json          # Migration state checkpoint (spoke-migrate only)
 └── reports/
     ├── scan-<timestamp>.json          # Scan reports (spoke-scan)
@@ -150,6 +152,22 @@ These fields are set during init and are immutable — they record the init-time
 | **Lifecycle** | Created by init with defaults. Continuously updated by every state-changing spoke. Bounded arrays evict oldest entries (see metrics-schema.md for maxLength defaults). |
 | **Corruption handling** | Pre-read validation: if parse fails, recreating with defaults + current spoke's data (graceful degradation). Never aborts the spoke. |
 | **Safe to delete** | Yes — any state-changing spoke will recreate it with defaults on next invocation. Historical trend data will be lost. |
+
+#### Lock Files
+
+Advisory lock files for concurrency control. Created by `spoke-init`, acquired via `flock` or `mkdir` before read-modify-write cycles on the protected resources. See `references/pre-flight-protocol.md` → Concurrency Lock Protocol for the full protocol.
+
+| File | Protects | Strategy |
+|------|----------|----------|
+| `.bestest/state/.metrics.lock` | `.bestest/state/metrics.json` | `flock` (primary), `mkdir` fallback |
+| `.bestest/.config.lock` | `.bestest/config.yaml` | `flock` (primary), `mkdir` fallback |
+
+**Lifecycle notes:**
+- Lock files are created as empty files by `spoke-init` (Phase 4 — Scaffold).
+- They are ephemeral concurrency artifacts — ignored by git via `*.lock` pattern in `.bestest/.gitignore`.
+- `flock`-based locks auto-release when the holding process exits (no stale locks possible).
+- `mkdir`-based locks include stale detection: locks older than 60 seconds are force-removed as stale from crashed processes.
+- Safe to delete manually if no bestest instances are running.
 
 ### `.bestest/reports/`
 

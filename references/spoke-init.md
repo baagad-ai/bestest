@@ -208,11 +208,13 @@ Create the `.bestest/` directory structure and populate it with configuration fi
 ```
 .bestest/
 ├── config.yaml              # Main test configuration
-├── .gitignore               # Ignore state/reports/cache
+├── .gitignore               # Ignore state/reports/cache/lock files
+├── .config.lock             # Advisory lock for config.yaml concurrency control
 ├── adrs/
 │   └── ADR-001-test-framework.md   # Framework decision record (generated in Phase 2)
 ├── state/
-│   └── stack-profile.json   # Detected stack profile (from Phase 1)
+│   ├── stack-profile.json   # Detected stack profile (from Phase 1)
+│   └── .metrics.lock        # Advisory lock for metrics.json concurrency control
 └── reports/                  # Empty directory for scan/generate output
 ```
 
@@ -434,6 +436,17 @@ Use `references/templates/testing-md.md`. Fill placeholders:
 #### `.bestest/.gitignore`
 
 Copy `references/templates/bestest-gitignore` verbatim. No placeholder substitution needed.
+
+#### Lock Files
+
+Create empty lock files for concurrency control:
+
+```bash
+touch .bestest/state/.metrics.lock
+touch .bestest/.config.lock
+```
+
+These are advisory lock files used by the Concurrency Lock Protocol (see `references/pre-flight-protocol.md` → Concurrency Lock Protocol). They are created as empty files during init so that `flock` has a target file descriptor to lock. The `*.lock` pattern in `.bestest/.gitignore` ensures they are not tracked by git.
 
 #### `.bestest/dashboard.html`
 
@@ -769,8 +782,10 @@ Verify every expected file exists:
 ```
 .bestest/config.yaml          — exists and is valid YAML
 .bestest/.gitignore           — exists
+.bestest/.config.lock         — exists (empty lock file for config.yaml concurrency control)
 .bestest/adrs/ADR-001-test-framework.md — exists and contains Status, Context, Decision, Rationale sections
 .bestest/state/stack-profile.json — exists and is valid JSON matching references/stack-profile-schema.md
+.bestest/state/.metrics.lock  — exists (empty lock file for metrics.json concurrency control)
 .bestest/reports/             — directory exists (empty)
 TESTING.md                    — exists at repo root (NOT inside .bestest/)
 vitest.config.ts OR jest.config.ts — exists at repo root
@@ -780,8 +795,10 @@ vitest.config.ts OR jest.config.ts — exists at repo root
 ```
 .bestest/config.yaml          — exists and is valid YAML with framework: pytest
 .bestest/.gitignore           — exists
+.bestest/.config.lock         — exists (empty lock file for config.yaml concurrency control)
 .bestest/adrs/ADR-001-test-framework.md — exists and contains Status, Context, Decision, Rationale sections
 .bestest/state/stack-profile.json — exists and is valid JSON matching references/stack-profile-schema.md
+.bestest/state/.metrics.lock  — exists (empty lock file for metrics.json concurrency control)
 .bestest/reports/             — directory exists (empty)
 TESTING.md                    — exists at repo root (NOT inside .bestest/)
 pyproject.toml                — exists with [tool.pytest.ini_options] section (or pytest.ini)
@@ -792,8 +809,10 @@ tests/                        — directory exists with conftest.py
 ```
 .bestest/config.yaml          — exists and is valid YAML with framework: junit5
 .bestest/.gitignore           — exists
+.bestest/.config.lock         — exists (empty lock file for config.yaml concurrency control)
 .bestest/adrs/ADR-001-test-framework.md — exists and contains Status, Context, Decision, Rationale sections
 .bestest/state/stack-profile.json — exists and is valid JSON matching references/stack-profile-schema.md
+.bestest/state/.metrics.lock  — exists (empty lock file for metrics.json concurrency control)
 .bestest/reports/             — directory exists (empty)
 TESTING.md                    — exists at repo root (NOT inside .bestest/)
 build.gradle or pom.xml       — exists with JUnit 5 dependencies added
@@ -804,8 +823,10 @@ src/test/java/                — test source directory exists
 ```
 .bestest/config.yaml          — exists and is valid YAML with framework: go_testing
 .bestest/.gitignore           — exists
+.bestest/.config.lock         — exists (empty lock file for config.yaml concurrency control)
 .bestest/adrs/ADR-001-test-framework.md — exists and contains Status, Context, Decision, Rationale sections
 .bestest/state/stack-profile.json — exists and is valid JSON matching references/stack-profile-schema.md
+.bestest/state/.metrics.lock  — exists (empty lock file for metrics.json concurrency control)
 .bestest/reports/             — directory exists (empty)
 TESTING.md                    — exists at repo root (NOT inside .bestest/)
 go.mod                        — exists with testify dependency added
@@ -832,9 +853,11 @@ Print a completion summary:
 | File | Purpose |
 |------|---------|
 | .bestest/config.yaml | Test configuration for [framework] |
-| .bestest/.gitignore | Ignores state, reports, and cache |
+| .bestest/.gitignore | Ignores state, reports, cache, and lock files |
+| .bestest/.config.lock | Advisory lock file for config.yaml concurrency control |
 | .bestest/adrs/ADR-001-test-framework.md | Framework selection decision record |
 | .bestest/state/stack-profile.json | Detected stack profile |
+| .bestest/state/.metrics.lock | Advisory lock file for metrics.json concurrency control |
 | .bestest/reports/ | Directory for scan and coverage reports |
 | TESTING.md | Living test documentation (repo root) |
 | [vitest.config.ts or jest.config.ts] | Framework configuration (repo root) |
@@ -1068,8 +1091,10 @@ After successful completion, the following files exist:
 | File | Location | Purpose |
 |------|----------|---------|
 | `config.yaml` | `.bestest/` | Test framework, coverage, paths, and generation settings |
-| `.gitignore` | `.bestest/` | Ignore state/, reports/, cache/ |
+| `.gitignore` | `.bestest/` | Ignore state/, reports/, cache/, and lock files |
+| `.config.lock` | `.bestest/` | Advisory lock file for config.yaml concurrency control |
 | `stack-profile.json` | `.bestest/state/` | Detected technology stack with confidence scores |
+| `.metrics.lock` | `.bestest/state/` | Advisory lock file for metrics.json concurrency control |
 | `ADR-001-test-framework.md` | `.bestest/adrs/` | Framework selection decision record |
 | — (empty directory) | `.bestest/reports/` | Future home for scan and coverage reports |
 | `TESTING.md` | **Repo root** | Living test documentation |
@@ -1080,8 +1105,10 @@ After successful completion, the following files exist:
 | File | Location | Purpose |
 |------|----------|---------|
 | `config.yaml` | `.bestest/` | Test framework (pytest), coverage, paths, and generation settings |
-| `.gitignore` | `.bestest/` | Ignore state/, reports/, cache/ |
+| `.gitignore` | `.bestest/` | Ignore state/, reports/, cache/, and lock files |
+| `.config.lock` | `.bestest/` | Advisory lock file for config.yaml concurrency control |
 | `stack-profile.json` | `.bestest/state/` | Detected technology stack with confidence scores |
+| `.metrics.lock` | `.bestest/state/` | Advisory lock file for metrics.json concurrency control |
 | `ADR-001-test-framework.md` | `.bestest/adrs/` | Framework selection decision record |
 | — (empty directory) | `.bestest/reports/` | Future home for scan and coverage reports |
 | `TESTING.md` | **Repo root** | Living test documentation |
@@ -1094,8 +1121,10 @@ After successful completion, the following files exist:
 | File | Location | Purpose |
 |------|----------|---------|
 | `config.yaml` | `.bestest/` | Test framework (junit5), coverage (JaCoCo), paths, and generation settings |
-| `.gitignore` | `.bestest/` | Ignore state/, reports/, cache/ |
+| `.gitignore` | `.bestest/` | Ignore state/, reports/, cache/, and lock files |
+| `.config.lock` | `.bestest/` | Advisory lock file for config.yaml concurrency control |
 | `stack-profile.json` | `.bestest/state/` | Detected technology stack with confidence scores |
+| `.metrics.lock` | `.bestest/state/` | Advisory lock file for metrics.json concurrency control |
 | `ADR-001-test-framework.md` | `.bestest/adrs/` | Framework selection decision record |
 | — (empty directory) | `.bestest/reports/` | Future home for scan and coverage reports |
 | `TESTING.md` | **Repo root** | Living test documentation |
@@ -1107,8 +1136,10 @@ After successful completion, the following files exist:
 | File | Location | Purpose |
 |------|----------|---------|
 | `config.yaml` | `.bestest/` | Test framework (go_testing), coverage (go test -cover), paths, and generation settings |
-| `.gitignore` | `.bestest/` | Ignore state/, reports/, cache/ |
+| `.gitignore` | `.bestest/` | Ignore state/, reports/, cache/, and lock files |
+| `.config.lock` | `.bestest/` | Advisory lock file for config.yaml concurrency control |
 | `stack-profile.json` | `.bestest/state/` | Detected technology stack with confidence scores |
+| `.metrics.lock` | `.bestest/state/` | Advisory lock file for metrics.json concurrency control |
 | `ADR-001-test-framework.md` | `.bestest/adrs/` | Framework selection decision record |
 | — (empty directory) | `.bestest/reports/` | Future home for scan and coverage reports |
 | `TESTING.md` | **Repo root** | Living test documentation |
