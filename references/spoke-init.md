@@ -294,6 +294,8 @@ For each file, read the corresponding template and fill all `{{variable}}` place
 
 Select the config template based on detected stack type:
 
+> **Minimal configuration:** For manual setup, only `framework` is required. See `references/config-schema.md` → **Minimal Configuration** for a 3-field quickstart example.
+
 | Stack Type | Template File |
 |------------|--------------|
 | Vitest single-package | `references/templates/config-vitest.yaml` |

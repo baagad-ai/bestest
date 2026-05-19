@@ -6,6 +6,9 @@
 # Advisory lock files (ephemeral concurrency artifacts)
 *.lock
 
+# Corrupt-file backups (forensic evidence from failed state recovery)
+*.corrupt.*
+
 # Generated test artifacts (tracked separately)
 # bestest scan/generate output in reports/ is informational only
 

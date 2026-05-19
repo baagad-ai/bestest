@@ -301,7 +301,10 @@ Which spokes read files inside `.bestest/`:
 All spokes that read `.bestest/state/*.json` apply pre-read validation:
 1. Attempt to parse the JSON file.
 2. If parsing succeeds: continue.
-3. If parsing fails (SyntaxError, unexpected token): report corruption and offer options (regenerate, manual fix, abort).
+3. If parsing fails (SyntaxError, unexpected token):
+   a. Backup the corrupt file: `cp <filename> <filename>.corrupt.$(date +%s)`
+      - Log the backup path so agents can locate it for forensic inspection
+   b. Report corruption and offer options (regenerate, manual fix, abort).
 
 See `references/pre-flight-protocol.md` for the shared validation pattern.
 

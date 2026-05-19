@@ -4,6 +4,29 @@ Complete schema for `.bestest/config.yaml`. This file is the single source of tr
 
 ## Field Inventory
 
+## Minimal Configuration
+
+New users only need **3 fields** to get a working bestest setup. All other fields have sensible defaults.
+
+| Field | Required? | Default | Notes |
+|-------|-----------|---------|-------|
+| `framework` | **Yes** | — | Must be one of: `vitest`, `jest`, `mocha`, `jasmine`, `pytest`, `junit5`, `testng`, `go_testing` |
+| `coverage.target` | No | `80` | Target coverage percentage (0–100) |
+| `paths.test` | No | Framework-specific glob | e.g. `src/**/*.{test,spec}.{ts,tsx}` for vitest |
+
+**Minimal `config.yaml` example:**
+
+```yaml
+# .bestest/config.yaml — minimal working configuration
+framework: vitest              # Required: your test framework
+coverage:
+  target: 80                   # Optional: default is 80
+paths:
+  test: "src/**/*.{test,spec}.{ts,tsx}"  # Optional: default varies by framework
+```
+
+> **Tip:** Run `bestest init` to auto-detect your stack and generate a complete config. See the full Field Inventory below for advanced options like `e2e`, `reporting`, `plugins`, and more.
+
 ### Top-Level Fields
 
 | Field | Type | Default | Description |
