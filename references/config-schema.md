@@ -246,6 +246,10 @@ Test generation behavior settings.
 | `generation.verify_compilation` | boolean | `true` | `true`, `false` | Run type-check after generation |
 | `generation.verify_pass` | boolean | `true` | `true`, `false` | Run tests after generation to verify they pass |
 | `generation.max_retries` | number | `2` | 0–5 | Maximum retry attempts when generated tests fail verification |
+| `generation.max_iterations` | number | `10` | 1–100 | Global cap on total Phase 5+6 loop iterations across all target files in a single generate run. Distinct from max_retries (per-file). When exhausted, the pipeline stops and emits a diagnostic summary. |
+| `generation.recompilation_guard` | boolean | `true` | `true`, `false` | When true, detects files re-entering Phase 5 more than twice without a successful Phase 6 pass, and auto-defers them for manual review. |
+
+`max_retries` caps per-file Phase 6 fix attempts. `max_iterations` caps the total Phase 5+6 iterations across all files in the run. A single file can consume at most `max_retries` iterations, but the global budget may be shared across multiple files. When the global budget is exhausted, remaining files are deferred with a diagnostic summary. `recompilation_guard` complements both: it detects pathological per-file cycles early (re-entering Phase 5 more than twice without progress) and defers those files before they exhaust the global budget.
 
 #### `generation.parallel.*`
 
@@ -483,6 +487,8 @@ generation:
   verify_compilation: true
   verify_pass: true
   max_retries: 2
+  max_iterations: 10
+  recompilation_guard: true
 reports:
   max_retained: 50
 
@@ -575,6 +581,8 @@ generation:
   verify_compilation: true
   verify_pass: true
   max_retries: 2
+  max_iterations: 10
+  recompilation_guard: true
 reports:
   max_retained: 50
 
@@ -670,6 +678,8 @@ generation:
   verify_compilation: true
   verify_pass: true
   max_retries: 2
+  max_iterations: 10
+  recompilation_guard: true
 reports:
   max_retained: 50
 
@@ -780,6 +790,8 @@ generation:
   verify_compilation: true
   verify_pass: true
   max_retries: 2
+  max_iterations: 10
+  recompilation_guard: true
 reports:
   max_retained: 50
 
@@ -886,6 +898,8 @@ generation:
   verify_compilation: true
   verify_pass: true
   max_retries: 2
+  max_iterations: 10
+  recompilation_guard: true
 reports:
   max_retained: 50
 
@@ -1004,6 +1018,8 @@ generation:
   verify_compilation: true
   verify_pass: true
   max_retries: 2
+  max_iterations: 10
+  recompilation_guard: true
 reports:
   max_retained: 50
 
