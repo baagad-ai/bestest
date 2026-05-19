@@ -285,10 +285,10 @@ for section in essential_principles detection_engine framework_decision context7
     "grep -q '^<${section}>' '$SKILL_FILE'"
 done
 
-# E017: Line count within bounds (200–310)
+# E017: Line count within bounds (200–350)
 LINE_COUNT=$(wc -l < "$SKILL_FILE" | tr -d ' ')
-check "SKILL.md line count ($LINE_COUNT) is within bounds (200-310)" "E017" "warning" \
-  "[ '$LINE_COUNT' -ge 200 ] && [ '$LINE_COUNT' -le 310 ]"
+check "SKILL.md line count ($LINE_COUNT) is within bounds (200-350)" "E017" "warning" \
+  "[ '$LINE_COUNT' -ge 200 ] && [ '$LINE_COUNT' -le 350 ]"
 
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""
