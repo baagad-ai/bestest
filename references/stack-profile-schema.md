@@ -12,7 +12,8 @@ The StackProfile is the primary output of the detection engine. It captures the 
     {
       "name": "string",
       "confidence": 0.0,
-      "evidence": ["string"]
+      "evidence": ["string"],
+      "role": "string"
     }
   ],
   "runtime": {
@@ -77,6 +78,7 @@ Array of detected programming languages, ordered by prevalence.
 | `name` | string | Language identifier: `typescript`, `javascript`, `python`, `java`, `kotlin`, `go`, `ruby`, `rust`, `csharp`, `php` |
 | `confidence` | number | 0–1 confidence score (see semantics below) |
 | `evidence` | string[] | Files, fields, or patterns that triggered this detection |
+| `role` | string | Classification of this language's role in the project. Values: `primary` (config at project root, multiplier 1.0), `isolated-primary` (config in subdirectory only, multiplier 1.0 for subdirectory scope / 0.7 for project scope), `secondary` (only source files in scripts/tools/examples, multiplier 0.7), `incidental` (only file-extension matches, multiplier 0.4). Set by the Context Relevance Modifier in detection-engine.md. |
 
 ### `runtime`
 
@@ -459,6 +461,34 @@ Confidence scores are additive: multiple corroborating signals increase the scor
   "coverage": { "provider": null, "recommended": "go_cover" }
 }
 ```
+
+### Polyglot Monorepo (Node.js + Go)
+
+```json
+{
+  "schemaVersion": "1.3",
+  "selectedLanguage": "typescript",
+  "languages": [
+    { "name": "typescript", "confidence": 0.98, "evidence": ["package.json", "tsconfig.json", "next.config.ts"], "role": "primary" },
+    { "name": "javascript", "confidence": 0.55, "evidence": ["*.js files in scripts/"], "role": "secondary" },
+    { "name": "go", "confidence": 0.665, "evidence": ["microservice/go.mod", "microservice/main.go"], "role": "isolated-primary" }
+  ],
+  "runtime": { "node": "20.x", "python": null, "jvm": null, "go": "1.22" },
+  "buildTool": "next",
+  "frameworks": ["next.js", "react", "gin"],
+  "testFrameworks": { "existing": ["vitest"], "recommended": "vitest" },
+  "e2eFramework": { "existing": null, "recommended": "playwright" },
+  "ciProvider": "github-actions",
+  "monorepo": { "detected": true, "tool": "pnpm-workspace" },
+  "packageManager": "pnpm",
+  "frontend": "react",
+  "databases": ["postgresql"],
+  "messageQueues": ["rabbitmq"],
+  "coverage": { "provider": "v8", "recommended": "v8" }
+}
+```
+
+Node.js is primary (config at project root, confidence 0.98). Go is isolated-primary — its `go.mod` exists only in `microservice/`, so the raw confidence of 0.95 is scaled by the 0.7 project-scope multiplier to yield 0.665. Downstream spokes use the `role` field to route correctly: primary languages drive the top-level test framework recommendation, while isolated-primary languages receive their own test configuration scoped to their subdirectory.
 
 ---
 

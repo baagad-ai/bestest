@@ -114,6 +114,59 @@ languages.sort((a, b) => {
 
 Present the top 3 languages to the user if confidence ≥ 0.6. The first language in the ranked list is the **primary language** for routing.
 
+### Polyglot Composition Rules
+
+When multiple languages coexist in a monorepo, the following evaluation order resolves conflicts and produces a deterministic ranking.
+
+#### Evaluation Order
+
+1. **Detect all languages independently.** Run the full signal set for every language present in the repository without short-circuiting across languages.
+2. **Apply definitive single signal override per-language.** For each language, if a definitive signal (confidence ≥ 0.95) exists, override that language's computed confidence to the definitive value.
+3. **Apply context relevance modifier per-language.** For each language, multiply the post-override confidence by the context relevance factor based on its directory role (Primary = 1.0, Secondary = 0.85, Isolated Primary = 0.7).
+4. **Apply multi-language ranking for final ordering.** Use the ranking algorithm above to sort all languages by their effective (post-modifier) confidence.
+
+#### Per-Language Early Termination
+
+Early termination is scoped **per-language, not global**. Once a specific language reaches confidence ≥ 0.90, stop checking that language's remaining signals but continue evaluating other languages' signals. This ensures a high-confidence detection for one language does not suppress signal collection for coexisting languages.
+
+#### Override + Relevance Interaction
+
+Context relevance **is** applied after the definitive single signal override. The override sets the raw confidence for that language; the context relevance modifier then adjusts it for project-scope ranking purposes.
+
+**Example:** If the definitive override sets confidence to 0.95 for a language classified as Isolated Primary, the project-scope effective confidence becomes:
+
+```
+effective = 0.95 × 0.7 = 0.665
+```
+
+This language is still detected with high per-language confidence but ranked lower than a Primary language with comparable raw confidence.
+
+#### Worked Example: Node.js + Go Monorepo
+
+Repository structure:
+- Root: `package.json` + `tsconfig.json`
+- `services/auth/`: `go.mod`
+
+| Language | Raw Signals | Override | Context Role | Effective Confidence |
+|----------|-------------|----------|--------------|---------------------|
+| Node.js  | package.json (0.85) + tsconfig.json (corroboration) | 0.95 (definitive: package.json) | Primary (root-level) | 0.95 × 1.0 = **0.95** |
+| Go       | go.mod (0.85) | 0.95 (definitive: go.mod) | Isolated Primary (subdirectory-only) | 0.95 × 0.7 = **0.665** |
+
+**Ranking:** Node.js (Primary, 0.95) → Go (Isolated Primary, 0.665). Node.js is selected as the primary language for routing; Go is presented as a secondary detected language.
+
+#### Worked Example: Python + Java Monorepo
+
+Repository structure:
+- Root: `pyproject.toml`
+- `services/api/`: `pom.xml`
+
+| Language | Raw Signals | Override | Context Role | Effective Confidence |
+|----------|-------------|----------|--------------|---------------------|
+| Python   | pyproject.toml (0.85) | 0.95 (definitive: pyproject.toml) | Primary (root-level) | 0.95 × 1.0 = **0.95** |
+| Java     | pom.xml (0.85) | 0.95 (definitive: pom.xml) | Isolated Primary (subdirectory-only) | 0.95 × 0.7 = **0.665** |
+
+**Ranking:** Python (Primary, 0.95) → Java (Isolated Primary, 0.665). Python is the primary language; Java is detected as secondary.
+
 ### Phase 2: Package Manager
 
 Check for lock files and package manager markers:
@@ -321,7 +374,7 @@ If `go.mod` was detected in Phase 1:
 
 ### Early Termination
 
-Once confidence ≥ 0.90 for the primary category (computed via the noisy-OR algorithm above), skip remaining signal checks in that category. Focus effort on categories where confidence is still below 0.7. Implementation: evaluate signals sequentially and break out of the category loop once the threshold is met — this is both a performance optimization and an accuracy guard, since additional signals add negligible information once confidence is very high.
+Once confidence ≥ 0.90 for the primary category (computed via the noisy-OR algorithm above), skip remaining signal checks in that category. Focus effort on categories where confidence is still below 0.7. Implementation: evaluate signals sequentially and break out of the category loop once the threshold is met — this is both a performance optimization and an accuracy guard, since additional signals add negligible information once confidence is very high. Early termination is per-language: once a specific language reaches confidence ≥ 0.90, skip remaining signals for that language only — other languages continue to be evaluated.
 
 ### Monorepo Detection
 

@@ -17,7 +17,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Create reports directory
+        run: mkdir -p .bestest/reports
+
       - name: Run validation script
         run: |
           chmod +x "$SKILL_DIR/scripts/validate-plugin.sh"
-          "$SKILL_DIR/scripts/validate-plugin.sh"
+          "$SKILL_DIR/scripts/validate-plugin.sh" 2>&1 | tee validation-output.txt
+
+      - name: Convert validation output to JUnit XML
+        if: always()
+        run: |
+          chmod +x "$SKILL_DIR/scripts/validate-to-junit.sh"
+          "$SKILL_DIR/scripts/validate-to-junit.sh" validation-output.txt .bestest/reports/junit-validation.xml
+
+      - name: Upload JUnit XML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-validation-report
+          path: .bestest/reports/junit-validation.xml
+          retention-days: 30
+
+      - name: Publish JUnit test report
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: .bestest/reports/junit-validation.xml
+          check_name: Bestest Validation Results
+          fail_on_failure: true
