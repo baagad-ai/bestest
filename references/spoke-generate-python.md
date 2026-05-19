@@ -293,11 +293,15 @@ Bad examples (never generate these):
 
 ## Phase 5 — Compilation Verification
 
+> **Iteration budget:** Before each Phase 5 execution, decrement the global iteration budget per the Global Iteration Budget section in `references/generate/pipeline-shared.md`. If the budget is exhausted, halt and present the diagnostic summary.
+
 > **On-demand load:** When compilation verification is needed, read `references/generate/python/phase5-compilation.md`. Apply the auto-fix patterns and retry loop defined there.
 
 ---
 
 ## Phase 6 — Execution Verification
+
+> **Iteration budget:** Before each Phase 6 execution, decrement the global iteration budget per the Global Iteration Budget section in `references/generate/pipeline-shared.md`. If the budget is exhausted, halt and present the diagnostic summary.
 
 > **On-demand load:** When execution verification is needed, read `references/generate/python/phase6-execution.md`. Run tests, analyze failures, and apply the fix-and-rerun loop defined there.
 

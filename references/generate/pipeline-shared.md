@@ -149,6 +149,61 @@ Update .bestest/config.yaml:
 
 ---
 
+## Global Iteration Budget
+
+The global iteration budget prevents pathological Phase 5→6 generate-verify cycles from running indefinitely. It operates independently of per-file `generation.max_retries` — while `max_retries` limits retries within a single phase for a single file, the global budget caps the total number of Phase 5 and Phase 6 executions across the entire generation run.
+
+```
+global_iterations = 0
+max_iterations = generation.max_iterations (default: 10)
+
+Before each Phase 5 or Phase 6 execution:
+  global_iterations += 1
+  if global_iterations > max_iterations:
+    Print: "Iteration budget exhausted ({max_iterations} iterations consumed)."
+    Print diagnostic summary:
+      - Files that completed successfully (name, phase reached, iterations used)
+      - Files that failed (name, last phase, last error, iterations used)
+      - Files deferred (not yet processed)
+    Halt generation. Present partial results in HITL gate.
+    Break out of the generation loop.
+```
+
+### Recompilation Guard
+
+When `generation.recompilation_guard` is `true` (default):
+
+```
+Track per-file Phase 5 re-entry count.
+If a file re-enters Phase 5 for the 3rd time without a successful Phase 6 pass:
+  Print: "Recompilation guard triggered for {file}: 3 Phase 5 entries without Phase 6 success."
+  Defer the file for manual review.
+  Skip to the next file.
+```
+
+### Diagnostic Summary Format
+
+When the iteration budget is exhausted, output the following diagnostic summary:
+
+```
+=== Iteration Budget Exhausted ===
+Budget: {max_iterations} iterations (all consumed)
+
+Files completed successfully:
+  ✅ {file_name} — reached Phase {N}, {iterations_used} iterations
+
+Files that failed:
+  ❌ {file_name} — last phase: {phase}, last error: {error_summary}, {iterations_used} iterations
+
+Files deferred (not processed):
+  ⏸️ {file_name}
+
+Recommendation: Review failed files above. Re-run with increased max_iterations
+or address the root cause of compilation/execution failures before retrying.
+```
+
+---
+
 ## Downstream Reference Core
 
 After `bestest generate` completes, the user can:

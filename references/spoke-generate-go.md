@@ -338,6 +338,8 @@ Bad examples (never generate these):
 
 Go's strict compilation rules require every generated test to pass `go vet` → `go build` → `go test -run='^$'` (3-stage pipeline).
 
+> **Iteration budget:** Before each Phase 5 execution, decrement the global iteration budget per the Global Iteration Budget section in `references/generate/pipeline-shared.md`. If the budget is exhausted, halt and present the diagnostic summary.
+
 > **On-demand load:** When compilation verification is needed, read `references/generate/go/phase5-compilation.md`. Apply the auto-fix patterns (unused imports, import cycles, undefined symbols, type mismatches, syntax errors, wrong package declarations, missing go.sum entries, build tag mismatches) and retry loop defined there.
 
 ---
@@ -345,6 +347,8 @@ Go's strict compilation rules require every generated test to pass `go vet` → 
 ## Phase 6 — Execution Verification (condensed)
 
 Run generated tests with `go test -v -race -timeout {timeout} -coverprofile=coverage.out -covermode={mode} ./path/to/package/`. Parse NDJSON output for pass/fail/skip. Handle exit codes: 0=pass, 1=failures, 2=invalid args. Fix-and-rerun loop up to `max_retries`. After passing: run race detection verification and coverage delta.
+
+> **Iteration budget:** Before each Phase 6 execution, decrement the global iteration budget per the Global Iteration Budget section in `references/generate/pipeline-shared.md`. If the budget is exhausted, halt and present the diagnostic summary.
 
 > **On-demand load:** When execution verification is needed, read `references/generate/go/phase6-execution.md`. Run tests, analyze failures using the root cause table, apply the fix-and-rerun loop, verify race detection, and measure coverage delta as defined there.
 

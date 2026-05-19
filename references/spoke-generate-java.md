@@ -278,6 +278,8 @@ Java requires compilation before test execution. Runs a 3-stage pipeline: syntax
 
 Fix loop: max 3 attempts. Deduplicate cascade errors, fix root causes in dependency order, recompile. If still failing after max attempts, mark as "compilation-failed" and present to user.
 
+> **Iteration budget:** Before each Phase 5 execution, decrement the global iteration budget per the Global Iteration Budget section in `references/generate/pipeline-shared.md`. If the budget is exhausted, halt and present the diagnostic summary.
+
 > **On-demand load:** Full 3-stage execution commands (Gradle/Maven), cascade error handling with examples, auto-fix patterns table, fix loop pseudocode → `references/generate/java/phase5-compilation.md`.
 
 ---
@@ -285,6 +287,8 @@ Fix loop: max 3 attempts. Deduplicate cascade errors, fix root causes in depende
 ## Phase 6 — Execution Verification
 
 Run generated tests via Gradle/Maven, analyze failures, and fix tests (never source code) in a controlled retry loop (max `generation.max_retries`, default 2). Failure root causes: test bug, source bug (document, don't fix), environment, Spring context failure, timeout, NullPointerException, missing test data. After passing, run JaCoCo coverage delta verification.
+
+> **Iteration budget:** Before each Phase 6 execution, decrement the global iteration budget per the Global Iteration Budget section in `references/generate/pipeline-shared.md`. If the budget is exhausted, halt and present the diagnostic summary.
 
 > **On-demand load:** Full execution commands (Gradle/Maven exit codes), failure analysis table, fix-and-rerun loop, coverage delta verification with JaCoCo → `references/generate/java/phase6-execution.md`.
 
