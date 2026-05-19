@@ -54,3 +54,6 @@ scripts/verify-*.sh
 # ── Root-level audit artifacts ──
 skill-audit-*.md
 skills-lock.json
+
+# ── GSD baseline (auto-generated) ──
+.gsd

@@ -69,6 +69,170 @@ This graceful degradation ensures that metrics corruption never blocks a spoke f
 
 ---
 
+## Concurrency Lock Protocol
+
+Used by: all spokes that **write** to `metrics.json` or `config.yaml` (scan, run, fix, generate, migrate, config, init).
+
+When two bestest instances run concurrently — two agent windows, parallel-dispatch workers, or a human and an agent — their read-modify-write cycles can silently overwrite each other's data. This protocol uses advisory file locking to serialize writes without blocking reads.
+
+### Lock File Locations
+
+| Resource | Lock File |
+|----------|-----------|
+| `.bestest/state/metrics.json` | `.bestest/state/.metrics.lock` |
+| `.bestest/config.yaml` | `.bestest/.config.lock` |
+
+Lock files live alongside the resources they protect. They are ephemeral state — add `.bestest/state/.metrics.lock` and `.bestest/.config.lock` to `.gitignore`.
+
+### Primary Strategy: `flock(1)` (Linux / macOS)
+
+`flock` is the preferred locking mechanism. It is atomic, auto-releases on process exit (no stale locks from crashes), and supports a non-blocking timeout.
+
+```bash
+# --- Acquire lock, read-modify-write metrics.json, release on exit ---
+LOCKFILE=".bestest/state/.metrics.lock"
+METRICS=".bestest/state/metrics.json"
+
+# Ensure lock file exists
+mkdir -p "$(dirname "$LOCKFILE")"
+touch "$LOCKFILE"
+
+# Acquire exclusive lock with 5-second timeout, write inside subshell
+(
+  if ! flock -s -w 5 200; then
+    echo "⚠ [bestest] Could not acquire lock on $LOCKFILE within 5s. Proceeding without lock (best-effort)." >&2
+    # Fall through to write anyway — metrics are observability, not gates.
+  fi
+
+  # --- Read-modify-write section (locked) ---
+  # Read current metrics (or use defaults if missing/corrupt)
+  if [ -f "$METRICS" ]; then
+    CURRENT=$(cat "$METRICS")
+  else
+    CURRENT='{"schemaVersion":"1.0"}'
+  fi
+
+  # ... merge / update $CURRENT here ...
+
+  # Write back atomically via temp file + mv
+  TMPFILE=$(mktemp "$(dirname "$METRICS")/metrics.XXXXXX")
+  echo "$CURRENT" > "$TMPFILE"
+  mv "$TMPFILE" "$METRICS"
+) 200>"$LOCKFILE"
+```
+
+Key points:
+- The subshell `( ... ) 200>"$LOCKFILE"` redirects fd 200 to the lock file; `flock -s -w 5 200` operates on that fd.
+- When the subshell exits (normally or via crash), the kernel closes fd 200 and releases the lock automatically.
+- `flock -s` means exclusive (writer) lock. Use `flock -s -s` for shared (reader) locks if needed — but spokes that only read metrics do not need to lock at all.
+
+### Fallback Strategy: `mkdir`-based Lock (NFS / systems without `flock`)
+
+On environments where `flock` is unavailable (some NFS mounts, minimal containers), use `mkdir` which is atomic on all POSIX filesystems:
+
+```bash
+# --- mkdir-based lock with retry loop ---
+LOCKDIR=".bestest/state/.metrics.lock"
+METRICS=".bestest/state/metrics.json"
+MAX_ATTEMPTS=3
+SLEEP_SEC=2
+
+acquired=false
+for i in $(seq 1 $MAX_ATTEMPTS); do
+  if mkdir "$LOCKDIR" 2>/dev/null; then
+    acquired=true
+    break
+  fi
+  # Stale lock check: if lock dir is older than 60 seconds, force-remove
+  if [ -d "$LOCKDIR" ]; then
+    lock_age=$(( $(date +%s) - $(stat -f %m "$LOCKDIR" 2>/dev/null || stat -c %Y "$LOCKDIR" 2>/dev/null || echo 0) ))
+    if [ "$lock_age" -gt 60 ]; then
+      echo "⚠ [bestest] Stale lock detected ($LOCKDIR is ${lock_age}s old). Removing." >&2
+      rm -rf "$LOCKDIR"
+      # Retry on next iteration
+    fi
+  fi
+  sleep $SLEEP_SEC
+done
+
+if [ "$acquired" = false ]; then
+  echo "⚠ [bestest] Could not acquire lock on $LOCKDIR after $MAX_ATTEMPTS attempts. Proceeding without lock (best-effort)." >&2
+fi
+
+# --- Read-modify-write section ---
+if [ -f "$METRICS" ]; then
+  CURRENT=$(cat "$METRICS")
+else
+  CURRENT='{"schemaVersion":"1.0"}'
+fi
+
+# ... merge / update $CURRENT here ...
+
+TMPFILE=$(mktemp "$(dirname "$METRICS")/metrics.XXXXXX")
+echo "$CURRENT" > "$TMPFILE"
+mv "$TMPFILE" "$METRICS"
+
+# --- Release lock ---
+if [ "$acquired" = true ]; then
+  rm -rf "$LOCKDIR"
+fi
+```
+
+Note: `mkdir`-based locks require explicit cleanup via `rm -rf`. The stale lock detection (60-second threshold) handles crashed agents that left locks behind.
+
+### Stale Lock Detection
+
+Both strategies handle stale locks:
+
+| Strategy | Stale Lock Handling |
+|----------|-------------------|
+| `flock` | **Automatic.** The kernel releases the lock when the holding process exits (even on crash). No stale locks possible. |
+| `mkdir` | **Manual.** Before each retry, check lock directory age. If older than **60 seconds**, force-remove and re-attempt. This covers crashed agents, killed processes, and orphaned locks. |
+
+The 60-second threshold is conservative — most bestest read-modify-write cycles complete in under 5 seconds. A lock held for over a minute almost certainly comes from a crashed process.
+
+### Ordered Locking Rule (Deadlock Prevention)
+
+When a spoke needs to write to **both** `config.yaml` and `metrics.json` in the same operation, it **must** acquire locks in this order:
+
+1. **Config lock first** (`.bestest/.config.lock`)
+2. **Metrics lock second** (`.bestest/state/.metrics.lock`)
+
+This fixed ordering ensures that two concurrent spokes can never deadlock each other by acquiring locks in opposite order.
+
+If a spoke only needs one lock, it acquires only that lock — no ordering concern.
+
+### Lock Acquisition Failure (Best-Effort Fallback)
+
+Locks are advisory, not mandatory. If a lock cannot be acquired after the full timeout/retry cycle, the spoke **proceeds with the write anyway** and emits a visible warning:
+
+```
+⚠ [bestest] Could not acquire lock on .bestest/state/.metrics.lock within 5s.
+  Proceeding without lock — concurrent writes may cause data loss.
+  If this persists, check for stale lock files or other running bestest instances.
+```
+
+Rationale: bestest metrics and config are **observability and configuration**, not transactional data. Losing a metrics update is far less harmful than blocking an agent's workflow entirely. The warning ensures the situation is visible for later diagnosis.
+
+### Cross-References
+
+- `references/metrics-schema.md` → "Update Protocol" — the read-modify-write contract that this lock protects.
+- `references/pipeline-shared.md` → "Config State Update" — config.yaml update semantics guarded by the config lock.
+- `references/schema-contract.md` → version compatibility rules that apply inside locked write sections.
+
+### Integration with Pre-Flight Steps
+
+This lock protocol runs **after** the Standard 3-Step validation (Steps 1–3) and **after** Step 4 (metrics.json pre-read validation). Locking is only needed for the write phase, not for validation reads:
+
+```
+1. Run Steps 1–4 (validation — no locking needed)
+2. Acquire lock(s) in order (config → metrics) before write phase
+3. Perform read-modify-write inside locked section
+4. Release lock(s) on completion or error
+```
+
+---
+
 ## Init-Specific Pattern (Inverse)
 
 Used by: `init`.
