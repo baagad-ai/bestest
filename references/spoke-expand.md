@@ -470,6 +470,24 @@ If targetType is "chaos":
   Skip to Phase 4.
 
 Else:
+  Step 0: Sanitize framework name
+    Define allowlist (derived from Framework → Library Mapping tables):
+      [playwright, cypress, supertest, stryker, pact, k6, artillery, selenium,
+       requests, httpx, mutmut, pact-python, rest-assured, spring-boot, pitest,
+       pact-jvm, jmeter, gatling, pact-go]
+    Normalize targetConfig.framework: lowercase, strip leading/trailing whitespace.
+    If targetType is "chaos": skip sanitization (chaos has no standard framework).
+    Else if normalized name is in allowlist: proceed to Step 1 with normalized name.
+    Else:
+      Print: "Warning: '{targetConfig.framework}' is not in the known framework allowlist."
+      Print: "Known frameworks: {allowlist joined by comma}."
+      Print: "This may be a typo or an unsupported framework."
+      Prompt user: "Confirm framework name or cancel? (confirm / rename <name> / cancel)"
+      - confirm: proceed to Step 1 with the original name (user vouches for correctness).
+      - rename <name>: re-check <name> against allowlist; if valid, use it; if not, re-prompt.
+      - cancel: Set docsResult = null, skip to Phase 4 with static defaults.
+    Do NOT call resolve_library() with a name that has not been validated or user-confirmed.
+
   Step 1: Resolve library ID
     Call resolve_library({ libraryName: targetConfig.framework, query: fetchQuery })
     If resolve fails:

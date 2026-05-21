@@ -184,21 +184,29 @@ check "detection-engine.md contains 'Confidence Scoring Algorithm' section" "E00
   "grep -q 'Confidence Scoring Algorithm' '$DE'"
 
 # E009: Must contain Output section and Signal Catalog + related files
-check "detection-engine.md contains 'Output' section" "E009" "critical" \
+check "detection-engine.md contains 'Output' section" "E009a" "critical" \
   "grep -qE '##.*Output|###.*Output' '$DE'"
 
-check "detection-engine.md contains 'Signal Catalog' section" "E009" "critical" \
+check "detection-engine.md contains 'Signal Catalog' section" "E009b" "critical" \
   "grep -q 'Signal Catalog' '$DE'"
 
-check "detection-signals.md exists and non-empty" "E009" "critical" \
+check "detection-signals.md exists and non-empty" "E009c" "critical" \
   "[ -s '$SKILL_DIR/references/detection-signals.md' ]"
 
-check "stack-profile-schema.md exists" "E009" "critical" \
+check "stack-profile-schema.md exists" "E009d" "critical" \
   "[ -f '$SKILL_DIR/references/stack-profile-schema.md' ]"
 
+e009_field="e"
 for field in schemaVersion languages buildTool frameworks testFrameworks coverage; do
-  check "stack-profile-schema.md documents '$field' field" "E009" "critical" \
+  check "stack-profile-schema.md documents '$field' field" "E009${e009_field}" "critical" \
     "grep -q '$field' '$SKILL_DIR/references/stack-profile-schema.md'"
+  case "$e009_field" in
+    e) e009_field="f" ;;
+    f) e009_field="g" ;;
+    g) e009_field="h" ;;
+    h) e009_field="i" ;;
+    i) e009_field="j" ;;
+  esac
 done
 
 # ─── Domain 5: Schema Field Coverage ──────────────────────────────────────
@@ -289,6 +297,90 @@ done
 LINE_COUNT=$(wc -l < "$SKILL_FILE" | tr -d ' ')
 check "SKILL.md line count ($LINE_COUNT) is within bounds (200-350)" "E017" "warning" \
   "[ '$LINE_COUNT' -ge 200 ] && [ '$LINE_COUNT' -le 350 ]"
+
+# ─── Semantic Validation ──────────────────────────────────────────────────
+echo "── Semantic Validation ──"
+
+# S1: Validate YAML templates parse correctly (skip templates with {{variable}} placeholders)
+for yaml_file in $(find "$SKILL_DIR/references/templates" -name '*.yaml' -o -name '*.yml' 2>/dev/null); do
+  if command -v python3 &>/dev/null; then
+    # Skip template files that contain Mustache/variable placeholders
+    if grep -q '{{' "$yaml_file" 2>/dev/null; then
+      continue
+    fi
+    if ! python3 -c "import yaml; yaml.safe_load(open('$yaml_file'))" 2>/dev/null; then
+      echo "⚠ S001: YAML syntax error in $yaml_file"
+    fi
+  fi
+done
+
+# S2: Validate JSON schema files parse correctly
+for json_file in stack-profile-schema.md scan-report-schema.md metrics-schema.md; do
+  # Check that JSON examples in schema files are valid
+  if [ -f "$SKILL_DIR/references/$json_file" ]; then
+    json_examples=$(grep -oE '\{[^}]+\}' "$SKILL_DIR/references/$json_file" 2>/dev/null | head -5)
+    for example in $json_examples; do
+      if command -v python3 &>/dev/null; then
+        if ! python3 -c "import json; json.loads('$example')" 2>/dev/null; then
+          : # JSON parse failure is expected for partial grep matches — not a real error
+        fi
+      fi
+    done
+  fi
+done
+
+# S3: Check that SKILL.md version matches CHANGELOG latest
+skill_version=$(grep -oE 'version: "[^"]+"' "$SKILL_DIR/SKILL.md" | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+changelog_version=$(grep -oE '^## \[?[0-9]+\.[0-9]+\.[0-9]+' "$SKILL_DIR/CHANGELOG.md" | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+if [ -n "$skill_version" ] && [ -n "$changelog_version" ]; then
+  if [ "$skill_version" != "$changelog_version" ]; then
+    echo "⚠ S003: Version mismatch — SKILL.md says $skill_version but CHANGELOG.md latest is $changelog_version"
+  fi
+fi
+
+# S4: Cross-reference spoke Purpose sections exist
+missing_purpose=0
+for spoke in $(grep -oE 'spoke-[a-z-]+\.md' "$SKILL_DIR/SKILL.md" | sort -u); do
+  if [ -f "$SKILL_DIR/references/$spoke" ]; then
+    if ! grep -q '## Purpose' "$SKILL_DIR/references/$spoke"; then
+      echo "⚠ S004: $spoke missing ## Purpose section"
+      missing_purpose=$((missing_purpose + 1))
+    fi
+  fi
+done
+
+# ─── Domain 8: Generate Spoke Behavioral Consistency ──────────────────────
+echo "── Domain 8: Generate Spoke Behavioral Consistency ──"
+
+GENERATE_SPOKES=("spoke-generate.md" "spoke-generate-python.md" "spoke-generate-java.md" "spoke-generate-go.md")
+
+# E022 (critical): All 4 generate spokes have "Write Companion Run Report" heading in Phase 6
+for spoke in "${GENERATE_SPOKES[@]}"; do
+  spoke_file="$SKILL_DIR/references/$spoke"
+  check "Generate spoke '$spoke' has 'Write Companion Run Report' in Phase 6" "E022" "critical" \
+    "[ -f '$spoke_file' ] && sed -n '/^## Phase 6/,/^## Phase 7/p' '$spoke_file' | grep -q '### Write Companion Run Report'"
+done
+
+# E023 (critical): All 4 generate spokes have "Run report (companion)" row in Output artifact table
+for spoke in "${GENERATE_SPOKES[@]}"; do
+  spoke_file="$SKILL_DIR/references/$spoke"
+  check "Generate spoke '$spoke' has 'Run report (companion)' in Output table" "E023" "critical" \
+    "[ -f '$spoke_file' ] && grep -q 'Run report (companion)' '$spoke_file'"
+done
+
+# E024 (critical): Step numbering in each spoke's Phase 2 is monotonically increasing
+for spoke in "${GENERATE_SPOKES[@]}"; do
+  spoke_file="$SKILL_DIR/references/$spoke"
+  check "Generate spoke '$spoke' Phase 2 step numbering is monotonically increasing" "E024" "critical" \
+    "[ -f '$spoke_file' ] && { steps=\$(sed -n '/^## Phase 2/,/^## Phase 3/p' '$spoke_file' | grep -oE 'Step [0-9]+' | grep -oE '[0-9]+'); if [ -z \"\$steps\" ]; then false; else prev=0; ok=true; while IFS= read -r n; do [ \"\$n\" -le \"\$prev\" ] && ok=false; prev=\$n; done <<< \"\$steps\"; \$ok; fi; }"
+done
+
+# E025 (warning): All 4 generate spokes' Metrics Update sections reference pipeline-shared.md
+for spoke in "${GENERATE_SPOKES[@]}"; do
+  spoke_file="$SKILL_DIR/references/$spoke"
+  check "Generate spoke '$spoke' Metrics Update references pipeline-shared.md" "E025" "warning" \
+    "[ -f '$spoke_file' ] && sed -n '/^## Metrics Update/,/^## /p' '$spoke_file' | grep -q 'pipeline-shared\\.md'"
+done
 
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""

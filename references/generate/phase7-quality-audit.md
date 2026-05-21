@@ -106,3 +106,46 @@ If score < quality_threshold * 100:
   For the lowest-scoring dimension:
     Print: "  - {dimension}: {score}/{max} — {specific improvement suggestions}"
 ```
+
+## External Calibration
+
+### Known Limitation: LLM Self-Evaluation Bias
+
+The quality scoring in this phase is performed by the same LLM agent that generated the tests. Research on LLM self-evaluation consistently shows 15–25% optimism bias when models evaluate their own outputs. This means:
+- Tests scoring 70-75 (near the threshold) may actually be 55-65 quality
+- The ≥70 auto-commit threshold should be treated as a soft gate, not a guarantee
+
+### Mitigation: Mutation Testing (Optional Phase 7b)
+
+For projects with critical testing requirements, run an optional mutation testing pass after Phase 7:
+
+```
+If stryker/stryker-cli is available in the project:
+  1. Run: npx stryker run
+  2. Check mutation score:
+     - Score ≥ 60%: Tests are catching real defects. Confidence: HIGH.
+     - Score 40-60%: Tests have gaps. Flag for review.
+     - Score < 40%: Tests may be testing mocks, not real code. Flag as low-quality.
+  3. Add mutation score to the quality report.
+```
+
+For Python projects using mutation testing:
+```
+If mutmut is available:
+  1. Run: mutmut run
+  2. Apply the same score thresholds as above.
+```
+
+For Go projects:
+```
+If gremlins is available:
+  1. Run: gremlins unleash
+  2. Apply the same score thresholds.
+```
+
+### Mitigation: Coverage Delta Verification
+
+After Phase 7 scoring, cross-check the quality score against the coverage delta:
+- If quality score ≥ 70 but coverage delta is 0% → tests may be exercising mocks only. Downgrade quality score by 10 points.
+- If quality score ≥ 70 and coverage delta > 5% → score is plausible.
+- This cross-check provides a lightweight external anchor without requiring mutation testing tooling.

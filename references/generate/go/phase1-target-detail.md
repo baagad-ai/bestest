@@ -4,7 +4,7 @@ Detailed targeting modes, path validation, preflight checks, Go naming conventio
 
 ## Path Validation (Full Detail)
 
-Before processing any target path through the targeting modes, validate the path to prevent filesystem traversal attacks, canonicalization issues, and invalid inputs. Apply these five validation steps, **in this exact order**, to every user-supplied path — ordering matters for security:
+Before processing any target path through the targeting modes, validate the path to prevent filesystem traversal attacks, canonicalization issues, and invalid inputs. Apply these six validation steps, **in this exact order**, to every user-supplied path — ordering matters for security:
 
 ```
 1. Traversal rejection: Reject raw userPath containing ".." or starting with "/".
@@ -29,9 +29,18 @@ Before processing any target path through the targeting modes, validate the path
    if isFile && !strings.HasSuffix(canonical, ".go"):
      fmt.Printf("File type not supported: %s. Expected .go.\n", canonical)
      Exit.
+
+6. Sensitive file exclusion: Reject files matching sensitive filename patterns.
+   Sensitive patterns (case-insensitive): .env, .env.*, *.pem, *.key, *.p12, *.pfx, *.jks,
+     id_rsa*, id_ed25519*, id_ecdsa*, credentials.*, service-account*.json,
+     .netrc, .npmrc, .pypirc, .aws/*, .ssh/*, .gnupg/*, *.keystore, *.truststore
+   basename := filepath.Base(canonical)
+   if matchSensitive(basename):
+     fmt.Printf("Sensitive file rejected: %s. Test generation for credential and key files is blocked for security.\n", canonical)
+     Exit.
 ```
 
-All five checks must pass before the path enters any targeting mode. If any check fails, print the error and exit — do not fall through to other modes.
+All six checks must pass before the path enters any targeting mode. If any check fails, print the error and exit — do not fall through to other modes.
 
 ## Targeting Modes (Full Detail)
 

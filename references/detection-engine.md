@@ -167,6 +167,56 @@ Repository structure:
 
 **Ranking:** Python (Primary, 0.95) → Java (Isolated Primary, 0.665). Python is the primary language; Java is detected as secondary.
 
+### Pre-Computed Confidence Lookup Tables
+
+To eliminate floating-point arithmetic drift across LLM providers, use these pre-computed lookup tables instead of calculating the noisy-OR formula at runtime.
+
+#### Standard Signal Combinations
+
+| Signals | Weights | Confidence |
+|---------|---------|------------|
+| 1 high | 0.40 | 0.40 |
+| 2 high | 0.40, 0.40 | 0.64 |
+| 3 high | 0.40, 0.40, 0.40 | 0.78 |
+| 4 high | 0.40 × 4 | 0.87 |
+| 1 medium | 0.20 | 0.20 |
+| 2 medium | 0.20, 0.20 | 0.36 |
+| 3 medium | 0.20 × 3 | 0.49 |
+| 1 high + 1 medium | 0.40, 0.20 | 0.52 |
+| 1 high + 2 medium | 0.40, 0.20, 0.20 | 0.62 |
+| 2 high + 1 medium | 0.40, 0.40, 0.20 | 0.71 |
+| 1 low | 0.08 | 0.08 |
+| 2 low | 0.08, 0.08 | 0.15 |
+| 1 high + 1 low | 0.40, 0.08 | 0.45 |
+| 1 medium + 1 low | 0.20, 0.08 | 0.26 |
+| 1 high + 1 medium + 1 low | 0.40, 0.20, 0.08 | 0.55 |
+
+#### Definitive Override + Additional Signals
+
+| Definitive Signal | Additional Signals | Effective Confidence |
+|-------------------|--------------------|---------------------|
+| tsconfig.json (0.95) | none | 0.95 |
+| tsconfig.json (0.95) | + package.json (0.40) | 0.97 |
+| tsconfig.json (0.95) | + *.ts files (0.40) | 0.97 |
+| tsconfig.json (0.95) | + package.json + *.ts | 0.98 |
+| tsconfig.json (0.95) | + 3 more signals | 0.99 |
+| go.mod (0.95) | none | 0.95 |
+| pyproject.toml (0.95) | none | 0.95 |
+| pom.xml (0.95) | none | 0.95 |
+
+#### Polyglot Context Relevance Adjusted
+
+| Raw Confidence | Context Role | Multiplier | Effective |
+|----------------|-------------|------------|-----------|
+| 0.95 | Primary (root) | 1.0 | 0.95 |
+| 0.95 | Isolated Primary (subdir) | 0.7 | 0.67 |
+| 0.95 | Secondary (scripts/) | 0.7 | 0.67 |
+| 0.95 | Incidental (extensions only) | 0.4 | 0.38 |
+| 0.64 | Primary | 1.0 | 0.64 |
+| 0.64 | Isolated Primary | 0.7 | 0.45 |
+
+**Usage:** When computing confidence for a detected language or framework, match the signal combination to the nearest row in the table above. If the exact combination is not listed, use the formula `1 - (1 - w1) × (1 - w2) × ...` and round to 2 decimal places. For combinations exceeding 5 signals, cap at 0.99.
+
 ### Phase 2: Package Manager
 
 Check for lock files and package manager markers:

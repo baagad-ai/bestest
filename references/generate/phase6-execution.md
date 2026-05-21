@@ -53,6 +53,14 @@ while tests fail AND retry_count < max_retries:
     If "test bug": fix assertion, mock setup, add await, or update mock return value.
     If "source bug": add comment `// NOTE: Source behavior documented for regression detection.` Adjust test to pass with current behavior. Flag in HITL report.
     If "environment": fix test setup (add env vars, imports, configuration).
+    
+  **Phase 6→5 Back-Loop Check:**
+  If any fix altered imports, types, type annotations, or structural code (not just assertion values or mock return values):
+    Return to Phase 5 (Compilation Verification) for recompilation before re-running tests.
+    Increment global_iterations on re-entry (see pipeline-shared.md → Global Iteration Budget).
+    The recompilation guard (3 Phase 5 entries without Phase 6 success) will catch pathological cycling.
+    After successful recompilation, continue to re-run tests.
+  
   Re-run tests.
   If all tests pass: break.
 

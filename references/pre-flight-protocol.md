@@ -16,7 +16,9 @@ This is the baseline validation that most spokes share. It checks three things i
 
 ```
 If .bestest/ does not exist:
-  Print: "No .bestest/ directory found. Run /bestest init first to set up testing infrastructure."
+  Print: "No testing configuration found (.bestest/ directory)."
+  Print: "This directory stores your test framework settings, coverage data, and scan reports."
+  Print: "Run /bestest init to detect your stack and create it."
   Exit.
 ```
 
@@ -24,7 +26,8 @@ If .bestest/ does not exist:
 
 ```
 If .bestest/config.yaml does not exist:
-  Print: ".bestest/config.yaml is missing. The config file is required for {command}."
+  Print: ".bestest/config.yaml is missing."
+  Print: "This file stores your test framework choice, coverage targets, and path settings."
   Print: "Run /bestest init to regenerate it, or restore it from version control."
   Exit.
 ```
@@ -36,7 +39,9 @@ Replace `{command}` with the spoke name (e.g. `scan`, `run`, `doctor`).
 ```
 If .bestest/config.yaml exists but is invalid YAML:
   Print: ".bestest/config.yaml contains invalid YAML and cannot be parsed."
+  Print: "This file controls which test framework to use and how tests are discovered."
   Print: "Fix the syntax error and re-run /bestest {command}."
+  Print: "Tip: Validate your YAML at yamllint.com or run: python3 -c \"import yaml; yaml.safe_load(open('.bestest/config.yaml'))\""
   Exit.
 ```
 
@@ -190,6 +195,78 @@ Both strategies handle stale locks:
 | `mkdir` | **Manual.** Before each retry, check lock directory age. If older than **60 seconds**, force-remove and re-attempt. This covers crashed agents, killed processes, and orphaned locks. |
 
 The 60-second threshold is conservative — most bestest read-modify-write cycles complete in under 5 seconds. A lock held for over a minute almost certainly comes from a crashed process.
+
+### LLM Agent Lock Protocol
+
+When the lock consumer is an LLM agent (not a bash shell), use this JSON-based lock protocol instead of flock. LLM agents execute tool calls (file read/write) rather than bash commands, so the lock must be expressible as file operations.
+
+#### Lock Acquisition
+
+```
+1. Attempt to write a JSON lock file alongside the resource:
+   
+   Resource: .bestest/state/metrics.json
+   Lock file: .bestest/state/.metrics.lock
+   
+   Write to lock file:
+   {
+     "holder": "<session-id-or-spoke-name>",
+     "acquiredAt": "<ISO-8601 timestamp>",
+     "action": "<spoke-name:action e.g. 'spoke-generate:metrics-update'>"
+   }
+
+2. Before writing, READ the lock file first:
+   a. If file does not exist or is empty → lock is free. Write the lock file.
+   b. If file exists and parsedAt is older than 60 seconds → STALE LOCK. Log warning, overwrite.
+   c. If file exists and parsedAt is within 60 seconds → LOCK HELD. Wait 2 seconds and retry (up to 3 attempts).
+   d. If all retries fail → proceed with best-effort write and set lastWriteConflict in metrics.json.
+
+3. After completing the read-modify-write cycle, DELETE the lock file (or overwrite with empty string).
+```
+
+#### Lock File Schema
+
+```json
+{
+  "holder": "spoke-generate",
+  "acquiredAt": "2025-05-19T15:30:00Z",
+  "action": "metrics-update"
+}
+```
+
+#### Stale Lock Detection for LLM Agents
+
+```
+1. Read the lock file.
+2. Parse the JSON. If parsing fails → stale (corrupted). Overwrite.
+3. Compare acquiredAt to current time.
+4. If age > 60 seconds → stale. Log: "⚠ Stale lock detected (holder: {holder}, age: {age}s). Overwriting."
+5. If age ≤ 60 seconds → lock is active. Wait or proceed with best-effort.
+```
+
+#### Implementation for Spokes
+
+When a spoke needs to write to metrics.json or config.yaml:
+
+```
+// Step 1: Acquire lock
+read .bestest/state/.metrics.lock
+if lock exists and is fresh (age < 60s):
+  wait 2s and retry (max 3 attempts)
+  if still locked: log warning and proceed with best-effort
+else:
+  write lock file: {holder: "spoke-name", acquiredAt: now, action: "write"}
+
+// Step 2: Read-modify-write
+read .bestest/state/metrics.json
+modify the data
+write .bestest/state/metrics.json (atomic: write to temp, rename)
+
+// Step 3: Release lock
+delete .bestest/state/.metrics.lock (or overwrite with empty string)
+```
+
+**Compatibility:** This protocol coexists with the bash flock protocol. A bash shell using flock and an LLM agent using JSON locks can both operate on the same repository. The lock file serves as a coordination point regardless of the consumer type.
 
 ### Ordered Locking Rule (Deadlock Prevention)
 

@@ -110,3 +110,29 @@ If score < quality_threshold * 100:
   For the lowest-scoring dimension:
     Print: "  - {dimension}: {score}/{max} — {specific improvement suggestions}"
 ```
+
+## External Calibration
+
+### Known Limitation: LLM Self-Evaluation Bias
+
+The quality scoring in this phase is performed by the same LLM agent that generated the tests. Research on LLM self-evaluation consistently shows 15–25% optimism bias when models evaluate their own outputs. Tests scoring 70-75 (near the threshold) may actually be 55-65 quality.
+
+### Mitigation: Mutation Testing (Optional Phase 7b)
+
+If `gremlins` is available:
+
+```
+1. Run: gremlins unleash
+2. Check mutation score:
+   - Score ≥ 60%: Tests are catching real defects. Confidence: HIGH.
+   - Score 40-60%: Tests have gaps. Flag for review.
+   - Score < 40%: Tests may be exercising mocks, not real code. Flag as low-quality.
+3. Add mutation score to the quality report.
+```
+
+### Mitigation: Coverage Delta Verification
+
+After Phase 7 scoring, cross-check the quality score against the `go test -coverprofile` delta:
+- If quality score ≥ 70 but coverage delta is 0% → tests may be exercising mocks only. Downgrade quality score by 10 points.
+- If quality score ≥ 70 and coverage delta > 5% → score is plausible.
+```

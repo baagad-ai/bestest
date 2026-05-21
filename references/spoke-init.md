@@ -89,6 +89,25 @@ After generating `.bestest/state/stack-profile.json`, set its `schemaVersion` to
 
 ## Phase 1 — Detect Stack
 
+#### Resume Detection
+
+```
+If .bestest/.init-checkpoint exists:
+  Read the checkpoint file.
+  Print: "Previous init checkpoint found at phase: {phase}"
+  Print: "  Framework: {framework}, Coverage: {coverage}, E2E: {e2e}"
+  Print: "Options:"
+  Print: "  1. Resume from checkpoint (skip to Phase 4 scaffolding)"
+  Print: "  2. Start fresh (delete checkpoint and re-detect)"
+  
+  If user selects "Resume":
+    Load framework, coverage, e2e from checkpoint.
+    Skip to Phase 4 (Scaffold) with the approved choices.
+  If user selects "Start fresh":
+    Delete .bestest/.init-checkpoint.
+    Continue with Phase 1 detection normally.
+```
+
 Run the detection engine from `references/detection-engine.md`. Follow phases 1–9 in order (phases 8–9 are conditional on JVM/Go ecosystem detection). Consult `references/detection-signals.md` for the complete signal catalog (80+ signals across 12 categories).
 
 The detection engine handles ALL detection logic — including JS/TS phases 1–7 and the conditional Java/JVM and Go detection phases. Do not inline detection steps here; `detection-engine.md` is the single canonical source.
@@ -183,6 +202,24 @@ After presenting the summary, prompt:
 ### Response Handling
 
 - **yes**: Proceed to Phase 4 (Scaffold). Use the recommended values as-is.
+
+#### Checkpoint: Framework Approval
+
+After the user approves the framework recommendation, write the approved choices to a checkpoint file:
+
+```
+Write to .bestest/.init-checkpoint:
+{
+  "phase": "framework-approved",
+  "timestamp": "<current ISO 8601>",
+  "framework": "<approved framework>",
+  "coverage": "<approved coverage provider>",
+  "e2e": "<approved e2e framework or null>"
+}
+```
+
+This checkpoint enables resuming init if the user cancels at a later phase.
+
 - **modify**: Allow the user to override specific values:
   - `--framework <vitest|jest>` — override the test framework
   - `--coverage <v8|istanbul>` — override the coverage provider
@@ -465,6 +502,14 @@ Before generating `vitest.config.ts` or `jest.config.ts`, attempt to fetch curre
 If Context7 is unavailable or returns no results:
 - Fall back to static templates from `references/templates/` without modification.
 - Print: "Note: Framework documentation fetch was unavailable. Generated config uses static defaults. Run /bestest doctor to validate against your installed version."
+
+#### Clean Up Checkpoint
+
+```
+After scaffolding completes successfully:
+  Delete .bestest/.init-checkpoint (if it exists).
+  The checkpoint is no longer needed after successful Phase 4 completion.
+```
 
 ---
 

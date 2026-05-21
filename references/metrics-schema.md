@@ -151,6 +151,10 @@ Every state-changing spoke (scan, run, fix, generate, migrate, doctor, coverage,
 - **Updated by:** Every state-changing spoke on every invocation.
 - **Purpose:** Quick staleness check — if `lastUpdated` is older than the caller's threshold, the data may not reflect the current state.
 
+### `lastWriteConflict`
+
+| `lastWriteConflict` | object | Optional | Present when a lock acquisition failed and the spoke proceeded with best-effort write. Fields: `{timestamp: string, spoke: string, action: string}`. Omitted when no conflicts have occurred. |
+
 ### `healthScore`
 
 Composite score (0.0–1.0) reflecting overall test suite health. Designed for the S05 dashboard and agent decision-making.
@@ -217,6 +221,8 @@ Run history across all spokes that execute tests.
 | `history[].total/passed/failed/skipped` | Run result counts. |
 | `history[].duration_ms` | Total test execution time in milliseconds. |
 | `history[].coverage` | Coverage snapshot from this run (same shape as `coverage.current`). |
+| `history[].scope` | string | Optional | Test suite filter used during this run: `"all"`, `"unit"`, `"e2e"`, `"integration"`, or `"generated"` (for companion run reports from generate). Default: `"all"`. |
+| `history[].topFailures` | array | Optional | Bounded array (max 5) of `{file: string, name: string, error: string, category: string}` for the most impactful failures in this run. Empty if all tests passed. |
 | `historyMaxLength` | Maximum entries in `history`. Oldest entries evicted on insert. Default: 100. |
 
 ### `modules`
@@ -250,6 +256,8 @@ Failure heat map — files with the most failures across all recorded runs.
 | `heatMap[].file` | Test file path. |
 | `heatMap[].count` | Cumulative failure count for this file. |
 | `heatMap[].lastFailed` | ISO 8601 timestamp of the most recent failure. |
+| `heatMap[].lastError` | string | Optional | Truncated error message from the most recent failure (max 500 chars). Empty string if no failures. |
+| `heatMap[].errorCategory` | string | Optional | Error classification: `"assertion"`, `"timeout"`, `"runtime"`, `"infrastructure"`, or `"unknown"`. |
 | `maxLength` | Maximum entries. Default: 20. |
 
 ### `activity`
@@ -324,6 +332,8 @@ Per MEM109 and the pre-flight protocol, corruption handling is inlined:
 - **Parse failure:** Log warning, recreate with defaults + current spoke's data. **Never abort the spoke** — metrics are observability, not a gate.
 - **schemaVersion mismatch (MAJOR):** Log warning, attempt to read known fields, write back with current schema version.
 - **schemaVersion mismatch (MINOR):** Proceed normally. Unrecognized fields are preserved (pass-through).
+
+**Write conflict tracking:** When a spoke proceeds without a lock (best-effort fallback), it MUST set `lastWriteConflict: {timestamp, spoke, action}` at the top level of metrics.json. This makes concurrency contention observable in the dashboard and health checks. Clear this field only when a subsequent write succeeds with the lock acquired.
 
 ### Bounded Array Eviction
 

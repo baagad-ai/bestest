@@ -46,3 +46,41 @@ jobs:
           report_paths: .bestest/reports/junit-validation.xml
           check_name: Bestest Validation Results
           fail_on_failure: true
+
+  validate-skill:
+    runs-on: ubuntu-latest
+    env:
+      SKILL_DIR: ${{ github.workspace }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create reports directory
+        run: mkdir -p .bestest/reports
+
+      - name: Run skill validation script
+        run: |
+          chmod +x "$SKILL_DIR/scripts/validate-skill.sh"
+          "$SKILL_DIR/scripts/validate-skill.sh" 2>&1 | tee skill-validation-output.txt
+
+      - name: Convert validation output to JUnit XML
+        if: always()
+        run: |
+          chmod +x "$SKILL_DIR/scripts/validate-to-junit.sh"
+          "$SKILL_DIR/scripts/validate-to-junit.sh" skill-validation-output.txt .bestest/reports/junit-skill-validation.xml
+
+      - name: Upload JUnit XML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-skill-validation-report
+          path: .bestest/reports/junit-skill-validation.xml
+          retention-days: 30
+
+      - name: Publish JUnit test report
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: .bestest/reports/junit-skill-validation.xml
+          check_name: Bestest Skill Validation Results
+          fail_on_failure: true

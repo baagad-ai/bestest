@@ -13,7 +13,7 @@ The generate spoke is the primary value delivery command — it transforms scan 
 - Scan report with `gaps[]` and `testInventory[]` arrays (run `/bestest scan` first for optimal targeting)
 - Scan report is not strictly required — the spoke can generate in degraded mode without it, using filesystem scanning instead of gap targeting
 
-> **Shared pipeline:** This spoke implements the 7-phase generation pipeline. Shared sections (Parallel Dispatch Decision, Priority Scoring Formula, Default Targeting, Pre-read Instruction, Content Boundary Notice, Taint Notice, HITL Gate, Error Handling stub, Config State Update, Downstream Reference) are defined in `references/generate/pipeline-shared.md`. Only language-specific phases and deltas are documented below.
+> **Shared pipeline:** This spoke implements the 7-phase generation pipeline. Shared sections (Parallel Dispatch Decision, Priority Scoring Formula, Default Targeting, Pre-read Instruction, Content Boundary Notice, Source Sanitization Protocol, Taint Notice, HITL Gate, Error Handling stub, Config State Update, Downstream Reference) are defined in `references/generate/pipeline-shared.md`. Only language-specific phases and deltas are documented below. The Pipeline Skeleton in pipeline-shared.md defines the canonical 7-phase structure every generate spoke follows.
 
 ## Pre-Flight Checks
 
@@ -149,6 +149,14 @@ For each side-effect dependency: Network calls → `vi.mock('axios')` or mock gl
 ### Step 5: Complexity estimation
 
 Estimate cyclomatic complexity by counting branching (`if`, `switch`, ternary, `&&`, `||`), loops (`for`, `while`, `map`, `filter`), and error handling (`try/catch`). Map to test count: complexity 1-3 → 2-3 tests, 4-8 → 4-6, 9-15 → 6-10, 16+ → 10+ (consider suggesting source refactoring).
+
+### Step 6: Source Sanitization (Structural Injection Mitigation)
+
+> **Critical security step.** This step MUST execute between Phase 2 and Phase 3.
+
+After gathering context and before strategy selection, extract a structured SourceAnalysis object from each target source file. Phase 3 and Phase 4 consume ONLY these SourceAnalysis objects — never the raw source content.
+
+> **Shared section:** See Source Sanitization Protocol in `references/generate/pipeline-shared.md` for the full protocol, enforcement steps, and known limitations.
 
 ---
 
@@ -317,71 +325,20 @@ After successful completion, the following artifacts exist:
 
 ## Metrics Update
 
-This spoke writes to `.bestest/state/metrics.json` following the shared metrics-update protocol defined in `references/metrics-schema.md`.
-
-Before reading metrics.json, acquire the concurrency lock per `references/pre-flight-protocol.md` → Concurrency Lock Protocol. The lock must be held for the entire read-modify-write cycle (Steps 0–8). If the lock cannot be acquired, log a warning and proceed with a best-effort write.
-
-### Sections Updated
-
-`tests`, `activity`
-
-### Field Mapping
-
-| Field | Source | Update Rule |
-|-------|--------|-------------|
-| `tests.*` | All test counts from run results | Replace with current value |
-| `activity[]` | Current spoke invocation metadata | Append entry, evict oldest if over maxLength |
-
-### Update Protocol
-
-Follow this protocol on every invocation:
-
-```
-0. Acquire lock on .bestest/state/.metrics.lock
-   - Use flock with 5-second timeout (primary) or mkdir-based fallback
-   - If lock cannot be acquired, proceed anyway with a warning (best-effort)
-   - For the full lock acquisition and release protocol, see references/pre-flight-protocol.md → Concurrency Lock Protocol
-1. Read .bestest/state/metrics.json
-2. Parse as JSON
-3. If parse fails (corruption):
-   a. Log warning: "metrics.json corrupted — recreating with defaults"
-   b. Initialize fresh metrics with schemaVersion "1.0" and default values
-   c. Continue with step 5 (do NOT abort the spoke)
-4. Validate schemaVersion — warn if MAJOR differs, proceed if MINOR differs
-5. Merge spoke-specific data:
-   - Update lastUpdated to current ISO 8601 timestamp
-   - Update only this spoke's sections (listed above), leave others unchanged
-   - Append to bounded arrays (history, trend, activity), evicting oldest when over maxLength
-   - Recalculate derived values (healthScore, overallFlakeRate, etc.)
-6. Write back to .bestest/state/metrics.json (atomic write: write to temp file, then rename)
-7. Update config.yaml state.last_metrics with current timestamp
-8. Release lock on .bestest/state/.metrics.lock
-   - flock: released automatically when the subshell/process exits
-   - mkdir: remove the lock directory with rm -rf
-```
-
-### Activity Log Entry
-
-Append an entry to the `activity` array:
-
-```json
-{
-  "timestamp": "<current ISO 8601>",
-  "spoke": "spoke-generate",
-  "action": "generate",
-  "summary": "<human-readable one-line summary>"
-}
-```
-
-### Graceful Degradation
-
-- **File missing:** Treated as first-time creation. Write this spoke's section with defaults for all others.
-- **Parse failure:** Log warning, recreate with defaults + current spoke's data. **Never abort the spoke** — metrics are observability, not a gate.
-- **schemaVersion mismatch (MAJOR):** Log warning, attempt to read known fields, write back with current schema version.
-- **schemaVersion mismatch (MINOR):** Proceed normally. Unrecognized fields are preserved (pass-through).
+> **Shared section:** See Metrics Update Core in `references/generate/pipeline-shared.md`.
 
 
 
 ## Downstream Reference
 
 > **Shared section:** See Downstream Reference Core in `references/generate/pipeline-shared.md`.
+
+## What to Run Next
+
+After `bestest generate` completes:
+
+- **If quality scores are low (< 70):** Run `/bestest fix` to repair flagged tests.
+- **If all tests pass:** Run `/bestest run` to execute the full suite and capture baseline metrics.
+- **To see coverage impact:** Run `/bestest coverage` for gap analysis with the new tests included.
+- **To verify overall health:** Run `/bestest scan` for a full audit reflecting the generated tests.
+- **To generate CI config:** Run `/bestest ci` to create pipeline configuration that runs your tests on every push.

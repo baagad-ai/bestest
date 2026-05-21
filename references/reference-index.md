@@ -101,7 +101,7 @@ All reference files are relative to `./`.
 | `./references/generate/go/phase7-quality-audit.md` | Quality scoring against Go generation guide rubric and stability testing |
 | `./references/generate/go/error-handling.md` | All error scenarios for the Go generate spoke |
 
-## Templates (6)
+## Templates (17)
 | File | Description |
 |------|-------------|
 | `./references/templates/vitest-config-ts.md` | Complete vitest.config.ts templates for 4 stack variants |
@@ -110,6 +110,17 @@ All reference files are relative to `./`.
 | `./references/templates/stryker-conf.md` | Stryker mutation testing configs for 2 test runner variants |
 | `./references/templates/supertest-helpers.md` | Reusable API test helper patterns for supertest |
 | `./references/templates/testing-md.md` | TESTING.md template with project documentation structure |
+| `./references/templates/config-vitest.yaml` | Vitest config.yaml template for JS/TS projects |
+| `./references/templates/config-jest.yaml` | Jest config.yaml template for existing Jest projects |
+| `./references/templates/config-pytest.yaml` | pytest config.yaml template for Python projects |
+| `./references/templates/config-junit5.yaml` | JUnit 5 config.yaml template for Java projects |
+| `./references/templates/config-go.yaml` | Go testing config.yaml template for Go projects |
+| `./references/templates/config-monorepo.yaml` | Monorepo config.yaml template for workspace projects |
+| `./references/templates/ci/github-actions-test.yml` | GitHub Actions CI pipeline template |
+| `./references/templates/ci/gitlab-ci-test.yml` | GitLab CI pipeline template |
+| `./references/templates/ci/jenkinsfile-test.groovy` | Jenkins pipeline template |
+| `./references/templates/dashboard.html` | Self-contained HTML dashboard for metrics visualization |
+| `./references/templates/bestest-gitignore` | .gitignore template for .bestest/ directory |
 
 ## Migration (1)
 | File | Description |

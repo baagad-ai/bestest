@@ -83,6 +83,10 @@ All spokes that read source files, configuration files, or external documentatio
 
 Individual spokes may customize the second sentence to reference their specific read context (e.g., "source file content" for scan, "test and source file content" for fix).
 
+### Context7 Input Sanitization
+
+Before passing any framework name to `resolve_library()`, the spoke must validate it against an allowlist of known frameworks. See **spoke-expand.md → Phase 3 → Step 0: Sanitize framework name** for the canonical sanitization step. The allowlist is derived from the Framework → Library Mapping tables in spoke-expand.md and covers all recognized library names across JS/TS, Python, Java, and Go. Unknown names trigger a user confirmation prompt rather than an unvalidated API call.
+
 ---
 
 ## Graceful Fallback

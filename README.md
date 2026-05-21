@@ -20,7 +20,7 @@
 
 bestest is an AI-native testing skill that architects your entire testing layer — not just generates a test file and hopes for the best.
 
-It's a **99-file, ~40K-line specification** that lives inside your AI coding agent and handles strategy, framework selection, test generation, CI pipelines, flaky test management, framework migration, and living documentation. All version-controlled in your repo.
+It's a **100+ file, ~40K-line specification** that lives inside your AI coding agent and handles strategy, framework selection, test generation, CI pipelines, flaky test management, framework migration, and living documentation. All version-controlled in your repo.
 
 ```
 Other tools:  "Write a test for X"  →  a test file (maybe compiles, maybe passes)
@@ -44,6 +44,8 @@ bestest:      Detect stack → Pick framework → Generate → Compile → Run �
 ### Prerequisites
 
 bestest works with any AI coding agent that loads skills from a local directory — including [GSD/pi](https://github.com/nicosql/gsd-pi) (an agent harness with auto-mode), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor](https://cursor.com), and others.
+
+A **skill** is a directory of markdown instructions that AI coding agents read and follow. When you install bestest into your agent's skills directory, the agent gains the ability to architect your entire testing layer — detecting your stack, recommending frameworks, generating tests, and managing CI pipelines — all without leaving your editor.
 
 ### Install
 

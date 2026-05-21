@@ -68,6 +68,12 @@ while tests fail AND retry_count < max_retries:
     If "environment": fix test setup (add @TestPropertySource, @MockBean, @ActiveProfiles).
     If "Spring context failure": add @MockBean for missing beans, or switch to narrower slice test (@WebMvcTest instead of @SpringBootTest).
     If "NullPointerException": add mock stub for the missing return value.
+    **Phase 6→5 Back-Loop Check:**
+    If any fix altered imports, types, type annotations, or structural code (not just assertion values or mock return values):
+      Return to Phase 5 (Compilation Verification) for recompilation before re-running tests.
+      Increment global_iterations on re-entry (see pipeline-shared.md Global Iteration Budget).
+      The recompilation guard will catch pathological cycling.
+      After successful recompilation, continue to re-run tests.
   Re-run tests.
   If all tests pass: break.
 

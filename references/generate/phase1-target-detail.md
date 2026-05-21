@@ -6,7 +6,7 @@
 
 ## Path Validation
 
-Before processing any target path through the targeting modes, validate the path to prevent filesystem traversal attacks, canonicalization issues, and invalid inputs. Apply these five validation steps, **in this exact order**, to every user-supplied path — ordering matters for security:
+Before processing any target path through the targeting modes, validate the path to prevent filesystem traversal attacks, canonicalization issues, and invalid inputs. Apply these six validation steps, **in this exact order**, to every user-supplied path — ordering matters for security:
 
 ```
 1. Traversal rejection: Reject raw userPath containing ".." or starting with "/".
@@ -35,9 +35,18 @@ Before processing any target path through the targeting modes, validate the path
    if (isFile && !matchesExpectedExtension(canonical)):
      error: "File type not supported: {canonical}. Expected {extension}."
      Exit.
+
+6. Sensitive file exclusion: Reject files matching sensitive filename patterns.
+   Sensitive patterns (case-insensitive): .env, .env.*, *.pem, *.key, *.p12, *.pfx, *.jks,
+     id_rsa*, id_ed25519*, id_ecdsa*, credentials.*, service-account*.json,
+     .netrc, .npmrc, .pypirc, .aws/*, .ssh/*, .gnupg/*, *.keystore, *.truststore
+   basename = path.basename(canonical)
+   if (basename matches any sensitive pattern, case-insensitive):
+     error: "Sensitive file rejected: {canonical}. Test generation for credential and key files is blocked for security."
+     Exit.
 ```
 
-All five checks must pass before the path enters any targeting mode. If any check fails, print the error and exit — do not fall through to other modes.
+All six checks must pass before the path enters any targeting mode. If any check fails, print the error and exit — do not fall through to other modes.
 
 ---
 
@@ -155,6 +164,17 @@ Validate scan-report.json schemaVersion:
   Expected version: ≤ 1.2 (current known version).
   If schemaVersion is missing:
     Treat as version "1.0" (pre-versioning legacy). Print a note and continue.
+  If MAJOR version matches (1.x) and MINOR ≤ 2:
+    Proceed normally.
+  If MAJOR version matches but MINOR > 2:
+    Print: "⚠ scan-report.json schemaVersion {version} is newer than expected (≤ 1.2). Proceeding — unrecognized fields will be ignored."
+    Continue with warning.
+  If MAJOR version differs:
+    Print: "Error: scan-report.json schemaVersion {version} has an incompatible MAJOR version. Expected 1.x."
+    Print: "Update bestest to the latest version, or re-run /bestest scan to regenerate."
+    Exit.
+```
+ a note and continue.
   If MAJOR version matches (1.x) and MINOR ≤ 2:
     Proceed normally.
   If MAJOR version matches but MINOR > 2:

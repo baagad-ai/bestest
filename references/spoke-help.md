@@ -53,6 +53,20 @@ bestest — Enterprise-grade testing architect
 Commands:
 ```
 
+### Getting Started
+
+New to bestest? Follow this path:
+
+```
+1. /bestest           → Auto-detects your project and runs init or scan
+2. /bestest scan      → Deep audit of your current test state
+3. /bestest generate  → Generate tests for uncovered files
+4. /bestest run       → Execute all tests
+5. /bestest fix       → Fix any failing tests
+```
+
+Tip: Just type `/bestest` with no arguments — it will automatically run init (first time) or scan (subsequent runs) based on your project state.
+
 #### Step 2: Display command table
 
 | Command | Description |
@@ -120,6 +134,18 @@ Usage:
   /bestest help <command>   → Detailed help for a specific command
   /bestest version          → Version and environment information
 ```
+
+### Your Next Step
+
+Based on your current state:
+- No `.bestest/` directory? → Run `/bestest init`
+- Have `.bestest/` but never scanned? → Run `/bestest scan`
+- Scan complete, have gaps? → Run `/bestest generate --untested`
+- Tests generated? → Run `/bestest run` to verify
+- Tests failing? → Run `/bestest fix`
+- All passing? → Run `/bestest coverage` to check coverage
+- Happy with coverage? → Run `/bestest ci` to add CI pipelines
+- Any issues? → Run `/bestest doctor` for a health check
 
 ### Command-Specific Help (`/bestest help <command>`)
 

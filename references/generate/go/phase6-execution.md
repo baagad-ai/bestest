@@ -74,6 +74,12 @@ while tests fail AND retry_count < max_retries:
     If "race condition": add mutex/channel synchronization or fix concurrent access pattern.
     If "nil pointer dereference": add mock return values for all called methods.
     If "timeout": add context with timeout, mock slow dependencies, or use require.Eventually.
+    **Phase 6→5 Back-Loop Check:**
+    If any fix altered imports, types, type annotations, or structural code (not just assertion values or mock return values):
+      Return to Phase 5 (Compilation Verification) for recompilation before re-running tests.
+      Increment global_iterations on re-entry (see pipeline-shared.md Global Iteration Budget).
+      The recompilation guard will catch pathological cycling.
+      After successful recompilation, continue to re-run tests.
   Re-run tests.
   If all tests pass: break.
 

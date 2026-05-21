@@ -49,12 +49,6 @@ Patches (documentation-only changes) do not increment the version.
 |---------|------|--------|
 | 1.0 | 2025-04 | Initial versioned schema. Added `schemaVersion` field to run-results.json shape. |
 
-#### run-results-schema
-
-| Version | Date | Change |
-|---------|------|--------|
-| 1.0 | 2025-04 | Initial versioned schema. Added `schemaVersion` field to run-results.json shape. |
-
 #### metrics-schema
 
 | Version | Date | Change |
@@ -102,12 +96,10 @@ Every spoke that reads a structured artifact must validate `schemaVersion` befor
 | `spoke-run` | `config.yaml` version + `stack-profile.json` schemaVersion | Warn if config version > known. Error if stack-profile MAJOR differs. |
 | `spoke-generate` | `stack-profile.json` schemaVersion + `scan-report.json` schemaVersion | Warn on unknown minor. Error on MAJOR mismatch. |
 | `spoke-fix` | `run-results.json` schemaVersion | Error if missing or MAJOR differs. |
-| `spoke-coverage` | `run-results.json` schemaVersion + `config.yaml` version | Warn on unknown minor. Error on MAJOR mismatch. |
-| `spoke-doctor` | `config.yaml` version + `stack-profile.json` schemaVersion | Warn on unknown minor. Error on MAJOR mismatch. |
+| `spoke-coverage` | `run-results.json` schemaVersion + `config.yaml` version + `metrics.json` schemaVersion | Warn on unknown minor. Error on MAJOR mismatch. |
+| `spoke-doctor` | `config.yaml` version + `stack-profile.json` schemaVersion + `metrics.json` schemaVersion | Warn on unknown minor. Error on MAJOR mismatch. |
 | `spoke-config` | `config.yaml` version | Warn if > known version. Do not overwrite newer versions. |
 | `spoke-report` | `metrics.json` schemaVersion | Warn on unknown minor. Error on MAJOR mismatch. |
-| `spoke-doctor` | `metrics.json` schemaVersion + `config.yaml` version + `stack-profile.json` schemaVersion | Warn on unknown minor. Error on MAJOR mismatch. |
-| `spoke-coverage` | `metrics.json` schemaVersion + `run-results.json` schemaVersion + `config.yaml` version | Warn on unknown minor. Error on MAJOR mismatch. |
 
 ## Breaking vs Non-Breaking Changes
 

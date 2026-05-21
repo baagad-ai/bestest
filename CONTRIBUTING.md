@@ -122,6 +122,15 @@ In SKILL.md `<routing>` section:
 
 - [ ] Decision tree file created: `references/<language>-decision-tree.md`
 - [ ] Generate spoke created: `references/spoke-generate-<language>.md`
+- [ ] **Create generation sub-files** — Create the 6 required pipeline sub-files in `references/generate/<lang>/`:
+  - `phase1-target-detail.md` — Target selection heuristics and path validation
+  - `phase4-generation-detail.md` — Language-specific test generation patterns and mocking
+  - `phase5-compilation.md` — Compilation verification with auto-fix
+  - `phase6-execution.md` — Execution verification with fix-and-rerun loop
+  - `phase7-quality-audit.md` — Quality scoring rubric and flakiness testing
+  - `error-handling.md` — Language-specific error scenarios
+  
+  Use an existing language's sub-files (e.g., `references/generate/python/`) as a template.
 - [ ] Detection signals added to `references/detection-engine.md`
 - [ ] Language added to routing table in SKILL.md
 - [ ] Language added to reference_index in SKILL.md

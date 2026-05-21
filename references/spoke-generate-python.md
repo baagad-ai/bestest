@@ -14,7 +14,7 @@ The generate spoke is the primary value delivery command — it transforms scan 
 - Scan report is not strictly required — the spoke can generate in degraded mode without it, using filesystem scanning instead of gap targeting
 - Python virtual environment detected (one of: `VIRTUAL_ENV` env var, `.venv/` directory, Poetry environment, Conda environment)
 
-> **Shared pipeline:** This spoke implements the 7-phase generation pipeline. Shared sections (Parallel Dispatch Decision, Priority Scoring Formula, Default Targeting, Pre-read Instruction, Content Boundary Notice, Taint Notice, HITL Gate, Error Handling stub, Config State Update, Downstream Reference) are defined in `references/generate/pipeline-shared.md`. Only language-specific phases and deltas are documented below.
+> **Shared pipeline:** This spoke implements the 7-phase generation pipeline. Shared sections (Parallel Dispatch Decision, Priority Scoring Formula, Default Targeting, Pre-read Instruction, Content Boundary Notice, Source Sanitization Protocol, Taint Notice, HITL Gate, Error Handling stub, Config State Update, Downstream Reference) are defined in `references/generate/pipeline-shared.md`. Only language-specific phases and deltas are documented below. The Pipeline Skeleton in pipeline-shared.md defines the canonical 7-phase structure every generate spoke follows.
 
 ## Pre-Flight Checks
 
@@ -192,6 +192,14 @@ If conftest.py files exist in the test directory tree:
   If no suitable fixture exists, generate one in the test file (not in conftest.py).
 ```
 
+### Step 7: Source Sanitization (Structural Injection Mitigation)
+
+> **Critical security step.** This step MUST execute between Phase 2 and Phase 3.
+
+After gathering context and before strategy selection, extract a structured SourceAnalysis object from each target source file. Phase 3 and Phase 4 consume ONLY these SourceAnalysis objects — never the raw source content.
+
+> **Shared section:** See Source Sanitization Protocol in `references/generate/pipeline-shared.md` for the full protocol, enforcement steps, and known limitations.
+
 ---
 
 ## Phase 3 — Test Strategy Selection
@@ -305,6 +313,29 @@ Bad examples (never generate these):
 
 > **On-demand load:** When execution verification is needed, read `references/generate/python/phase6-execution.md`. Run tests, analyze failures, and apply the fix-and-rerun loop defined there.
 
+### Write Companion Run Report
+
+After execution verification completes (whether tests pass or fail), write a `run-<timestamp>.json` to `.bestest/reports/` using the same schema as spoke-run Phase 4. This ensures downstream spokes (especially fix) can consume the test execution results from generation verification without requiring a separate `/bestest run`.
+
+**When to write:**
+- Phase 6 ran test execution (i.e., `generation.verify_pass` is `true` in config)
+- Tests were actually executed (not skipped due to compilation failure)
+
+**What to include:**
+- `schemaVersion`: "1.0"
+- `timestamp`: Generation completion timestamp
+- `framework`: From config
+- `language`: From config
+- `suiteFilter`: "generated" (to distinguish from full suite runs)
+- `execution`: Timing and exit code from Phase 6 test run
+- `summary`: Pass/fail counts from the verification run
+- `tests[]`: Per-file results for generated tests only
+- `coverage`: If collected during verification
+- `errors[]`: Any errors from failed verification runs
+- `companionTo`: "generate" (marks this as generation-related, not a full suite run)
+
+**When to skip:** If `generation.verify_pass` is `false`, or if tests could not be executed (compilation failure), skip writing the companion run report.
+
 ---
 
 ## Phase 7 — Quality Audit
@@ -326,6 +357,7 @@ After successful completion, the following artifacts exist:
 | Artifact | Location | Purpose |
 |----------|----------|---------|
 | Generated test files | Configured test directory (per `pytest.testpaths`) | Test files matching naming convention (e.g., `test_calculate.py`) |
+| Run report (companion) | `.bestest/reports/run-<timestamp>.json` | Execution results from verification phase, consumable by fix/coverage/report |
 | Updated conftest.py | Test directory (if new shared fixtures needed) | Shared fixtures for generated tests |
 | Updated reports | `.bestest/reports/` | Coverage metrics and quality scores |
 | Updated TESTING.md | Repo root | New test inventory reflecting generated tests |
@@ -349,68 +381,7 @@ After successful completion, the following artifacts exist:
 
 ## Metrics Update
 
-This spoke writes to `.bestest/state/metrics.json` following the shared metrics-update protocol defined in `references/metrics-schema.md`.
-
-Before reading metrics.json, acquire the concurrency lock per `references/pre-flight-protocol.md` → Concurrency Lock Protocol. The lock must be held for the entire read-modify-write cycle (Steps 0–8). If the lock cannot be acquired, log a warning and proceed with a best-effort write.
-
-### Sections Updated
-
-`tests`, `activity`
-
-### Field Mapping
-
-| Field | Source | Update Rule |
-|-------|--------|-------------|
-| `tests.*` | All test counts from run results | Replace with current value |
-| `activity[]` | Current spoke invocation metadata | Append entry, evict oldest if over maxLength |
-
-### Update Protocol
-
-Follow this protocol on every invocation:
-
-```
-0. Acquire lock on .bestest/state/.metrics.lock
-   - Use flock with 5-second timeout (primary) or mkdir-based fallback
-   - If lock cannot be acquired, proceed anyway with a warning (best-effort)
-   - For the full lock acquisition and release protocol, see references/pre-flight-protocol.md → Concurrency Lock Protocol
-1. Read .bestest/state/metrics.json
-2. Parse as JSON
-3. If parse fails (corruption):
-   a. Log warning: "metrics.json corrupted — recreating with defaults"
-   b. Initialize fresh metrics with schemaVersion "1.0" and default values
-   c. Continue with step 5 (do NOT abort the spoke)
-4. Validate schemaVersion — warn if MAJOR differs, proceed if MINOR differs
-5. Merge spoke-specific data:
-   - Update lastUpdated to current ISO 8601 timestamp
-   - Update only this spoke's sections (listed above), leave others unchanged
-   - Append to bounded arrays (history, trend, activity), evicting oldest when over maxLength
-   - Recalculate derived values (healthScore, overallFlakeRate, etc.)
-6. Write back to .bestest/state/metrics.json (atomic write: write to temp file, then rename)
-7. Update config.yaml state.last_metrics with current timestamp
-8. Release lock on .bestest/state/.metrics.lock
-   - flock: released automatically when the subshell/process exits
-   - mkdir: remove the lock directory with rm -rf
-```
-
-### Activity Log Entry
-
-Append an entry to the `activity` array:
-
-```json
-{
-  "timestamp": "<current ISO 8601>",
-  "spoke": "spoke-generate-python",
-  "action": "generate",
-  "summary": "<human-readable one-line summary>"
-}
-```
-
-### Graceful Degradation
-
-- **File missing:** Treated as first-time creation. Write this spoke's section with defaults for all others.
-- **Parse failure:** Log warning, recreate with defaults + current spoke's data. **Never abort the spoke** — metrics are observability, not a gate.
-- **schemaVersion mismatch (MAJOR):** Log warning, attempt to read known fields, write back with current schema version.
-- **schemaVersion mismatch (MINOR):** Proceed normally. Unrecognized fields are preserved (pass-through).
+> **Shared section:** See Metrics Update Core in `references/generate/pipeline-shared.md`.
 
 
 

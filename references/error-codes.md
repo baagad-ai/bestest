@@ -38,10 +38,10 @@ Error code taxonomy for `scripts/validate-skill.sh` and `scripts/validate-plugin
 | E019 | critical | Dashboard & JUnit Cross-Cutting | dashboard.html does not reference metrics.json (validate-plugin.sh only) |
 | E020 | critical | Dashboard & JUnit Cross-Cutting | spoke-init.md does not reference dashboard.html (validate-plugin.sh only) |
 | E021 | critical | Dashboard & JUnit Cross-Cutting | dot-bestest-schema.md does not reference dashboard.html or junit-report.xml (validate-plugin.sh only) |
-| E022 | — | Planned | Documented but not yet implemented by any validation script. |
-| E023 | — | Planned | Documented but not yet implemented by any validation script. |
-| E024 | — | Planned | Documented but not yet implemented by any validation script. |
-| E025 | — | Planned | Documented but not yet implemented by any validation script. |
+| E022 | validate-skill.sh | critical | Generate spoke missing Write Companion Run Report in Phase 6. |
+| E023 | validate-skill.sh | critical | Generate spoke missing Run report (companion) in Output table. |
+| E024 | validate-skill.sh | critical | Generate spoke Phase 2 step numbering not monotonically increasing. |
+| E025 | validate-skill.sh | warning | Generate spoke Metrics Update section does not reference pipeline-shared.md. |
 
 ---
 
@@ -329,25 +329,37 @@ These codes verify cross-references between the dashboard template, metrics data
 - **Status:** Reserved for future use. Not implemented by any validation script.
 - **Note:** This code slot is available for a future check. Do not assign it without updating this document and implementing the corresponding check in at least one validation script.
 
-### E022 — Planned
+### E022 — Generate spoke missing Write Companion Run Report in Phase 6
 
-- **Status:** Documented but not yet implemented by any validation script.
-- **Note:** This code slot is reserved for a future template completeness check. It may be activated in a future milestone.
+- **Severity:** critical
+- **Scripts:** validate-skill.sh
+- **Check:** For each of the 4 generate spoke files (spoke-generate.md, spoke-generate-python.md, spoke-generate-java.md, spoke-generate-go.md), the Phase 6 section must contain a `### Write Companion Run Report` heading between the Phase 6 and Phase 7 boundaries. This ensures all spokes produce companion run reports with structural parity.
+- **Validates:** `references/spoke-generate*.md` → Phase 6 companion report subsection
+- **Remediation:** Add the `### Write Companion Run Report` subsection to the spoke's Phase 6, between the on-demand load paragraph and the Phase 7 separator. Copy the canonical content from spoke-generate.md.
 
-### E023 — Planned
+### E023 — Generate spoke missing Run report (companion) in Output table
 
-- **Status:** Documented but not yet implemented by any validation script.
-- **Note:** This code slot is reserved for a future SKILL.md integrity check. It may be activated in a future milestone.
+- **Severity:** critical
+- **Scripts:** validate-skill.sh
+- **Check:** For each of the 4 generate spoke files, the Output artifact table must contain a `Run report (companion)` row. This ensures the companion report is documented as a first-class output artifact across all generate spokes.
+- **Validates:** `references/spoke-generate*.md` → Output artifact table
+- **Remediation:** Add a `Run report (companion)` row to the spoke's Output artifact table, immediately after the "Generated test files" row. Copy the canonical row from spoke-generate.md.
 
-### E024 — Planned
+### E024 — Generate spoke Phase 2 step numbering not monotonically increasing
 
-- **Status:** Documented but not yet implemented by any validation script.
-- **Note:** This code slot is reserved for a future SKILL.md integrity check. It may be activated in a future milestone.
+- **Severity:** critical
+- **Scripts:** validate-skill.sh
+- **Check:** For each of the 4 generate spoke files, all `### Step N:` headings within Phase 2 must have strictly increasing N values. JS/TS spokes have 6 steps; Python/Java/Go spokes have 7 steps. Detects step numbering regressions from incorrect edits.
+- **Validates:** `references/spoke-generate*.md` → Phase 2 step headings
+- **Remediation:** Renumber the `### Step N:` headings in the spoke's Phase 2 section so they increase from 1 without gaps or duplicates. Verify against the canonical step count (6 for JS/TS, 7 for Python/Java/Go).
 
-### E025 — Planned
+### E025 — Generate spoke Metrics Update section does not reference pipeline-shared.md
 
-- **Status:** Documented but not yet implemented by any validation script.
-- **Note:** This code slot is reserved for a future SKILL.md integrity check. It may be activated in a future milestone.
+- **Severity:** warning
+- **Scripts:** validate-skill.sh
+- **Check:** For each of the 4 generate spoke files, the Metrics Update section must reference `pipeline-shared.md` rather than containing the full inline content. This enforces the single-source-of-truth pattern for shared pipeline sections.
+- **Validates:** `references/spoke-generate*.md` → Metrics Update section → `references/generate/pipeline-shared.md`
+- **Remediation:** Replace the full Metrics Update section with a one-liner reference: `> **Shared section:** See Metrics Update Core in \`references/generate/pipeline-shared.md\`. Ensure the shared content exists in pipeline-shared.md under the heading "Metrics Update Core".
 
 ---
 
@@ -357,7 +369,7 @@ The two validation scripts use this error code taxonomy as follows:
 
 ### validate-skill.sh
 
-Runs 7 domains (Domains 1–7). Does not include Domain 8 (Dashboard & JUnit Cross-Cutting). Additionally checks E004b, E012b, E012c, E012d which are unique to this script. Uses stricter E017 bounds (200–310 lines).
+Runs 8 domains (Domains 1–8). Does not include E004b, E012b, E012c, E012d which are unique to this script. Uses stricter E017 bounds (200–310 lines).
 
 1. **Load** the error code catalog from `references/error-codes.md`.
 2. **Run checks sequentially** by domain:
@@ -368,6 +380,7 @@ Runs 7 domains (Domains 1–7). Does not include Domain 8 (Dashboard & JUnit Cro
    - Domain 5: Schema Field Coverage (E010–E012, E012b–E012d)
    - Domain 6: Template Completeness (E013)
    - Domain 7: SKILL.md Integrity (E015–E017, bounds 200–310)
+   - Domain 8: Generate Spoke Behavioral Consistency (E022–E025)
 3. **Report each finding** using the error code, e.g.: `E007 (critical): detection-engine.md contains Phase 3 heading`.
 4. **Exit with code 0** if no critical errors are found (warnings such as E017 are logged but do not block).
 5. **Exit with code 1** if any critical error is found.
