@@ -127,6 +127,20 @@ All reference files are relative to `./`.
 |------|-------------|
 | `./references/migration-rules.md` | Transformation rule catalog for jest→vitest, junit4→junit5, cypress→playwright |
 
+## Init Sub-Files (5)
+| File | Description |
+|------|-------------|
+| `./references/init/phase3-hitl-gate.md` | Phase 3 HITL Gate: framework selection presentation, user prompt, response handling, checkpoint |
+| `./references/init/phase4-scaffold.md` | Phase 4 Scaffold: directory structure, template resolution, Context7 integration |
+| `./references/init/phase5-install.md` | Phase 5 Install Dependencies: dependency lists by framework, install processes, failure recovery |
+| `./references/init/phase6-validation.md` | Phase 6 Validation: state file corruption handling, file existence checks, config validation |
+| `./references/init/output-and-metrics.md` | Output tables, Metrics Update protocol, activity log, graceful degradation, downstream commands |
+
+## Data Source Discovery (1)
+| File | Description |
+|------|-------------|
+| `./references/data-source-discovery.md` | Shared discovery pattern for run/scan result lookup used by fix, coverage, report, doctor, and status spokes |
+
 ## Reference Infrastructure (5)
 | File | Description |
 |------|-------------|

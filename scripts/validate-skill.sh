@@ -169,6 +169,13 @@ for lang in python java go; do
   done
 done
 
+# E028: All 5 init sub-files exist and are non-empty
+INIT_FILES='phase3-hitl-gate.md phase4-scaffold.md phase5-install.md phase6-validation.md output-and-metrics.md'
+for f in $INIT_FILES; do
+  check "Init sub-file 'references/init/$f' exists and non-empty" "E028" "critical" \
+    "[ -s '$SKILL_DIR/references/init/$f' ]"
+done
+
 # ─── Domain 4: Detection Engine Structure ──────────────────────────────────
 echo "── Domain 4: Detection Engine Structure ──"
 

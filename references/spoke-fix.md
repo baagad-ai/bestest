@@ -58,7 +58,7 @@ If .bestest/config.yaml exists but is invalid YAML:
 ### 2. Check for run or scan reports
 
 ```
-Follow the Shared Data Source Discovery pattern from references/pre-flight-protocol.md:
+Follow the Shared Data Source Discovery pattern from references/data-source-discovery.md:
 
 Step A — Check for run reports (preferred):
   Glob for .bestest/reports/run-*.json files.

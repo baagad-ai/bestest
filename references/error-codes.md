@@ -44,6 +44,7 @@ Error code taxonomy for `scripts/validate-skill.sh` and `scripts/validate-plugin
 | E025 | validate-skill.sh | warning | Generate spoke Metrics Update section does not reference pipeline-shared.md. |
 | E026 | critical | Security Hardening | phase1-target-detail file missing sensitive-file exclusion step |
 | E027 | critical | Security Hardening | spoke-expand.md missing Context7 input sanitization step |
+| E028 | critical | Spoke File Integrity | Init sub-file missing or empty under references/init/ |
 
 ---
 
@@ -387,6 +388,14 @@ These codes verify that security hardening from S02 (T01 Context7 sanitization, 
 - **Validates:** `references/spoke-expand.md` Context7 input sanitization presence
 - **Remediation:** Restore the "Step 0: Sanitize framework name" block to spoke-expand.md's Phase 3 Execution section, inserted before the existing Step 1 (Resolve library ID). The step must define an allowlist of known framework names, normalize input, and gate the `resolve_library()` call.
 
+### E028 — Init sub-file missing or empty
+
+- **Severity:** critical
+- **Scripts:** validate-skill.sh
+- **Check:** Each of the 5 init sub-files under `references/init/` (`phase3-hitl-gate.md`, `phase4-scaffold.md`, `phase5-install.md`, `phase6-validation.md`, `output-and-metrics.md`) must exist and be non-empty. These files were extracted from spoke-init.md during S04/T01 decomposition. If any file is missing or empty, the decomposition is incomplete or corrupted.
+- **Validates:** `references/init/*.md` structural file existence
+- **Remediation:** Ensure spoke-init.md decomposition produced all 5 phase sub-files. See S04-PLAN.md for the extraction plan and line ranges.
+
 ---
 
 ## Usage in Validation Scripts
@@ -401,7 +410,7 @@ Runs 9 domains (Domains 1–9). Does not include E004b, E012b, E012c, E012d whic
 2. **Run checks sequentially** by domain:
    - Domain 1: Routing & Index Consistency (E001–E002)
    - Domain 2: Reference Index & File Existence (E003–E004, E004b)
-   - Domain 3: Spoke & Generate File Integrity (E005–E006)
+   - Domain 3: Spoke & Generate File Integrity (E005–E006, E028)
    - Domain 4: Detection Engine Structure (E007–E009)
    - Domain 5: Schema Field Coverage (E010–E012, E012b–E012d)
    - Domain 6: Template Completeness (E013)
@@ -421,7 +430,7 @@ Runs 8 domains (Domains 1–8). Does not include E004b, E012b–E012d. Uses rela
 2. **Run checks sequentially** by domain:
    - Domain 1: Routing & Index Consistency (E001–E002)
    - Domain 2: Reference Index & File Existence (E003–E004)
-   - Domain 3: Spoke & Generate File Integrity (E005–E006)
+   - Domain 3: Spoke & Generate File Integrity (E005–E006, E028)
    - Domain 4: Detection Engine Structure (E007–E009)
    - Domain 5: Schema Field Coverage (E010–E012)
    - Domain 6: Template Completeness (E013)
