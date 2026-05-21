@@ -66,8 +66,9 @@ After writing the spoke file:
 
 1. **Add to the routing table** in SKILL.md's `<routing>` section — add a row to the Command Routing table with the command name, spoke file path, and purpose.
 2. **Add to the reference_index** in SKILL.md — add a row to the "Command Spokes (Load on Demand)" table.
-3. **Add to the Quick Reference** in SKILL.md — add a row to the Command Quick Reference table if the command has user-facing arguments.
-4. **Update version** — bump `version` in SKILL.md frontmatter and add a CHANGELOG.md entry.
+3. **Update reference-index.md** — add the new spoke file to the file catalog table in `references/reference-index.md` with a description.
+4. **Add to the Quick Reference** in SKILL.md — add a row to the Command Quick Reference table if the command has user-facing arguments.
+5. **Update version** — bump `version` in SKILL.md frontmatter and add a CHANGELOG.md entry.
 
 ---
 
@@ -134,6 +135,8 @@ In SKILL.md `<routing>` section:
 - [ ] Detection signals added to `references/detection-engine.md`
 - [ ] Language added to routing table in SKILL.md
 - [ ] Language added to reference_index in SKILL.md
+- [ ] reference-index.md updated with new spoke file and language sub-files
+- [ ] pipeline-shared.md sections reviewed for language-specific applicability (e.g., HITL Gate Core, Downstream Reference Core, Metrics Update Core)
 - [ ] StackProfile schema updated with language identifier
 - [ ] Version bumped in SKILL.md frontmatter
 - [ ] CHANGELOG.md entry added
