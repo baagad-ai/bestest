@@ -51,6 +51,8 @@ See `./references/parallel-dispatch.md` for the agent-agnostic parallel dispatch
 
 Parse the subcommand from `/bestest <command> [args]` and load the corresponding spoke reference file. Only one spoke loads per invocation.
 
+<command_routing>
+
 ### Language-Aware Routing
 
 The `generate` command routes to a language-specific generation spoke based on the primary language detected in the StackProfile (or `.bestest/state/stack-profile.json` if it exists). All other commands use language-agnostic spokes extended with language branches internally.
@@ -72,11 +74,14 @@ The `generate` command routes to a language-specific generation spoke based on t
 | `expand` | `./references/spoke-expand.md` | Add new test types |
 | `migrate` | `./references/spoke-migrate.md` | Migrate test frameworks |
 | `ci` | `./references/spoke-ci.md` | Generate CI pipelines |
-
 | `help` | `./references/spoke-help.md` | Show available commands, current config summary, and quick-start guide |
 | `explain` | `./references/spoke-explain.md` | Explain testing architecture decisions, ADRs, and framework choices |
 | `status` | `./references/spoke-status.md` | Show current test health: coverage, last scan, flaky tests, CI status |
 | `version` | `./references/spoke-version.md` | Show bestest version, skill location, and last update timestamp |
+
+</command_routing>
+
+<migration_routing>
 
 ### Migration Command Routing
 
@@ -102,6 +107,10 @@ The `migrate` command transforms test suites from one framework to another using
 1. Before migration: freshness-check on source framework docs via Context7 (resolve_library + get_library_docs for the target framework).
 2. After migration: run `spoke-run.md` to verify migrated tests pass. If failures occur, `spoke-fix.md` is invoked for auto-fix.
 
+</migration_routing>
+
+<language_detection>
+
 ### Language Detection for Generate Routing
 
 When the user runs `/bestest generate`, determine the language:
@@ -115,6 +124,10 @@ When the user runs `/bestest generate`, determine the language:
    - `go` → `./references/spoke-generate-go.md`
    - Unsupported language → print error with supported languages list
 
+</language_detection>
+
+<confidence_gate>
+
 ### Confidence Gate (R5)
 
 After determining the primary language but before loading the spoke, check its confidence score:
@@ -124,6 +137,10 @@ After determining the primary language but before loading the spoke, check its c
    - Present options: **(a)** Proceed with detected language, **(b)** Manually select from supported languages (JS/TS, Python, Java, Go), **(c)** Abort generation.
    - Default to option (a) only if the user explicitly confirms.
 3. If no `.bestest/state/stack-profile.json` exists and detection engine Phase 1 produces no language above 0.3 → suggest running `/bestest init` first to build an accurate profile.
+
+</confidence_gate>
+
+<multi_language>
 
 ### Multi-Language Projects (R10)
 
@@ -141,12 +158,20 @@ For polyglot projects where multiple languages have confidence ≥ 0.6:
    stackProfile.selectedLanguage = langFlag
    ```
 
+</multi_language>
+
+<no_command>
+
 ## No Command Specified
 
 If the user runs `/bestest` with no subcommand:
 1. Check if `.bestest/` exists in the repo
 2. If not → Run `init` flow (first-time setup)
 3. If yes → Run `scan` flow (status check)
+
+</no_command>
+
+<unknown_command>
 
 ## Unknown Command
 
@@ -155,9 +180,15 @@ If the user specifies an unrecognized command:
 2. Suggest the most likely intended command based on partial match
 3. Exit gracefully
 
+</unknown_command>
+
+<spoke_loading>
+
 ## Spoke Loading
 
 Read the spoke file from the skill directory. The path is relative to `./`. Load only the spoke file for the requested command — do not load all spokes.
+
+</spoke_loading>
 
 </routing>
 
@@ -177,19 +208,21 @@ Full reference index: see `./references/reference-index.md`
 
 Load reference files on-demand per command — never load all references upfront.
 
-| Command | Required Reference Files |
-|---------|------------------------|
-| `init`, `scan` | `detection-engine.md` + `stack-profile-schema.md` |
-| `generate` (JS/TS) | spoke + `pipeline-shared.md` + `generate/*.md` sub-files |
-| `generate` (Python) | spoke + `pipeline-shared.md` + `generate/python/*.md` sub-files |
-| `generate` (Java) | spoke + `pipeline-shared.md` + `generate/java/*.md` sub-files |
-| `generate` (Go) | spoke + `pipeline-shared.md` + `generate/go/*.md` sub-files |
-| `ci` | spoke + `templates/` |
-| `config` | `config-schema.md` |
-| `fix` | spoke + `anti-patterns.md` |
-| `coverage`, `run`, `report` | spoke only |
+| Command | Required Reference Files | Est. Tokens |
+|---------|------------------------|-------------|
+| `init`, `scan` | `detection-engine.md` + `stack-profile-schema.md` | ~3,000-4,000 |
+| `generate` (JS/TS) | spoke + `pipeline-shared.md` + `generate/*.md` sub-files | ~8,000-12,000 |
+| `generate` (Python) | spoke + `pipeline-shared.md` + `generate/python/*.md` sub-files | ~8,000-12,000 |
+| `generate` (Java) | spoke + `pipeline-shared.md` + `generate/java/*.md` sub-files | ~8,000-12,000 |
+| `generate` (Go) | spoke + `pipeline-shared.md` + `generate/go/*.md` sub-files | ~8,000-12,000 |
+| `ci` | spoke + `templates/` | ~2,000-3,000 |
+| `config` | `config-schema.md` | ~500-800 |
+| `fix` | spoke + `anti-patterns.md` | ~2,000-3,000 |
+| `coverage`, `run`, `report` | spoke only | ~500-1,000 |
 
 **Principle:** Load only the spoke file for the requested command plus its required references. The full `reference-index.md` (~130 lines / ~2,400 tokens) should only be loaded when discovering which files to reference — not on every invocation.
+
+*Token estimates are approximate ranges based on typical file sizes. Actual consumption varies by provider and context window.*
 
 </reference_index>
 <success_criteria>

@@ -39,6 +39,8 @@ bestest:      Detect stack → Pick framework → Generate → Compile → Run �
 | "No CI pipeline" | Generates GitHub Actions / GitLab CI / Jenkins configs |
 | "Nobody knows our test strategy" | `TESTING.md` — living documentation, auto-updated on every scan |
 
+> **Runtime Model** — bestest is a *skill*, not a CLI tool. It's a directory of markdown files that AI coding agents (GSD/pi, Claude Code, Cursor, etc.) load as instructions. When you run `/bestest generate`, the agent reads the corresponding spoke file and follows it step-by-step. There's no daemon, no binary, no API server — just structured markdown that makes your agent smarter about testing.
+
 ## Getting Started
 
 ### Prerequisites
