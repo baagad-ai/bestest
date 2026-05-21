@@ -129,7 +129,7 @@ while IFS= read -r filepath; do
   rel="${filepath#$SKILL_DIR/}"
   check "references file '$rel' is listed in reference_index" "E004" "critical" \
     "echo '$INDEX_REFS' | grep -qF '$rel'"
-done <<< "$(find "$SKILL_DIR/references" -name '*.md' -not -path '*/templates/*' -not -name 'error-codes.md' | sort)"
+done <<< "$(find "$SKILL_DIR/references" -name '*.md' -not -path '*/templates/*' -not -name 'error-codes.md' -not -name 'reference-index.md' | sort)"
 
 # E004b: pipeline-shared.md must be referenced by all 4 generate spokes
 for spoke in spoke-generate.md spoke-generate-python.md spoke-generate-java.md spoke-generate-go.md; do
