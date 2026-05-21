@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # validate-skill.sh — Comprehensive consistency checker for the bestest skill
-# Checks 7 domains: routing↔index, index↔disk, spoke existence, detection engine,
-# schema field coverage, template completeness, SKILL.md integrity.
+# Checks 9 domains: routing↔index, index↔disk, spoke existence, detection engine,
+# schema field coverage, template completeness, SKILL.md integrity, generate spoke
+# behavioral consistency, and security hardening.
 # Exit 0 if all pass (or only warnings), exit 1 if any critical failure.
 
 set -euo pipefail
@@ -381,6 +382,28 @@ for spoke in "${GENERATE_SPOKES[@]}"; do
   check "Generate spoke '$spoke' Metrics Update references pipeline-shared.md" "E025" "warning" \
     "[ -f '$spoke_file' ] && sed -n '/^## Metrics Update/,/^## /p' '$spoke_file' | grep -q 'pipeline-shared\\.md'"
 done
+
+# ─── Domain 9: Security Hardening ──────────────────────────────────────────
+echo "── Domain 9: Security Hardening ──"
+
+# Phase1-target-detail files (4 language variants)
+PHASE1_FILES=(
+  "references/generate/phase1-target-detail.md"
+  "references/generate/python/phase1-target-detail.md"
+  "references/generate/java/phase1-target-detail.md"
+  "references/generate/go/phase1-target-detail.md"
+)
+
+# E026 (critical): Each phase1-target-detail file must contain sensitive-file exclusion step
+for p1file in "${PHASE1_FILES[@]}"; do
+  check "Sensitive-file exclusion present in '$p1file'" "E026" "critical" \
+    "[ -f '$SKILL_DIR/$p1file' ] && grep -qi 'sensitive' '$SKILL_DIR/$p1file'"
+done
+
+# E027 (critical): spoke-expand.md must contain Context7 sanitization (allowlist or sanitiz keyword)
+SPOKE_EXPAND="$SKILL_DIR/references/spoke-expand.md"
+check "Context7 sanitization step present in spoke-expand.md" "E027" "critical" \
+  "[ -f '$SPOKE_EXPAND' ] && grep -qiE 'allowlist|sanitiz' '$SPOKE_EXPAND'"
 
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""

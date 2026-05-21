@@ -42,6 +42,8 @@ Error code taxonomy for `scripts/validate-skill.sh` and `scripts/validate-plugin
 | E023 | validate-skill.sh | critical | Generate spoke missing Run report (companion) in Output table. |
 | E024 | validate-skill.sh | critical | Generate spoke Phase 2 step numbering not monotonically increasing. |
 | E025 | validate-skill.sh | warning | Generate spoke Metrics Update section does not reference pipeline-shared.md. |
+| E026 | critical | Security Hardening | phase1-target-detail file missing sensitive-file exclusion step |
+| E027 | critical | Security Hardening | spoke-expand.md missing Context7 input sanitization step |
 
 ---
 
@@ -363,13 +365,37 @@ These codes verify cross-references between the dashboard template, metrics data
 
 ---
 
+## Domain 9: Security Hardening
+
+> E026–E027
+
+These codes verify that security hardening from S02 (T01 Context7 sanitization, T02 sensitive-file exclusion) cannot silently regress. Checks grep for the security-relevant keywords in the affected files.
+
+### E026 — phase1-target-detail file missing sensitive-file exclusion step
+
+- **Severity:** critical
+- **Scripts:** validate-skill.sh
+- **Check:** Each of the 4 phase1-target-detail files (`references/generate/phase1-target-detail.md`, `references/generate/python/phase1-target-detail.md`, `references/generate/java/phase1-target-detail.md`, `references/generate/go/phase1-target-detail.md`) must contain the keyword `sensitive` (case-insensitive). This keyword appears in the "Step 6: Sensitive file exclusion" block added by S02/T02, which prevents test generation for sensitive files (`.env`, `*.pem`, `*.key`, credentials, etc.). If the keyword is absent, the sensitive-file exclusion step has been removed or corrupted.
+- **Validates:** `references/generate/*/phase1-target-detail.md` sensitive-file exclusion presence
+- **Remediation:** Restore the "Step 6: Sensitive file exclusion" block to the affected file. Copy the canonical content from `references/generate/phase1-target-detail.md`. The step must define a sensitive filename pattern list and reject matching paths with a clear error message.
+
+### E027 — spoke-expand.md missing Context7 input sanitization step
+
+- **Severity:** critical
+- **Scripts:** validate-skill.sh
+- **Check:** `references/spoke-expand.md` must contain either `allowlist` or `sanitiz` (case-insensitive) within its Phase 3 Execution section. These keywords appear in the "Step 0: Sanitize framework name" block added by S02/T01, which validates Context7 framework name inputs against a known allowlist before passing them to the external `resolve_library()` API. If neither keyword is present, the sanitization step has been removed or corrupted.
+- **Validates:** `references/spoke-expand.md` Context7 input sanitization presence
+- **Remediation:** Restore the "Step 0: Sanitize framework name" block to spoke-expand.md's Phase 3 Execution section, inserted before the existing Step 1 (Resolve library ID). The step must define an allowlist of known framework names, normalize input, and gate the `resolve_library()` call.
+
+---
+
 ## Usage in Validation Scripts
 
 The two validation scripts use this error code taxonomy as follows:
 
 ### validate-skill.sh
 
-Runs 8 domains (Domains 1–8). Does not include E004b, E012b, E012c, E012d which are unique to this script. Uses stricter E017 bounds (200–310 lines).
+Runs 9 domains (Domains 1–9). Does not include E004b, E012b, E012c, E012d which are unique to this script. Uses stricter E017 bounds (200–310 lines).
 
 1. **Load** the error code catalog from `references/error-codes.md`.
 2. **Run checks sequentially** by domain:
@@ -381,6 +407,7 @@ Runs 8 domains (Domains 1–8). Does not include E004b, E012b, E012c, E012d whic
    - Domain 6: Template Completeness (E013)
    - Domain 7: SKILL.md Integrity (E015–E017, bounds 200–310)
    - Domain 8: Generate Spoke Behavioral Consistency (E022–E025)
+   - Domain 9: Security Hardening (E026–E027)
 3. **Report each finding** using the error code, e.g.: `E007 (critical): detection-engine.md contains Phase 3 heading`.
 4. **Exit with code 0** if no critical errors are found (warnings such as E017 are logged but do not block).
 5. **Exit with code 1** if any critical error is found.
