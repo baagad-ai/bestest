@@ -420,3 +420,50 @@ Runs 8 domains (Domains 1–8). Does not include E004b, E012b–E012d. Uses rela
 - Dashboard template: `references/templates/dashboard.html`
 - Init spoke: `references/spoke-init.md`
 - Directory schema: `references/dot-bestest-schema.md`
+
+---
+
+## Error Envelope Specification
+
+A machine-readable JSON envelope that CI automation, tooling consumers, and downstream pipelines can parse programmatically. This section defines the contract; actual emission by validation scripts is a future capability.
+
+### JSON Schema
+
+```json
+{
+  "schema": "bestest-error-envelope/v1",
+  "timestamp": "ISO-8601",
+  "correlationId": "unique-run-identifier",
+  "code": "E-code (e.g. E007)",
+  "severity": "critical | warning | info",
+  "domain": "domain-name (e.g. detection-engine)",
+  "message": "human-readable summary",
+  "file": "affected file path or null",
+  "remediation": "one-line fix guidance or null"
+}
+```
+
+### Field Definitions
+
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `schema` | string | No | Envelope version identifier. Enables future schema evolution without breaking consumers. Must follow the pattern `bestest-error-envelope/vN`. |
+| `timestamp` | string | No | ISO-8601 timestamp of when the error was produced (e.g. `2025-06-15T14:32:01Z`). |
+| `correlationId` | string | No | Unique identifier linking all errors from a single validation run. Allows grouping related findings across domains. |
+| `code` | string | No | Error code from the taxonomy above (e.g. `E007`, `E022`). |
+| `severity` | enum | No | One of `critical`, `warning`, or `info`. Maps to the severity definitions in the table at the top of this document. |
+| `domain` | string | No | Human-readable domain name matching the domain sections above (e.g. `detection-engine`, `routing-index`, `schema-coverage`). |
+| `message` | string | No | Human-readable summary of what failed and why. Intended for log files and developer review. |
+| `file` | string | Yes | File path of the affected artifact relative to the skill root, or `null` if the error is not file-specific. |
+| `remediation` | string | Yes | One-line guidance on how to fix the issue, or `null` if no single-line fix applies. |
+
+### Design Notes
+
+1. **All fields are required except `file` and `remediation`**, which are nullable. Consumers must handle `null` values gracefully.
+2. **`schema` enables future versioning.** When the envelope shape changes, a new schema version (e.g. `bestest-error-envelope/v2`) is introduced. Consumers must check `schema` before processing.
+3. **`correlationId` links to the validation run.** All errors emitted during a single `validate-skill.sh` or `validate-plugin.sh` invocation share the same `correlationId`, enabling grouped analysis and deduplication.
+4. **Consumers must ignore unknown fields** for forward compatibility. New fields may be added in future schema versions without a major version bump; unknown keys should be passed through silently.
+
+### Usage
+
+This specification serves as the **contract definition** for structured error output. Validation scripts (`validate-skill.sh`, `validate-plugin.sh`) will emit this envelope when machine-readable output is requested via a future `--json` or `--machine-readable` flag. Currently, scripts produce human-readable console output referencing the error codes defined above. When the machine-readable mode is implemented, each finding will be serialized as a single JSON line conforming to this envelope, with one JSON object per line (NDJSON) to support streaming consumption in CI pipelines.
