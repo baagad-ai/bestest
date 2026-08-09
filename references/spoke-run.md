@@ -1454,7 +1454,7 @@ Compute aggregate summary fields from the parsed test results:
 
 Fully populated run-results.json object in memory, ready for disk writing.
 
-> **Human review gate:** Before writing the run results artifact, present a brief summary of the test run to the user. Include: total tests run, pass/fail/skip counts, total duration, coverage delta (if coverage enabled — show before/after percentage), and any flaky tests detected. Wait for user acknowledgment before writing the report file.
+> **Lightweight confirmation (not a HITL gate):** `run` is classified as a read-only command in SKILL.md's principle 4 and does NOT use the mutating-command HITL gates. Before writing the run results artifact, optionally present a one-line summary (total tests, pass/fail/skip, duration) for the user's awareness. This is informational only — do not block on acknowledgment in non-interactive/CI contexts. If the user has not requested confirmation, write the report immediately.
 
 ---
 
@@ -1499,6 +1499,8 @@ Write the run report to disk, update config state, and print a console summary.
    - Timestamp format: `YYYYMMDDTHHmmssZ` (compact ISO 8601, e.g., `run-20240715T143045Z.json`)
    - Ensure the `.bestest/reports/` directory exists before writing.
    - **Never overwrite or delete existing reports.** All prior reports are preserved for trend analysis. If a report with the same timestamp exists (extremely unlikely), append a `-2` suffix.
+
+   **Apply run-report rotation** — Before writing, enforce `reports.max_retained` (default: 50) on `run-*.json` files (same policy as spoke-scan Phase 7 Step 7). If `run-*.json` count already exceeds the limit, delete the oldest (count − max_retained) files so the directory stays bounded. This prevents unbounded growth now that run reports are produced by `run`, `scan` (companion), and `generate` (companion).
 
 3. **Update config state** — Write the run timestamp to `.bestest/config.yaml`:
 
@@ -1815,8 +1817,11 @@ Follow this protocol on every invocation:
 2. Parse as JSON
 3. If parse fails (corruption):
    a. Log warning: "metrics.json corrupted — recreating with defaults"
-   b. Initialize fresh metrics with schemaVersion "1.0" and default values
-   c. Continue with step 5 (do NOT abort the spoke)
+   b. Backup the corrupt file: `cp .bestest/state/metrics.json .bestest/state/metrics.json.corrupt.$(date +%s)`
+      - Log the backup path so agents can locate it for forensic inspection
+      - This must happen BEFORE recreating defaults to preserve evidence
+   c. Initialize fresh metrics with schemaVersion "1.0" and default values
+   d. Continue with step 5 (do NOT abort the spoke)
 4. Validate schemaVersion — warn if MAJOR differs, proceed if MINOR differs
 5. Merge spoke-specific data:
    - Update lastUpdated to current ISO 8601 timestamp
@@ -1871,17 +1876,17 @@ The run report feeds into the fix, coverage, and report spokes. This section doc
 
 ### Fix Spoke Expectations
 
-The fix spoke (`workflows/spoke-fix.md`) expects the following from the run report:
+The fix spoke (`references/spoke-fix.md`) expects the following from the run report:
 
 1. **The `errors` array contains actionable failure data** — each failed test has `filePath`, `testName`, and `message` populated.
 2. **`tests[].cases[]` provides per-test detail** — the fix spoke reads error messages at the individual test level to generate targeted fixes.
 3. **`framework.name` determines fix strategy** — Vitest, Jest, pytest, JUnit 5 (via Gradle/Maven), and Go testing have different APIs for mocking, assertions, and lifecycle hooks. The fix spoke uses this field to emit correct syntax.
 4. **`language` field determines language-specific fix patterns** — Python tests use different import patterns, assertion styles, and fixture mechanisms than JavaScript/TypeScript tests.
-4. **Multiple run reports enable flaky detection** — the fix spoke can compare consecutive run results to identify tests that pass sometimes and fail sometimes (flaky behavior).
+5. **Multiple run reports enable flaky detection** — the fix spoke can compare consecutive run results to identify tests that pass sometimes and fail sometimes (flaky behavior).
 
 ### Coverage Spoke Expectations
 
-The coverage spoke (`workflows/spoke-coverage.md`) expects:
+The coverage spoke (`references/spoke-coverage.md`) expects:
 
 1. **`coverage.collected` is `true`** — if false, the coverage spoke falls back to the most recent scan report for coverage data.
 2. **`coverage` field follows the Istanbul metric shape** — `lines`, `branches`, `functions`, `statements` each with `total`, `covered`, `pct`.
@@ -1889,7 +1894,7 @@ The coverage spoke (`workflows/spoke-coverage.md`) expects:
 
 ### Report Spoke Expectations
 
-The report spoke (`workflows/spoke-report.md`) expects:
+The report spoke (`references/spoke-report.md`) expects:
 
 1. **Multiple run reports exist** for trend analysis — the report spoke reads all `run-*.json` files from `.bestest/reports/`.
 2. **Each report is self-contained** — no cross-references to other files needed to render a single run's results.
@@ -1905,7 +1910,6 @@ Downstream spokes are invoked as:
 /bestest fix <test-path>              # Fix a specific failing test
 /bestest coverage                     # Analyze coverage gaps using latest run data
 /bestest report                       # Generate a summary report from run history
-/bestest report --since <date>        # Generate report for a time range
 ```
 
 Each invocation reads the most recent run-results.json from `.bestest/reports/` to determine current state.

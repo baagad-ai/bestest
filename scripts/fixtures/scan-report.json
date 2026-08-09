@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "1.2",
+  "timestamp": "2026-05-01T14:30:45.123Z",
+  "configSnapshot": {
+    "framework": "vitest",
+    "language": "typescript",
+    "version": "1.0",
+    "coverage": {
+      "enabled": true,
+      "target": 80,
+      "provider": "v8"
+    },
+    "paths": {
+      "test": "**/*.{test,spec}.{ts,tsx}",
+      "src": "src/**/*.{ts,tsx}",
+      "ignore": ["**/node_modules/**", "**/dist/**", "**/.bestest/**"]
+    },
+    "e2e": {
+      "enabled": false,
+      "framework": null
+    },
+    "api": {
+      "enabled": false,
+      "framework": null,
+      "base_url": "http://localhost:3000"
+    },
+    "mutation": {
+      "enabled": false
+    },
+    "contract": {
+      "enabled": false
+    },
+    "chaos": {
+      "enabled": false
+    },
+    "performance": {
+      "enabled": false
+    },
+    "ci": {
+      "enabled": true,
+      "provider": "github-actions"
+    },
+    "monorepo": {
+      "detected": false,
+      "tool": null
+    },
+    "generation": {
+      "quality_threshold": 0.7,
+      "verify_compilation": true,
+      "verify_pass": true,
+      "max_retries": 2
+    },
+    "reports": {
+      "max_retained": 50
+    },
+    "state": {
+      "last_scan": "2026-05-01T14:30:45.123Z",
+      "last_generate": null,
+      "last_run": null,
+      "last_doctor": null,
+      "version": "1.0"
+    }
+  },
+  "summary": {
+    "totalTests": 142,
+    "totalTestFiles": 18,
+    "passed": 135,
+    "failed": 3,
+    "skipped": 4,
+    "testTypes": {
+      "unit": 14,
+      "integration": 2,
+      "e2e": 1,
+      "snapshot": 1
+    }
+  },
+  "coverage": {
+    "lines": { "total": 1842, "covered": 1523, "pct": 82.7 },
+    "branches": { "total": 312, "covered": 234, "pct": 75.0 },
+    "functions": { "total": 198, "covered": 167, "pct": 84.3 },
+    "statements": { "total": 2104, "covered": 1756, "pct": 83.5 }
+  },
+  "antiPatterns": [
+    {
+      "file": "src/utils/format.test.ts",
+      "pattern": "sleep-based-waits",
+      "line": 42,
+      "severity": "high",
+      "description": "Uses await sleep(2000) instead of waitFor."
+    }
+  ],
+  "flakyTests": [
+    {
+      "path": "src/services/payment.test.ts",
+      "name": "Payment Service > processPayment > handles timeout",
+      "signals": ["uncontrolled-time", "network-calls"],
+      "riskLevel": "high"
+    }
+  ],
+  "gaps": [
+    {
+      "sourcePath": "src/services/payment.ts",
+      "hasTest": false,
+      "coverage": 0,
+      "priority": "critical",
+      "reason": "No test file. Imported by 6 modules."
+    }
+  ],
+  "testInventory": [
+    {
+      "path": "src/utils/format.test.ts",
+      "type": "unit",
+      "tests": 12,
+      "status": "passed",
+      "lastRun": "2026-05-01T14:30:45.123Z"
+    }
+  ]
+}

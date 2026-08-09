@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-05-01T14:30:45.123Z",
+  "healthScore": 93,
+  "status": "Excellent",
+  "indicator": "🟢",
+  "dimensions": {
+    "framework-version": {
+      "id": "framework-version",
+      "label": "Framework Version",
+      "status": "scored",
+      "score": 100,
+      "weight": 1.0,
+      "note": "vitest@1.6.0 — current with latest release",
+      "remediation": null
+    },
+    "config-validity": {
+      "id": "config-validity",
+      "label": "Config Validity",
+      "status": "scored",
+      "score": 100,
+      "weight": 1.5,
+      "note": "All required and optional fields present.",
+      "remediation": null
+    }
+  },
+  "remediation": [
+    {
+      "priority": 1,
+      "dimension": "coverage-trend",
+      "action": "Collect coverage data to score the coverage trend dimension.",
+      "command": "/bestest run --coverage"
+    }
+  ],
+  "configSnapshot": {
+    "framework": "vitest",
+    "language": "typescript",
+    "version": "1.0"
+  },
+  "skippedFiles": []
+}

@@ -99,10 +99,11 @@ If Context7 is unavailable or returns no results:
 ## Static Reference Files
 
 These encode stable principles that don't change with framework versions:
-- `references/testing-strategies.md` — Testing model selection
-- `references/anti-patterns.md` — Test smell catalog
-- `references/coverage-standards.md` — Coverage targets by criticality
+- `references/anti-patterns.md` — Test smell catalog (20+ patterns with detection methods)
 - `references/ci-patterns.md` — CI pipeline design patterns
-- `references/ai-generation-guide.md` — AI test generation principles
+- `references/ai-generation-guide.md` — AI test generation principles (JS/TS)
+- `references/python-generation-guide.md` — pytest generation principles
+- `references/go-generation-guide.md` — Go testing generation principles
+- `references/framework-decisions.md` — Framework decision tree summaries
 
 </context7_helper>

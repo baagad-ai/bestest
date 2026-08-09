@@ -7,11 +7,19 @@ On-demand sub-file for `spoke-generate-python.md`. Contains compilation verifica
 ## Execution
 
 ```
-# Global iteration budget check
-global_iterations += 1
-if global_iterations > generation.max_iterations (default: 10):
-  Emit diagnostic summary (see Global Iteration Budget in references/generate/pipeline-shared.md).
-  Halt. Do not proceed with this phase.
+# Two-tier iteration budget check (see Global Iteration Budget in references/generate/pipeline-shared.md)
+# Tier 1 — per-file retry depth
+file_iterations[<test-file>] += 1
+if file_iterations[<test-file>] > generation.max_retries_per_file (default: 5):
+  Print: "Per-file retry budget exhausted for {file} ({max_retries_per_file} iterations)."
+  Defer the file. Move to next file.
+  Return to the generation loop (Phase 1).
+
+# Tier 2 — file-processing breadth (maintained by the generation loop between files)
+# If files_processed >= generation.max_files (default: 50), break out of the generation loop
+# and emit the diagnostic summary.
+
+# Legacy compatibility: if only generation.max_iterations is set, both tiers inherit its value.
 
 # Recompilation guard
 if generation.recompilation_guard is true:
@@ -51,7 +59,7 @@ When compilation/collection fails, analyze errors and apply common fixes:
 | `NameError: name 'pytest' is not defined` | Add `import pytest` at the top of the file. |
 | Missing `conftest.py` fixture | If test references a fixture that doesn't exist, define it locally in the test file. |
 | `@pytest.mark.asyncio` not recognized | Verify `pytest-asyncio` is installed. If missing, note it; if present, check `asyncio_mode` config. |
-| Missing dependency type | Note missing package, do not install automatically. |
+| Missing dependency type | Check whether the missing package is a test-only dependency. With user approval (HITL), install it: `pip install <package>` (into the active venv). If the user declines, note the missing package in the quality report and continue — do NOT auto-install without approval. |
 
 ## Fix loop
 

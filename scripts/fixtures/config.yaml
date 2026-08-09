@@ -1,0 +1,91 @@
+# .bestest/config.yaml — Canonical fixture for contract validation
+framework: vitest
+language: typescript
+version: "1.0"
+
+coverage:
+  enabled: true
+  target: 80
+  provider: v8
+  reporters:
+    - text
+    - html
+    - json-summary
+
+paths:
+  test: "**/*.{test,spec}.{ts,tsx}"
+  src: "src/**/*.{ts,tsx}"
+  ignore:
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/.bestest/**"
+
+e2e:
+  enabled: false
+  framework: null
+  config_path: null
+
+flaky:
+  retries: 2
+
+api:
+  enabled: false
+  framework: null
+  base_url: "http://localhost:3000"
+
+mutation:
+  enabled: false
+
+contract:
+  enabled: false
+
+chaos:
+  enabled: false
+
+performance:
+  enabled: false
+
+ci:
+  enabled: true
+  provider: github-actions
+  junit:
+    enabled: true
+    outputPath: ".bestest/reports/junit-report.xml"
+
+vitest:
+  config_path: vitest.config.ts
+  globals: false
+  environment: node
+
+monorepo:
+  detected: false
+  tool: null
+
+generation:
+  quality_threshold: 0.7
+  verify_compilation: true
+  verify_pass: true
+  max_retries: 2
+  max_files: 50
+  max_retries_per_file: 5
+  recompilation_guard: true
+  parallel:
+    enabled: true
+    min_targets: 5
+    group_size: 5
+    depth_limit: 1
+
+reports:
+  max_retained: 50
+
+state:
+  last_scan: null
+  last_generate: null
+  last_run: null
+  last_doctor: null
+  last_fix: null
+  last_report: null
+  last_metrics: null
+  init_type: "greenfield"
+  existing_frameworks_preserved: []
+  version: "1.0"

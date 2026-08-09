@@ -20,9 +20,16 @@ Run these checks before starting any detection work. They guard against invalid 
 
 ```
 If .bestest/ exists:
-  Print: "A .bestest/ directory already exists. This suggests testing infrastructure has been set up before."
-  Print: "Run /bestest doctor to validate your existing setup, or delete .bestest/ to start fresh."
-  Exit. No files created or modified.
+  If --force (or --reinit) was provided:
+    Print: "⚠ --force provided. Reinitializing — removing existing .bestest/ and regenerating."
+    Proceed to Step 2. (Existing state, reports, and TESTING.md will be lost. The old .bestest/
+    directory is preserved at .bestest.bak-<timestamp> before removal for safety.)
+    Create the backup: cp -r .bestest .bestest.bak-$(date +%s)
+  Else:
+    Print: "A .bestest/ directory already exists. This suggests testing infrastructure has been set up before."
+    Print: "Run /bestest doctor to validate your existing setup, or run /bestest init --force to reinitialize,"
+    Print: "or delete .bestest/ to start fresh."
+    Exit. No files created or modified.
 ```
 
 ### 2. Check for project manifest
@@ -169,6 +176,7 @@ Generate an Architecture Decision Record at `.bestest/adrs/ADR-001-test-framewor
 | .bestest/state/stack-profile.json | Detected stack profile |
 | .bestest/state/.metrics.lock | Advisory lock file for metrics.json concurrency control |
 | .bestest/reports/ | Directory for scan and coverage reports |
+| .bestest/dashboard.html | Self-contained health dashboard (reads metrics.json; renders health gauges, coverage trends, flaky alerts) |
 | TESTING.md | Living test documentation (repo root) |
 | [vitest.config.ts or jest.config.ts] | Framework configuration (repo root) |
 ```

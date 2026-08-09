@@ -91,8 +91,11 @@ Follow this protocol on every invocation:
 2. Parse as JSON
 3. If parse fails (corruption):
    a. Log warning: "metrics.json corrupted — recreating with defaults"
-   b. Initialize fresh metrics with schemaVersion "1.0" and default values
-   c. Continue with step 5 (do NOT abort the spoke)
+   b. Backup the corrupt file: `cp .bestest/state/metrics.json .bestest/state/metrics.json.corrupt.$(date +%s)`
+      - Log the backup path so agents can locate it for forensic inspection
+      - This must happen BEFORE recreating defaults to preserve evidence
+   c. Initialize fresh metrics with schemaVersion "1.0" and default values
+   d. Continue with step 5 (do NOT abort the spoke)
 4. Validate schemaVersion — warn if MAJOR differs, proceed if MINOR differs
 5. Merge spoke-specific data:
    - Update lastUpdated to current ISO 8601 timestamp
@@ -178,7 +181,7 @@ Process files in descending score order.
 ### Language Deltas
 
 - **Go:** Adds `if has exported interface types: score += 5`. Uses "packages" instead of "files" in the `imported by` line.
-- **Java:** Adds `if has exported interface types: score += 5`. Uses same wording as JS/TS canonical version.
+- **Java:** Uses `if has Spring annotations: score += 5` (not "exported interface types") and `if imported by 10+ classes: score += 15` (not the canonical "5+ files"). Matches `references/generate/java/phase1-target-detail.md`.
 
 ---
 
@@ -331,7 +334,9 @@ Present the generation results to the user for review before committing.
 
 **Summary sections:** Files Generated (test count + quality score per file), Coverage Delta (before → after per source), Quality Scores (average/high/low), Flagged Items (below threshold, anti-patterns), Source Behavior Notes (source bugs discovered).
 
-**Auto-commit criteria** (write to disk when ALL met): Score ≥ 70 for every file, all tests pass, no critical/high anti-patterns, all flakiness tests stable (5/5). Files scoring 50-69: write but flag. Files scoring < 50 or with compilation/execution failures: do not commit, present for manual review.
+**Auto-commit criteria** (write to disk when ALL met): Score ≥ `quality_threshold × 100` (default 70) for every file, all tests pass, no critical/high anti-patterns, all flakiness tests stable (5/5). Files scoring below the threshold but ≥ threshold − 20: write but flag. Files scoring below `threshold − 20` or with compilation/execution failures: do not commit, present for manual review.
+
+> **Quality-scale rule:** All quality scores are on a **0–100 scale** everywhere in the skill. The `generation.quality_threshold` config field (0–1) is converted at the gate: `threshold_pts = quality_threshold × 100`. Never compare a 0–1 score against the 0–100 rubric directly. Parallel-dispatch worker self-assessments MUST report 0–100 (see parallel-dispatch.md) so merged gates compare consistently.
 
 > **Clarification:** "Auto-commit" means writing generated test files to the filesystem. **Git commits are never made automatically.** All file writes pass through the HITL gate where the user explicitly approves.
 
@@ -339,7 +344,7 @@ Present the generation results to the user for review before committing.
 
 ### Language Deltas
 
-- **Java / Go:** These spokes use condensed wording for the auto-commit criteria (e.g., "Write-to-disk criteria:" instead of "Auto-commit criteria (write to disk when ALL met):") and omit the clarification paragraph. The behavioral logic is identical.
+- **Java / Go:** These spokes use condensed wording for the auto-commit criteria ("Write-to-disk criteria:") and omit the clarification paragraph. Both use the threshold-driven gate (`quality_threshold × 100`, default 70). **Go adds one extra criterion** — `(5) no races` — reflecting `go test -race` verification; the other three languages do not have a race criterion. The gate behavior is otherwise identical.
 
 ---
 
@@ -372,7 +377,7 @@ Update .bestest/config.yaml:
 
 ### Language Deltas
 
-- **Java:** The Java spoke does not include this update block explicitly in its Output section. However, the config state update behavior is implicitly expected. Future revisions should add the explicit block for consistency.
+- **Java:** The Java spoke references the shared Config State Update block via the pipeline-shared shared-sections list and documents "Updated config state" in its Output artifact table. No inline duplication needed.
 
 ---
 
@@ -433,7 +438,8 @@ When the iteration budget is exhausted, output the following diagnostic summary:
 
 ```
 === Iteration Budget Exhausted ===
-Budget: {max_iterations} iterations (all consumed)
+Budget: max_files = {max_files} files, max_retries_per_file = {max_retries_per_file} iterations per file
+(Legacy max_iterations: {max_iterations} if set)
 
 Files completed successfully:
   ✅ {file_name} — reached Phase {N}, {iterations_used} iterations
@@ -444,8 +450,9 @@ Files that failed:
 Files deferred (not processed):
   ⏸️ {file_name}
 
-Recommendation: Review failed files above. Re-run with increased max_iterations
-or address the root cause of compilation/execution failures before retrying.
+Recommendation: Review failed files above. Re-run with increased max_files/max_retries_per_file
+(or increased max_iterations for legacy configs) or address the root cause of
+compilation/execution failures before retrying.
 ```
 
 ---
@@ -467,5 +474,6 @@ The generate spoke reads the scan report (produced by `/bestest scan`) and write
 
 ### Language Additions
 
-- **Python / Go:** These spokes additionally list `/bestest run` (Execute the full test suite with unified result capture).
+- **Python / Java / Go:** These spokes additionally list `/bestest run` (Execute the full test suite with unified result capture).
+- **JS/TS:** The JS/TS spoke additionally includes a "What to Run Next" section listing scan, run, coverage, and fix follow-ups.
 - **Java / Go:** These spokes additionally include a **Reference Links** table pointing to language-specific reference files (decision tree, generation guide, config schema, templates).

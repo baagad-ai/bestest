@@ -163,6 +163,23 @@ These codes verify that the detection engine specification (`detection-engine.md
 - **Validates:** `references/detection-engine.md` output structure → `references/detection-signals.md` → `references/stack-profile-schema.md` field completeness
 - **Remediation:** Add the missing section to detection-engine.md, create or restore detection-signals.md, or add the missing field documentation to stack-profile-schema.md.
 
+**Sub-codes (validate-skill.sh only):** `validate-skill.sh` splits E009 into granular sub-codes so a failure names the exact missing piece:
+
+| Sub-code | Check |
+|----------|-------|
+| E009a | detection-engine.md contains an "Output" section heading |
+| E009b | detection-engine.md contains a "Signal Catalog" section |
+| E009c | detection-signals.md exists and is non-empty |
+| E009d | stack-profile-schema.md exists on disk |
+| E009e | stack-profile-schema.md documents `schemaVersion` |
+| E009f | stack-profile-schema.md documents `languages` |
+| E009g | stack-profile-schema.md documents `buildTool` |
+| E009h | stack-profile-schema.md documents `frameworks` |
+| E009i | stack-profile-schema.md documents `testFrameworks` |
+| E009j | stack-profile-schema.md documents `coverage` |
+
+`validate-plugin.sh` reports the same ten checks under the plain code `E009`. Remediage the failing sub-item using the E009 remediation above.
+
 ---
 
 ## Domain 5: Schema Field Coverage
@@ -278,18 +295,58 @@ These codes verify that the main SKILL.md file has valid YAML frontmatter with r
 ### E017 — SKILL.md line count outside bounds
 
 - **Severity:** warning
-- **Scripts:** validate-skill.sh (bounds: 200–310), validate-plugin.sh (bounds: 180–325)
-- **Check:** SKILL.md total line count must fall within the accepted bounds. validate-skill.sh enforces stricter bounds (200–310) optimized for the token budget of skill validation. validate-plugin.sh uses relaxed bounds (180–325) to accommodate structural variation in plugin contexts. A line count outside these ranges suggests content loss from truncation or bloat from duplicate content.
+- **Scripts:** validate-skill.sh (bounds: 200–350), validate-plugin.sh (bounds: 180–325)
+- **Check:** SKILL.md total line count must fall within the accepted bounds. validate-skill.sh enforces bounds (200–350) optimized for the token budget of skill validation. validate-plugin.sh uses relaxed bounds (180–325) to accommodate structural variation in plugin contexts. A line count outside these ranges suggests content loss from truncation or bloat from duplicate content.
 - **Validates:** `SKILL.md` total line count
 - **Remediation:** Investigate whether content was lost or duplicated. Compare against version control history.
 
 ---
 
-## Domain 8: Dashboard & JUnit Cross-Cutting
+## Domain 8 (validate-skill.sh): Generate Spoke Behavioral Consistency
+
+> E022–E025
+
+These codes verify behavioral consistency across the 4 language-specific generate spokes (JS/TS, Python, Java, Go): each must emit a companion run report, document it as an output artifact, keep Phase 2 step numbering monotonic, and delegate its Metrics Update to pipeline-shared.md. These checks run only in validate-skill.sh.
+
+### E022 — Generate spoke missing Write Companion Run Report in Phase 6
+
+- **Severity:** critical
+- **Scripts:** validate-skill.sh
+- **Check:** For each of the 4 generate spoke files (spoke-generate.md, spoke-generate-python.md, spoke-generate-java.md, spoke-generate-go.md), the Phase 6 section must contain a `### Write Companion Run Report` heading between the Phase 6 and Phase 7 boundaries. This ensures all spokes produce companion run reports with structural parity.
+- **Validates:** `references/spoke-generate*.md` → Phase 6 companion report subsection
+- **Remediation:** Add the `### Write Companion Run Report` subsection to the spoke's Phase 6, between the on-demand load paragraph and the Phase 7 separator. Copy the canonical content from spoke-generate.md.
+
+### E023 — Generate spoke missing Run report (companion) in Output table
+
+- **Severity:** critical
+- **Scripts:** validate-skill.sh
+- **Check:** For each of the 4 generate spoke files, the Output artifact table must contain a `Run report (companion)` row. This ensures the companion report is documented as a first-class output artifact across all generate spokes.
+- **Validates:** `references/spoke-generate*.md` → Output artifact table
+- **Remediation:** Add a `Run report (companion)` row to the spoke's Output artifact table, immediately after the "Generated test files" row. Copy the canonical row from spoke-generate.md.
+
+### E024 — Generate spoke Phase 2 step numbering not monotonically increasing
+
+- **Severity:** critical
+- **Scripts:** validate-skill.sh
+- **Check:** For each of the 4 generate spoke files, all `### Step N:` headings within Phase 2 must have strictly increasing N values. JS/TS spokes have 6 steps; Python/Java/Go spokes have 7 steps. Detects step numbering regressions from incorrect edits.
+- **Validates:** `references/spoke-generate*.md` → Phase 2 step headings
+- **Remediation:** Renumber the `### Step N:` headings in the spoke's Phase 2 section so they increase from 1 without gaps or duplicates. Verify against the canonical step count (6 for JS/TS, 7 for Python/Java/Go).
+
+### E025 — Generate spoke Metrics Update section does not reference pipeline-shared.md
+
+- **Severity:** warning
+- **Scripts:** validate-skill.sh
+- **Check:** For each of the 4 generate spoke files, the Metrics Update section must reference `pipeline-shared.md` rather than containing the full inline content. This enforces the single-source-of-truth pattern for shared pipeline sections.
+- **Validates:** `references/spoke-generate*.md` → Metrics Update section → `references/generate/pipeline-shared.md`
+- **Remediation:** Replace the full Metrics Update section with a one-liner reference: `> **Shared section:** See Metrics Update Core in \`references/generate/pipeline-shared.md\`. Ensure the shared content exists in pipeline-shared.md under the heading "Metrics Update Core".
+
+---
+
+## Domain 8 (validate-plugin.sh): Dashboard & JUnit Cross-Cutting
 
 > E018–E021
 
-These codes verify cross-references between the dashboard template, metrics data, spoke initialization, and schema documentation. These checks run only in validate-plugin.sh.
+These codes verify cross-references between the dashboard template, metrics data, spoke initialization, and schema documentation. These checks run only in validate-plugin.sh. (Numbering note: validate-skill.sh's Domain 8 is "Generate Spoke Behavioral Consistency" — E022–E025 — so the domain numbers differ between the two scripts; the E-codes themselves are unique and unambiguous.)
 
 ### E018 — dashboard.html template missing or empty
 
@@ -332,38 +389,6 @@ These codes verify cross-references between the dashboard template, metrics data
 - **Status:** Reserved for future use. Not implemented by any validation script.
 - **Note:** This code slot is available for a future check. Do not assign it without updating this document and implementing the corresponding check in at least one validation script.
 
-### E022 — Generate spoke missing Write Companion Run Report in Phase 6
-
-- **Severity:** critical
-- **Scripts:** validate-skill.sh
-- **Check:** For each of the 4 generate spoke files (spoke-generate.md, spoke-generate-python.md, spoke-generate-java.md, spoke-generate-go.md), the Phase 6 section must contain a `### Write Companion Run Report` heading between the Phase 6 and Phase 7 boundaries. This ensures all spokes produce companion run reports with structural parity.
-- **Validates:** `references/spoke-generate*.md` → Phase 6 companion report subsection
-- **Remediation:** Add the `### Write Companion Run Report` subsection to the spoke's Phase 6, between the on-demand load paragraph and the Phase 7 separator. Copy the canonical content from spoke-generate.md.
-
-### E023 — Generate spoke missing Run report (companion) in Output table
-
-- **Severity:** critical
-- **Scripts:** validate-skill.sh
-- **Check:** For each of the 4 generate spoke files, the Output artifact table must contain a `Run report (companion)` row. This ensures the companion report is documented as a first-class output artifact across all generate spokes.
-- **Validates:** `references/spoke-generate*.md` → Output artifact table
-- **Remediation:** Add a `Run report (companion)` row to the spoke's Output artifact table, immediately after the "Generated test files" row. Copy the canonical row from spoke-generate.md.
-
-### E024 — Generate spoke Phase 2 step numbering not monotonically increasing
-
-- **Severity:** critical
-- **Scripts:** validate-skill.sh
-- **Check:** For each of the 4 generate spoke files, all `### Step N:` headings within Phase 2 must have strictly increasing N values. JS/TS spokes have 6 steps; Python/Java/Go spokes have 7 steps. Detects step numbering regressions from incorrect edits.
-- **Validates:** `references/spoke-generate*.md` → Phase 2 step headings
-- **Remediation:** Renumber the `### Step N:` headings in the spoke's Phase 2 section so they increase from 1 without gaps or duplicates. Verify against the canonical step count (6 for JS/TS, 7 for Python/Java/Go).
-
-### E025 — Generate spoke Metrics Update section does not reference pipeline-shared.md
-
-- **Severity:** warning
-- **Scripts:** validate-skill.sh
-- **Check:** For each of the 4 generate spoke files, the Metrics Update section must reference `pipeline-shared.md` rather than containing the full inline content. This enforces the single-source-of-truth pattern for shared pipeline sections.
-- **Validates:** `references/spoke-generate*.md` → Metrics Update section → `references/generate/pipeline-shared.md`
-- **Remediation:** Replace the full Metrics Update section with a one-liner reference: `> **Shared section:** See Metrics Update Core in \`references/generate/pipeline-shared.md\`. Ensure the shared content exists in pipeline-shared.md under the heading "Metrics Update Core".
-
 ---
 
 ## Domain 9: Security Hardening
@@ -398,23 +423,49 @@ These codes verify that security hardening from S02 (T01 Context7 sanitization, 
 
 ---
 
+## Contract Validation Codes (validate-contracts.sh)
+
+> C001–C030
+
+These codes are emitted by `scripts/validate-contracts.sh`, which validates golden JSON fixtures in `scripts/fixtures/` against the schemas they represent and verifies that every spoke's documented read/write fields exist in the corresponding fixture. This catches behavioral drift — spokes reading field names that the schemas don't define — which the presence-based E-codes cannot detect.
+
+| Code | Severity | Domain | Summary |
+|------|----------|--------|---------|
+| C001 | critical | Fixture Integrity | JSON fixture missing or fails to parse as valid JSON |
+| C002 | critical | schemaVersion Parity | JSON fixture missing its `schemaVersion` field |
+| C003 | critical | schemaVersion Parity | doctor-report fixture missing `healthScore` |
+| C004 | critical | Companion Contract | Companion/full-suite run report fails the `suiteFilter`/`companionTo` contract |
+| C010 | critical | Spoke Field Contracts | status spoke reads a scan/run/doctor field absent from the fixture |
+| C011 | critical | Spoke Field Contracts | report spoke reads a run field absent from the fixture |
+| C012 | critical | Spoke Field Contracts | fix spoke reads a run field absent from the fixture |
+| C013 | critical | Spoke Field Contracts | coverage spoke reads a coverage-report field absent from the fixture |
+| C014 | critical | Spoke Field Contracts | generate spoke reads a scan field absent from the fixture |
+| C015 | critical | Spoke Field Contracts | metrics.json missing a required top-level section |
+| C016 | critical | Spoke Field Contracts | doctor dimensions is not an object keyed by dimension-id |
+| C020 | critical / warning | Companion Filtering | Consumer spoke or data-source-discovery missing companion-filtering keywords |
+| C030 | critical | suiteFilter Semantics | run-report fixture uses an invalid `suiteFilter` value |
+
+**Remediation:** When a C-code fires, either the fixture is stale (regenerate it to match the schema doc) or a spoke reads fields the schema doesn't define (fix the spoke or extend the schema). The fixtures are the executable contract — they encode the schemas exactly, so they are the source of truth for field names.
+
+---
+
 ## Usage in Validation Scripts
 
 The two validation scripts use this error code taxonomy as follows:
 
 ### validate-skill.sh
 
-Runs 9 domains (Domains 1–9). Does not include E004b, E012b, E012c, E012d which are unique to this script. Uses stricter E017 bounds (200–310 lines).
+Runs 9 domains (Domains 1–9). Includes E004b, E012b, E012c, E012d (unique to this script) and the E009a–E009j sub-codes. Uses E017 bounds (200–350 lines).
 
 1. **Load** the error code catalog from `references/error-codes.md`.
 2. **Run checks sequentially** by domain:
    - Domain 1: Routing & Index Consistency (E001–E002)
    - Domain 2: Reference Index & File Existence (E003–E004, E004b)
    - Domain 3: Spoke & Generate File Integrity (E005–E006, E028)
-   - Domain 4: Detection Engine Structure (E007–E009)
+   - Domain 4: Detection Engine Structure (E007–E009, E009a–E009j)
    - Domain 5: Schema Field Coverage (E010–E012, E012b–E012d)
    - Domain 6: Template Completeness (E013)
-   - Domain 7: SKILL.md Integrity (E015–E017, bounds 200–310)
+   - Domain 7: SKILL.md Integrity (E015–E017, bounds 200–350)
    - Domain 8: Generate Spoke Behavioral Consistency (E022–E025)
    - Domain 9: Security Hardening (E026–E027)
 3. **Report each finding** using the error code, e.g.: `E007 (critical): detection-engine.md contains Phase 3 heading`.
@@ -424,7 +475,7 @@ Runs 9 domains (Domains 1–9). Does not include E004b, E012b, E012c, E012d whic
 
 ### validate-plugin.sh
 
-Runs 8 domains (Domains 1–8). Does not include E004b, E012b–E012d. Uses relaxed E017 bounds (180–325 lines).
+Runs 8 domains. Does not include E004b, E012b–E012d, or E022–E025. Uses relaxed E017 bounds (180–325 lines).
 
 1. **Load** the error code catalog from `references/error-codes.md`.
 2. **Run checks sequentially** by domain:

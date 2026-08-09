@@ -20,6 +20,7 @@ Patches (documentation-only changes) do not increment the version.
 | `stack-profile.json` | Top-level `schemaVersion` | `1.3` |
 | `scan-report.json` | Top-level `schemaVersion` | `1.2` |
 | `run-results.json` | Top-level `schemaVersion` | `1.0` |
+| `coverage-report.json` | Top-level `schemaVersion` | `1.0` |
 | `junit-report.xml` | XML declaration + `<testsuites>` root element | `1.0` |
 | `metrics.json` | Top-level `schemaVersion` | `1.0` |
 | `config.yaml` | `version` (top-level) | `1.0` |
@@ -48,6 +49,12 @@ Patches (documentation-only changes) do not increment the version.
 | Version | Date | Change |
 |---------|------|--------|
 | 1.0 | 2025-04 | Initial versioned schema. Added `schemaVersion` field to run-results.json shape. |
+
+#### coverage-report-schema
+
+| Version | Date | Change |
+|---------|------|--------|
+| 1.0 | 2025-05 | Initial schema. Coverage gap analysis report emitted by spoke-coverage. Top-level `schemaVersion`, `timestamp`, `configSnapshot`, `targetComparison`, `gaps[]`, `summary`. |
 
 #### metrics-schema
 
@@ -121,6 +128,6 @@ Every spoke that reads a structured artifact must validate `schemaVersion` befor
 
 ## Cross-Reference
 
-- Schema shapes: `references/stack-profile-schema.md`, `references/scan-report-schema.md`, `references/config-schema.md`, `references/metrics-schema.md`
+- Schema shapes: `references/stack-profile-schema.md`, `references/scan-report-schema.md`, `references/config-schema.md`, `references/metrics-schema.md`, run-results shape in `references/spoke-run.md` (Phase 4), coverage-report shape in `references/spoke-coverage.md` (Phase 5), junit-report shape in `references/spoke-run.md` (JUnit XML emission)
 - Consuming spokes: `references/spoke-scan.md`, `references/spoke-run.md`, `references/spoke-generate.md`, `references/spoke-fix.md`, `references/spoke-coverage.md`, `references/spoke-doctor.md`, `references/spoke-config.md`
 - Prompt injection defense: `references/context3-helper.md` (L4 schema validation)

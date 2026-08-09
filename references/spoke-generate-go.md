@@ -15,7 +15,7 @@ The generate spoke is the primary value delivery command — it transforms scan 
 - Scan report with `gaps[]` and `testInventory[]` arrays (run `/bestest scan` first for optimal targeting)
 - Scan report is not strictly required — the spoke can generate in degraded mode without it, using filesystem scanning instead of gap targeting
 
-> **Shared pipeline:** This spoke implements the 7-phase generation pipeline. Shared sections (Parallel Dispatch Decision, Pre-read Instruction, Content Boundary Notice, Source Sanitization Protocol, Taint Notice, Graceful Fallback, HITL Gate, Error Handling, Config State Update, Downstream Reference) are defined in `references/generate/pipeline-shared.md`. Only language-specific phases and deltas are documented below. The Pipeline Skeleton in pipeline-shared.md defines the canonical 7-phase structure every generate spoke follows.
+> **Shared pipeline:** This spoke implements the 7-phase generation pipeline. Shared sections (Parallel Dispatch Decision, Priority Scoring Formula, Default Targeting, Strategy Preview Gate, Pre-read Instruction, Content Boundary Notice, Source Sanitization Protocol, Taint Notice, Graceful Fallback, HITL Gate, Error Handling, Config State Update, Downstream Reference) are defined in `references/generate/pipeline-shared.md`. Only language-specific phases and deltas are documented below. The Pipeline Skeleton in pipeline-shared.md defines the canonical 7-phase structure every generate spoke follows.
 
 ## Pre-Flight Checks
 
@@ -81,7 +81,11 @@ Confidence gate: See SKILL.md "Confidence Gate (R5)" — the orchestrator checks
 ### 5. Check for scan report
 
 ```
-If no scan report exists: print warning, set mode = "filesystem-scan", gaps = [].
+If no scan report exists:
+  Check for the most recent coverage-*.json report (from /bestest coverage):
+    If found: print "No scan report found. Using most recent coverage report for gap targeting."
+             extract gaps[] if present, set mode = "coverage-guided".
+    Else: print warning, set mode = "filesystem-scan", gaps = [].
 Else: load most recent report, extract gaps[] and testInventory[], set mode = "scan-guided".
 ```
 
@@ -102,9 +106,9 @@ Determine which source files to generate tests for. Four targeting modes operate
 
 ### Path Validation (condensed)
 
-Validate every user-supplied path with 5 ordered checks: (1) traversal rejection (reject `..` or leading `/`), (2) canonicalize via `filepath.EvalSymlinks` + `filepath.Clean`, (3) boundary check (must be within project root), (4) existence check, (5) file type check (`*.go`). All five must pass before entering targeting modes.
+Validate every user-supplied path with 6 ordered checks: (1) traversal rejection (reject `..` segments or leading `/`), (2) canonicalize via `filepath.EvalSymlinks` + `filepath.Clean`, (3) boundary check (must be within project root, prefix-collision-safe), (4) existence check, (5) file type check (`*.go`), (6) sensitive-file exclusion. All six must pass before entering targeting modes.
 
-> **On-demand load:** For the complete 5-step validation algorithm with code examples, detailed targeting mode logic (explicit path, --untested, --type, --critical, default), Go test file naming conventions (white-box vs black-box), and priority scoring formula, read `references/generate/go/phase1-target-detail.md`.
+> **On-demand load:** For the complete 6-step validation algorithm with code examples, detailed targeting mode logic (explicit path, --untested, --type, --critical, default), Go test file naming conventions (white-box vs black-box), and priority scoring formula, read `references/generate/go/phase1-target-detail.md`.
 
 ### Targeting Modes (condensed)
 
@@ -168,11 +172,13 @@ Else:
 
 ### Step 3: Fetch framework documentation via Context7
 
-Use the Context7 helper from SKILL.md to fetch version-specific documentation. For each framework, call `resolve_library({ libraryName, query })` then `get_library_docs({ libraryId, query, tokens })`.
+Use the Context7 helper from `references/context7-helper.md` to fetch version-specific documentation. For each framework, call `resolve_library({ libraryName, query })` then `get_library_docs({ libraryId, query, tokens })`.
+
+> **Sanitization note:** The library names below are static allowlisted values from this spoke — never interpolate user-supplied strings into `libraryName`. If a name is not in the Common Library Mappings table in `references/context7-helper.md`, do not call `resolve_library` with it; fall back to static patterns instead (see Graceful Fallback).
 
 **Fetch targets:**
 - **testify** (libraryName: `"testify"`, query: `"assert require Equal NoError Error Contains mock suite table-driven tests"`, tokens: 5000): Produces version-accurate testify assertion patterns, mock setup, suite patterns, and failure message formatting.
-- **Go testing** (libraryName: `"go"`, query: `"testing.T t.Run t.Helper t.Cleanup t.TempDir t.Setenv table-driven tests subtests"`, tokens: 4000): Standard library testing patterns. Fetched as baseline even when testify is active.
+- **Go testing** (libraryName: `"go testing"`, query: `"testing.T t.Run t.Helper t.Cleanup t.TempDir t.Setenv table-driven tests subtests"`, tokens: 4000): Standard library testing patterns. Fetched as baseline even when testify is active.
 - **Gin** (libraryName: `"gin"`, query: `"gin.TestMode httptest.NewRecorder ServeHTTP testing handlers"`, tokens: 3000): Gin testing patterns with httptest. Only fetched when Gin is detected.
 - **Echo** (libraryName: `"echo"`, query: `"echo.New ServeHTTP httptest.NewRecorder testing handlers"`, tokens: 3000): Echo testing patterns with httptest. Only fetched when Echo is detected.
 - **gomock** (libraryName: `"gomock"`, query: `"gomock.NewController EXPECT mockgen generated mocks"`, tokens: 3000): gomock patterns for type-safe mocking. Only fetched when gomock mocking strategy is selected.
@@ -371,6 +377,7 @@ After execution verification completes (whether tests pass or fail), write a `ru
 **What to include:**
 - `schemaVersion`: "1.0"
 - `timestamp`: Generation completion timestamp
+- `configSnapshot`: Deep snapshot of `.bestest/config.yaml` at generation time (same shape as spoke-run Phase 4)
 - `framework`: From config
 - `language`: From config
 - `suiteFilter`: "generated" (to distinguish from full suite runs)
@@ -379,6 +386,7 @@ After execution verification completes (whether tests pass or fail), write a `ru
 - `tests[]`: Per-file results for generated tests only
 - `coverage`: If collected during verification
 - `errors[]`: Any errors from failed verification runs
+- `raw_output`: Raw framework output when JSON parsing was unavailable, otherwise `null`
 - `companionTo`: "generate" (marks this as generation-related, not a full suite run)
 
 **When to skip:** If `generation.verify_pass` is `false`, or if tests could not be executed (compilation failure), skip writing the companion run report.
@@ -399,7 +407,7 @@ Score each test file on the 0-100 rubric (Assertion Quality 30, Test Structure 2
 
 Summary sections: **Files Generated** (test count + quality score per file), **Coverage Delta** (before → after per source), **Quality Scores** (avg/highest/lowest), **Race Detection** results, **Flagged Items** (below threshold, missing scenarios, anti-patterns), **Source Behavior Notes** (source bugs discovered).
 
-**Write-to-disk criteria:** Write when all conditions met: (1) score ≥ threshold for every file, (2) all tests pass, (3) no critical/high anti-patterns, (4) 5/5 stability, (5) no races. Score 50-69: write but flag. Score <50: do not write, present for review. Compilation/execution failures: do not write, present failure details.
+**Write-to-disk criteria:** Write when all conditions met: (1) score ≥ `quality_threshold × 100` (default 70) for every file, (2) all tests pass, (3) no critical/high anti-patterns, (4) 5/5 stability, (5) no races. Files scoring below threshold but ≥ threshold − 20: write but flag. Files scoring below `threshold − 20`: do not write, present for review. Compilation/execution failures: do not write, present failure details.
 
 **User approval actions:** Approve all, approve specific files, request regeneration, or request manual edit.
 

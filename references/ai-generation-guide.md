@@ -678,12 +678,13 @@ test('test1', () => {
 
 ### Auto-Commit Thresholds
 
+The gate is threshold-driven; `threshold_pts = quality_threshold × 100` (default 70). All scores are on a 0–100 scale.
+
 | Score | Action |
 |-------|--------|
-| **≥ 85** | Auto-commit. High quality, no review needed. |
-| **70-84** | Auto-commit with summary comment listing the quality score. |
-| **50-69** | Present to user for review before committing. Flag specific low-scoring dimensions. |
-| **< 50** | Do not commit. Regenerate or present for manual writing. |
+| **≥ threshold_pts** | Auto-commit. High quality, no review needed. |
+| **threshold_pts − 20 to threshold_pts − 1** | Auto-commit with flag. Present to user with a summary comment listing the quality score. |
+| **< threshold_pts − 20** | Do not commit. Regenerate or present for manual writing. |
 
 ---
 
@@ -728,10 +729,10 @@ Items requiring manual review:
 
 ### Auto-Commit Decision
 
-Based on scores:
-- All tests ≥ 70: **Auto-commit.** Summary displayed for awareness.
-- Any test 50-69: **Auto-commit with flag.** User can review and request regeneration.
-- Any test < 50: **Hold for review.** User must approve before commit.
+Based on scores (0–100 scale; `threshold_pts = quality_threshold × 100`, default 70):
+- All tests ≥ threshold_pts: **Auto-commit.** Summary displayed for awareness.
+- Any test in [threshold_pts − 20, threshold_pts): **Auto-commit with flag.** User can review and request regeneration.
+- Any test < threshold_pts − 20: **Hold for review.** User must approve before commit.
 
 ---
 

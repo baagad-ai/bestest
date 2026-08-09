@@ -62,13 +62,19 @@ If `coverage` section is missing entirely, treat it as default: `coverage.enable
 
 ```
 Priority order for data source selection:
-  1. Most recent run-results.json (from .bestest/reports/run-*.json)
+  1. Most recent NON-companion run-results.json (from .bestest/reports/run-*.json)
      - Must have coverage.collected === true
+     - Exclude companion reports (suiteFilter === "generated" OR companionTo present):
+       these are partial verification runs whose coverage snapshot reflects generated tests only
      - Provides both aggregate metrics and per-file coverage
   2. Most recent scan report (from .bestest/reports/scan-*.json)
      - Contains coverage block and gaps[] from prior scan
      - Provides aggregate metrics, per-file coverage from Phase 3, and pre-computed gaps
-  3. Language-specific raw coverage artifacts (when framework is known from config.yaml):
+  3. Most recent companion run report with coverage.collected === true
+     - Partial snapshot only — warn the user before using it as the coverage baseline:
+       Print: "⚠ Using companion run report (generated-test verification). Coverage reflects generated tests only."
+     - Use only if no full-suite run or scan report exists
+  4. Language-specific raw coverage artifacts (when framework is known from config.yaml):
      - Python (pytest): .bestest/reports/coverage.json (coverage.py JSON from pytest-cov)
      - Java (junit5): build/reports/jacoco/test/jacocoTestReport.xml (Gradle) or
                        target/site/jacoco/jacoco.xml (Maven)
@@ -559,6 +565,7 @@ Write the structured coverage report to disk and print a console summary.
 
    ```json
    {
+     "schemaVersion": "1.0",
      "timestamp": "<ISO 8601 of report completion>",
      "configSnapshot": "<from Phase 1>",
      "targetComparison": "<from Phase 3>",
@@ -584,6 +591,7 @@ Write the structured coverage report to disk and print a console summary.
    ```
 
    Field definitions:
+   - `schemaVersion` (string): Schema version identifier (`"1.0"`). Used by consuming spokes (generate) to detect breaking changes. See `references/schema-contract.md`.
    - `timestamp` (string): ISO 8601 datetime of report generation
    - `configSnapshot` (object): Snapshot of config.yaml at analysis time
    - `targetComparison` (object): Per-metric comparison against targets (from Phase 3)
@@ -699,8 +707,10 @@ The gaps[] array produced in Phase 2 is directly compatible with generate's gap 
 The shape matches exactly: { sourcePath, hasTest, coverage, priority, reason }.
 
 Invoke: /bestest generate {selected-flag}
-The generate spoke reads the most recent report from .bestest/reports/ (which now includes the
-coverage report just written) and proceeds through its 7-phase pipeline.
+The generate spoke reads the most recent scan report from .bestest/reports/ for gap targeting.
+Note: generate does NOT read coverage-*.json directly — it globs scan-*.json (Pre-Flight Check 4).
+When run immediately after /bestest coverage, run /bestest scan first (or use the gaps[] listed
+above as explicit targets) so generate's scan-guided targeting reflects the fresh coverage data.
 ```
 
 ### Data Contract
@@ -908,8 +918,11 @@ Follow this protocol on every invocation:
 2. Parse as JSON
 3. If parse fails (corruption):
    a. Log warning: "metrics.json corrupted — recreating with defaults"
-   b. Initialize fresh metrics with schemaVersion "1.0" and default values
-   c. Continue with step 5 (do NOT abort the spoke)
+   b. Backup the corrupt file: `cp .bestest/state/metrics.json .bestest/state/metrics.json.corrupt.$(date +%s)`
+      - Log the backup path so agents can locate it for forensic inspection
+      - This must happen BEFORE recreating defaults to preserve evidence
+   c. Initialize fresh metrics with schemaVersion "1.0" and default values
+   d. Continue with step 5 (do NOT abort the spoke)
 4. Validate schemaVersion — warn if MAJOR differs, proceed if MINOR differs
 5. Merge spoke-specific data:
    - Update lastUpdated to current ISO 8601 timestamp

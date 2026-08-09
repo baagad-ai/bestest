@@ -49,25 +49,41 @@ Else:
 ### 3. Check for scan reports
 
 ```
-Scan .bestest/reports/ for scan-*.json files.
+Preferred (CLI): if python3 is available:
+  python3 <skill-dir>/scripts/bestest-cli.py report list --kind scan --latest
+  → { latest: { file, data } | null }
+  If latest is non-null, extract fields from latest.data (see below).
+
+Fallback (manual): Scan .bestest/reports/ for scan-*.json files.
 If found:
   Sort by timestamp descending
   Read most recent scan report
-  Extract: timestamp, test_count, source_count, coverage_pct, anti_patterns_count, health_score
-  Set hasScanData = true
+Extract: timestamp, summary.totalTests, summary.totalTestFiles,
+         coverage.lines.pct, coverage.branches.pct,
+         antiPatterns.length, flakyTests[]
+Set hasScanData = true
 Else:
   Set hasScanData = false
 ```
 
+> **Note:** Scan reports contain no top-level `health_score`. Health is reported by the doctor spoke (`healthScore`). For coverage display, use `coverage.lines.pct` (fall back to `coverage.statements.pct` if lines is null).
+
 ### 4. Check for run reports
 
 ```
-Scan .bestest/reports/ for run-*.json files.
+Preferred (CLI): if python3 is available:
+  python3 <skill-dir>/scripts/bestest-cli.py report list --kind run --latest
+  → { latest: { file, data } | null }
+  Exclude latest.data if it is a companion report (suiteFilter: "generated" or companionTo present)
+  — these are partial verification runs from generate/scan, not full-suite results.
+
+Fallback (manual): Scan .bestest/reports/ for run-*.json files.
 If found:
   Sort by timestamp descending
-  Read most recent run report
-  Extract: timestamp, total_tests, passed, failed, skipped, duration_ms
-  Set hasRunData = true
+  Read most recent NON-companion run report
+Extract: timestamp, summary.totalTests, summary.passed, summary.failed,
+         summary.skipped, execution.durationMs
+Set hasRunData = true
 Else:
   Set hasRunData = false
 ```
@@ -79,7 +95,8 @@ Scan .bestest/reports/ for doctor-*.json files.
 If found:
   Sort by timestamp descending
   Read most recent doctor report
-  Extract: timestamp, overall_score, dimensions[]
+  Extract: timestamp, healthScore, status, dimensions (object keyed by
+           dimension-id, each with label, score, weight, status, note)
   Set hasDoctorData = true
 Else:
   Set hasDoctorData = false
@@ -129,11 +146,11 @@ CI:          {ciDetected ? ciProvider : 'not configured'}
 
 If `hasScanData`:
 ```
-  Latest coverage:  {scan.coverage_pct}%
+  Latest coverage:  {scan.coverage.lines.pct}%
   Target:           {config.coverage.target}%
-  Status:           {coverage_pct >= target ? '✓ On target' : '⚠ Below target (gap: {target - coverage_pct}%)'}
-  Source files:     {scan.source_count}
-  Test files:       {scan.test_count}
+  Status:           {scan.coverage.lines.pct >= target ? '✓ On target' : '⚠ Below target (gap: {target - scan.coverage.lines.pct}%)'}
+  Source files:     {scan.summary.totalTestFiles}
+  Test files:       {scan.summary.totalTests}
   Last scan:        {scan.timestamp}
 ```
 
@@ -151,11 +168,11 @@ If NOT `hasScanData`:
 
 If `hasRunData`:
 ```
-  Total:    {run.total_tests}
-  Passed:   {run.passed}  ✓
-  Failed:   {run.failed}  {run.failed > 0 ? '✗' : ''}
-  Skipped:  {run.skipped}
-  Duration: {run.duration_ms / 1000}s
+  Total:    {run.summary.totalTests}
+  Passed:   {run.summary.passed}  ✓
+  Failed:   {run.summary.failed}  {run.summary.failed > 0 ? '✗' : ''}
+  Skipped:  {run.summary.skipped}
+  Duration: {run.execution.durationMs / 1000}s
   When:     {run.timestamp}
 ```
 
@@ -171,16 +188,16 @@ If NOT `hasRunData`:
 ─── Flaky Tests ───
 ```
 
-If `hasScanData` AND `scan.anti_patterns_count` exists:
+If `hasScanData` AND `scan.antiPatterns` exists:
 ```
-  Anti-patterns detected: {scan.anti_patterns_count}
+  Anti-patterns detected: {scan.antiPatterns.length}
 ```
 
-If `hasRunData` AND `run.flaky_tests` exists:
+If `hasScanData` AND `scan.flakyTests` is a non-empty array:
 ```
-  Flaky tests detected:   {run.flaky_tests.length}
+  Flaky tests detected:   {scan.flakyTests.length}
   For each flaky test:
-    - {test_name}: {failure_rate}% failure rate
+    - {test_name}: risk {riskLevel} (signals: {signals joined by ', '})
 ```
 
 If no flaky data:
@@ -222,17 +239,16 @@ If NOT `ciDetected`:
 
 If `hasDoctorData`:
 ```
-  Overall:    {doctor.overall_score}/100
+  Overall:    {doctor.healthScore}/100 ({doctor.status})
   Dimensions:
-    For each dimension:
-      {icon} {name}: {score}/100
+    For each dimension in doctor.dimensions (object keyed by id):
+      {icon} {dimension.label}: {dimension.score}/100
   Last check: {doctor.timestamp}
 ```
 
 Else if `hasScanData`:
 ```
-  Estimated:  {scan.health_score}/100 (from last scan)
-  Run /bestest doctor for a full health check.
+  No doctor data yet. Run /bestest doctor for a full health check.
 ```
 
 Else:
@@ -250,11 +266,9 @@ Else:
 Collect timestamps from all available data sources and display in reverse chronological order:
 
 ```
-  {timestamp}  scan     → {test_count} tests, {coverage_pct}% coverage
-  {timestamp}  run      → {passed}/{total} passed, {duration_ms/1000}s
-  {timestamp}  doctor   → score {overall_score}/100
-  {timestamp}  generate → {files_generated} tests generated
-  {timestamp}  fix      → {tests_fixed} tests fixed
+  {timestamp}  scan     → {summary.totalTests} tests, {coverage.lines.pct}% coverage
+  {timestamp}  run      → {summary.passed}/{summary.totalTests} passed, {execution.durationMs/1000}s
+  {timestamp}  doctor   → score {healthScore}/100
 ```
 
 If no activity:
@@ -277,11 +291,11 @@ Logic for recommendations:
 If NOT hasScanData:
   Print: "→ Run /bestest scan to analyze your test suite"
 
-If hasScanData AND coverage_pct < coverage.target:
-  Print: "→ Run /bestest generate to increase coverage (gap: {target - coverage_pct}%)"
+If hasScanData AND coverage.lines.pct < coverage.target:
+  Print: "→ Run /bestest generate to increase coverage (gap: {target - coverage.lines.pct}%)"
 
-If hasRunData AND run.failed > 0:
-  Print: "→ Run /bestest fix to resolve {run.failed} failing tests"
+If hasRunData AND run.summary.failed > 0:
+  Print: "→ Run /bestest fix to resolve {run.summary.failed} failing tests"
 
 If NOT ciDetected:
   Print: "→ Run /bestest ci to set up CI integration"
@@ -289,8 +303,8 @@ If NOT ciDetected:
 If NOT hasDoctorData:
   Print: "→ Run /bestest doctor for a full infrastructure health check"
 
-If hasDoctorData AND doctor.overall_score < 70:
-  Print: "→ Health score is low ({score}/100). Run /bestest doctor for detailed recommendations."
+If hasDoctorData AND doctor.healthScore < 70:
+  Print: "→ Health score is low ({healthScore}/100). Run /bestest doctor for detailed recommendations."
 
 If all checks pass:
   Print: "✓ All systems healthy. No immediate actions needed."
@@ -382,9 +396,9 @@ Continue with config-only display. Do not exit — partial status is still usefu
 |--------|------------|---------|
 | `config.yaml` | `framework`, `language`, `coverage.target`, `coverage.enabled`, `e2e.*`, `ci.*` | Project configuration display |
 | `stack-profile.json` | `languages[]` | Stack context |
-| `reports/scan-*.json` | `timestamp`, `test_count`, `source_count`, `coverage_pct`, `anti_patterns_count`, `health_score` | Coverage and scan status |
-| `reports/run-*.json` | `timestamp`, `total_tests`, `passed`, `failed`, `skipped`, `duration_ms`, `flaky_tests` | Run results display |
-| `reports/doctor-*.json` | `timestamp`, `overall_score`, `dimensions[]` | Health score display |
+| `reports/scan-*.json` | `timestamp`, `summary.totalTests`, `summary.totalTestFiles`, `coverage.lines.pct`, `antiPatterns`, `flakyTests` | Coverage and scan status |
+| `reports/run-*.json` | `timestamp`, `summary.totalTests`, `summary.passed`, `summary.failed`, `summary.skipped`, `execution.durationMs` | Run results display (non-companion runs only) |
+| `reports/doctor-*.json` | `timestamp`, `healthScore`, `status`, `dimensions` | Health score display |
 | CI files | File existence check | CI status display |
 
 ### Output Data Contracts

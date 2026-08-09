@@ -112,8 +112,8 @@ If score < quality_threshold * 100:
 ### Known Limitation: LLM Self-Evaluation Bias
 
 The quality scoring in this phase is performed by the same LLM agent that generated the tests. Research on LLM self-evaluation consistently shows 15–25% optimism bias when models evaluate their own outputs. This means:
-- Tests scoring 70-75 (near the threshold) may actually be 55-65 quality
-- The ≥70 auto-commit threshold should be treated as a soft gate, not a guarantee
+- Tests scoring 70-75 (near the default threshold) may actually be 55-65 quality
+- The auto-commit threshold (`quality_threshold × 100`) should be treated as a soft gate, not a guarantee
 
 ### Mitigation: Mutation Testing (Optional Phase 7b)
 
@@ -127,20 +127,6 @@ If stryker/stryker-cli is available in the project:
      - Score 40-60%: Tests have gaps. Flag for review.
      - Score < 40%: Tests may be testing mocks, not real code. Flag as low-quality.
   3. Add mutation score to the quality report.
-```
-
-For Python projects using mutation testing:
-```
-If mutmut is available:
-  1. Run: mutmut run
-  2. Apply the same score thresholds as above.
-```
-
-For Go projects:
-```
-If gremlins is available:
-  1. Run: gremlins unleash
-  2. Apply the same score thresholds.
 ```
 
 ### Mitigation: Coverage Delta Verification

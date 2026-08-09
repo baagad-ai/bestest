@@ -2,7 +2,7 @@
 
 ## Purpose
 
-AI-powered JUnit 5 test generation spoke implementing the full 7-phase pipeline for Java/JVM projects. Generates production-quality tests for target source files, ensuring every generated test compiles (via `gradle compileTestJava` or `javac`), passes (via `gradle test` or `mvn test`), covers meaningful behavior, and scores ≥ `quality_threshold` (default 0.7) on the assertion quality audit rubric. Supports targeting specific files, untested classes, code type filtering, and critical-path prioritization.
+AI-powered JUnit 5 test generation spoke implementing the full 7-phase pipeline for Java/JVM projects. Generates production-quality tests for target source files, ensuring every generated test compiles (via `gradle compileTestJava` or `javac`), passes (via `gradle test` or `mvn test`), covers meaningful behavior, and scores ≥ `quality_threshold` (default 0.7) on the assertion quality audit rubric from `references/java-generation-guide.md`. Supports targeting specific files, untested classes, code type filtering, and critical-path prioritization.
 
 The generate spoke is the primary value delivery command — it transforms scan insights into concrete test files. Every test it produces must be a net positive: compiling, passing, contributing real coverage, and free of the anti-patterns cataloged in `references/anti-patterns.md` and the Java-specific anti-patterns described in this spoke.
 
@@ -15,7 +15,7 @@ The generate spoke is the primary value delivery command — it transforms scan 
 - Scan report with `gaps[]` and `testInventory[]` arrays (run `/bestest scan` first for optimal targeting)
 - Scan report is not strictly required — the spoke can generate in degraded mode without it, using filesystem scanning instead of gap targeting
 
-> **Shared pipeline:** This spoke implements the 7-phase generation pipeline. Shared sections (Parallel Dispatch Decision, Priority Scoring Formula, Default Targeting, Pre-read Instruction, Content Boundary Notice, Source Sanitization Protocol, Taint Notice, HITL Gate, Error Handling stub, Config State Update, Downstream Reference) are defined in `references/generate/pipeline-shared.md`. Only language-specific phases and deltas are documented below. The Pipeline Skeleton in pipeline-shared.md defines the canonical 7-phase structure every generate spoke follows.
+> **Shared pipeline:** This spoke implements the 7-phase generation pipeline. Shared sections (Parallel Dispatch Decision, Priority Scoring Formula, Default Targeting, Strategy Preview Gate, Pre-read Instruction, Content Boundary Notice, Source Sanitization Protocol, Taint Notice, HITL Gate, Error Handling stub, Config State Update, Downstream Reference) are defined in `references/generate/pipeline-shared.md`. Only language-specific phases and deltas are documented below. The Pipeline Skeleton in pipeline-shared.md defines the canonical 7-phase structure every generate spoke follows.
 
 ## Pre-Flight Checks
 
@@ -71,8 +71,14 @@ Confidence gate: See SKILL.md "Confidence Gate (R5)" — the orchestrator checks
 
 ```
 If no scan report exists:
-  Print: "Warning: No scan report found. Generation will use filesystem scanning."
-  Set mode = "filesystem-scan", gaps = [], testInventory = [].
+  Check for the most recent coverage-*.json report (from /bestest coverage):
+    If found:
+      Print: "No scan report found. Using most recent coverage report for gap targeting."
+      Extract gaps[] (if present) from the coverage report.
+      Set mode = "coverage-guided".
+    Else:
+      Print: "Warning: No scan report found. Generation will use filesystem scanning."
+      Set mode = "filesystem-scan", gaps = [], testInventory = [].
 Else:
   Load most recent scan report. Extract gaps[], testInventory[], configSnapshot.
   Set mode = "scan-guided".
@@ -94,7 +100,7 @@ If missing → treat as "1.0" legacy.
 
 Determine which source files to generate tests for. Four targeting modes operate with priority ordering: explicit path overrides all other modes. Target file patterns for Java: `src/main/java/**/*.java` excluding `*Test.java`, `*Tests.java`, and files in `generated/`.
 
-**Path validation:** Apply 5-step security validation (traversal rejection → canonicalize → boundary check → existence → file type) to every user-supplied path before targeting mode entry.
+**Path validation:** Apply 6-step security validation (traversal rejection → canonicalize → boundary check → existence → file type → sensitive-file exclusion) to every user-supplied path before targeting mode entry.
 
 **Targeting modes (in priority order):**
 1. **Explicit path `<path>`** — single file or directory. Skip all other modes.
@@ -143,7 +149,9 @@ Else:
 
 ### Step 3: Fetch framework documentation via Context7
 
-Use the Context7 helper from SKILL.md to fetch version-specific documentation. For each framework, call `resolve_library({ libraryName, query })` then `get_library_docs({ libraryId, query, tokens })`.
+Use the Context7 helper from `references/context7-helper.md` to fetch version-specific documentation. For each framework, call `resolve_library({ libraryName, query })` then `get_library_docs({ libraryId, query, tokens })`.
+
+> **Sanitization note:** The library names below are static allowlisted values from this spoke — never interpolate user-supplied strings into `libraryName`. If a name is not in the Common Library Mappings table in `references/context7-helper.md`, do not call `resolve_library` with it; fall back to static patterns instead (see Graceful Fallback).
 
 **Fetch targets:**
 - **JUnit 5** (libraryName: `"junit-jupiter"`, query: `"@Test @ParameterizedTest @Nested @DisplayName @ExtendWith Assertions assertThrows"`, tokens: 5000): Produces version-accurate JUnit 5 patterns for test declarations, parameterized tests, nested classes, and assertion methods.
@@ -311,6 +319,7 @@ After execution verification completes (whether tests pass or fail), write a `ru
 **What to include:**
 - `schemaVersion`: "1.0"
 - `timestamp`: Generation completion timestamp
+- `configSnapshot`: Deep snapshot of `.bestest/config.yaml` at generation time (same shape as spoke-run Phase 4)
 - `framework`: From config
 - `language`: From config
 - `suiteFilter`: "generated" (to distinguish from full suite runs)
@@ -319,6 +328,7 @@ After execution verification completes (whether tests pass or fail), write a `ru
 - `tests[]`: Per-file results for generated tests only
 - `coverage`: If collected during verification
 - `errors[]`: Any errors from failed verification runs
+- `raw_output`: Raw framework output when JSON parsing was unavailable, otherwise `null`
 - `companionTo`: "generate" (marks this as generation-related, not a full suite run)
 
 **When to skip:** If `generation.verify_pass` is `false`, or if tests could not be executed (compilation failure), skip writing the companion run report.
@@ -339,7 +349,7 @@ Score each generated test file against the 0-100 rubric (Assertion Quality 30, T
 
 Present generation results for user review: files generated with test count and quality score, coverage delta (JaCoCo before→after), quality scores (average/highest/lowest), flagged items (below threshold, anti-patterns), source behavior notes.
 
-**Write-to-disk criteria:** Write all tests when every file scores ≥70, all tests pass, no critical/high anti-patterns, and all stability tests pass. Files scoring 50-69: write but flag. Files scoring <50: hold for manual review. Compilation/execution failures after max retries: hold for manual resolution.
+**Write-to-disk criteria:** Write all tests when every file scores ≥ `quality_threshold × 100` (default 70), all tests pass, no critical/high anti-patterns, and all stability tests pass. Files scoring below threshold but ≥ threshold − 20: write but flag. Files scoring below `threshold − 20`: hold for manual review. Compilation/execution failures after max retries: hold for manual resolution.
 
 User may: approve all, approve specific files, request regeneration, or request manual edit.
 

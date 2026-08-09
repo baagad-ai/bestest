@@ -894,12 +894,13 @@ def test_1():
 
 ### Auto-Commit Thresholds
 
+All scores are on a 0–100 scale. `threshold_pts = quality_threshold × 100` (default 70).
+
 | Score | Action |
 |-------|--------|
-| **≥ 85** | Auto-commit. High quality, no review needed. |
-| **70-84** | Auto-commit with summary comment listing the quality score. |
-| **50-69** | Present to user for review before committing. Flag specific low-scoring dimensions. |
-| **< 50** | Do not commit. Regenerate or present for manual writing. |
+| **≥ threshold_pts** | Auto-commit. High quality, no review needed. |
+| **threshold_pts − 20 to threshold_pts − 1** | Auto-commit with summary comment listing the quality score. |
+| **< threshold_pts − 20** | Do not commit. Regenerate or present for manual writing. |
 
 ---
 

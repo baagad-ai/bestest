@@ -4,6 +4,7 @@
 # Monorepo tool: {{monorepo_tool}}
 
 framework: vitest
+language: typescript
 version: "1.0"
 
 # Coverage collection settings
@@ -31,6 +32,11 @@ paths:
 e2e:
   enabled: {{e2e_enabled}}
   framework: {{e2e_framework}}
+  # config_path: playwright.config.ts  # uncomment when E2E is enabled
+
+# Flaky-test retry policy for generated CI pipelines and E2E suites
+flaky:
+  retries: 2
 
 # CI/CD pipeline integration
 ci:

@@ -64,6 +64,15 @@ End-to-end testing settings.
 |-------|------|---------|--------------|-------------|
 | `e2e.enabled` | boolean | `false` | `true`, `false` | Enable E2E test scaffolding |
 | `e2e.framework` | string or null | `null` | `playwright`, `cypress`, `null` | E2E test framework. `null` for API-only projects. |
+| `e2e.config_path` | string or null | `null` | Path string | Path to the E2E framework config file (e.g., `playwright.config.ts`). Referenced by spoke-expand when enabling existing E2E config. |
+
+### `flaky.*`
+
+Flaky-test retry policy used by CI pipeline generation.
+
+| Field | Type | Default | Valid Values | Description |
+|-------|------|---------|--------------|-------------|
+| `flaky.retries` | integer | `2` | 0–10 | Retry count for flaky test stages in generated CI pipelines (Medium + Slow stages) and E2E suites. Consumed by spoke-ci, ci-patterns, and spoke-explain. |
 
 ### `api.*`
 
@@ -72,7 +81,7 @@ API testing settings. Used for HTTP-level integration tests against REST or Grap
 | Field | Type | Default | Valid Values | Description |
 |-------|------|---------|--------------|-------------|
 | `api.enabled` | boolean | `false` | `true`, `false` | Enable API test type |
-| `api.framework` | string or null | `null` | `supertest`, `msw`, `null` | API testing framework |
+| `api.framework` | string or null | `null` | `supertest`, `msw`, `httpx`, `requests`, `mockmvc`, `webtestclient`, `httptest`, `bufconn`, `null` | API testing framework. Valid values are language-dependent: JS/TS → `supertest`/`msw`; Python → `httpx`/`requests`; Java → `mockmvc`/`webtestclient`; Go → `httptest`/`bufconn`. |
 | `api.base_url` | string | `"http://localhost:3000"` | Any URL | Default base URL for API tests |
 
 ### `mutation.*`
@@ -265,14 +274,16 @@ Test generation behavior settings.
 
 | Field | Type | Default | Valid Values | Description |
 |-------|------|---------|--------------|-------------|
-| `generation.quality_threshold` | number | `0.7` | 0–1 | Minimum quality score for generated tests (agent self-assessment) |
+| `generation.quality_threshold` | number | `0.7` | 0–1 | Minimum quality gate for generated tests, normalized 0–1. Converted at the gate: `threshold_pts = quality_threshold × 100` (default 70 on the 0–100 rubric). |
 | `generation.verify_compilation` | boolean | `true` | `true`, `false` | Run type-check after generation |
 | `generation.verify_pass` | boolean | `true` | `true`, `false` | Run tests after generation to verify they pass |
 | `generation.max_retries` | number | `2` | 0–5 | Maximum retry attempts when generated tests fail verification |
-| `generation.max_iterations` | number | `10` | 1–100 | Global cap on total Phase 5+6 loop iterations across all target files in a single generate run. Distinct from max_retries (per-file). When exhausted, the pipeline stops and emits a diagnostic summary. |
+| `generation.max_files` | number | `50` | 1–1000 | Two-tier budget: maximum number of source files processed in a single generate run. When reached, remaining files are deferred with a diagnostic summary. |
+| `generation.max_retries_per_file` | number | `5` | 1–20 | Two-tier budget: maximum Phase 5+6 iterations per file. When a file exceeds this, it is deferred and processing moves to the next file. |
+| `generation.max_iterations` | number | `10` | 1–100 | Legacy global cap on total Phase 5+6 loop iterations across all target files. Kept for backward compatibility — when set, it is interpreted per the Legacy Compatibility rule in `references/generate/pipeline-shared.md` (both tiers inherit the value). New configs should use `max_files` + `max_retries_per_file` instead. |
 | `generation.recompilation_guard` | boolean | `true` | `true`, `false` | When true, detects files re-entering Phase 5 more than twice without a successful Phase 6 pass, and auto-defers them for manual review. |
 
-`max_retries` caps per-file Phase 6 fix attempts. `max_iterations` caps the total Phase 5+6 iterations across all files in the run. A single file can consume at most `max_retries` iterations, but the global budget may be shared across multiple files. When the global budget is exhausted, remaining files are deferred with a diagnostic summary. `recompilation_guard` complements both: it detects pathological per-file cycles early (re-entering Phase 5 more than twice without progress) and defers those files before they exhaust the global budget.
+`max_files` and `max_retries_per_file` form the **two-tier iteration budget**: `max_files` bounds breadth (how many files the run processes), `max_retries_per_file` bounds depth (how many Phase 5+6 cycles a single file may consume). `max_retries` remains the narrower Phase 6 fix-and-rerun cap (0–5). `max_iterations` is the legacy single-counter budget (default 10) kept for backward compatibility — per the Legacy Compatibility rule, when it is present the two-tier fields inherit its value. `recompilation_guard` complements all of them: it detects pathological per-file cycles early (re-entering Phase 5 more than twice without progress) and defers those files before they exhaust the budget.
 
 #### `generation.parallel.*`
 
@@ -303,6 +314,8 @@ Runtime state managed by bestest. **DO NOT EDIT** — these fields are automatic
 | `state.last_generate` | string or null | `null` | ISO 8601 timestamp of last `bestest generate` execution |
 | `state.last_run` | string or null | `null` | ISO 8601 timestamp of last `bestest run` execution |
 | `state.last_doctor` | string or null | `null` | ISO 8601 timestamp of last `bestest doctor` execution |
+| `state.last_fix` | string or null | `null` | ISO 8601 timestamp of last `bestest fix` execution (written by spoke-fix) |
+| `state.last_report` | string or null | `null` | ISO 8601 timestamp of last `bestest report` execution (written by spoke-report) |
 | `state.last_metrics` | string or null | `null` | ISO 8601 timestamp of last metrics.json update (written by every state-changing spoke). See `references/metrics-schema.md`. |
 | `state.init_type` | string | `"greenfield"` | How the project was initialized: `"greenfield"` (no existing test infrastructure), `"brownfield-coexist"` (existing tests kept alongside bestest), `"brownfield-migrate"` (existing tests being migrated to bestest-recommended framework), `"brownfield-replace"` (existing tests replaced). Set during init, immutable after. |
 | `state.existing_frameworks_preserved` | string[] | `[]` | List of legacy framework names that were detected during init and are being preserved (coexist mode). Only populated when `state.init_type` is `"brownfield-coexist"`. Example: `["mocha", "jasmine"]`. Empty for greenfield and non-coexist brownfield inits. |

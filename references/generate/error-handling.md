@@ -129,3 +129,29 @@ Else (no test file but file exists at the target path):
   Print: "Generating to {test-path}.new to avoid overwriting."
   Generate to a .new suffixed file and present for manual merge.
 ```
+
+## 10. All Exports Already Covered by Existing Tests
+
+**Trigger:** Phase 2 Step 2 detects that every testable export of the target file already has matching tests in the existing test file.
+
+**Response:**
+```
+Print: "All testable exports in {source-path} already have tests in {test-path}."
+Print: "No new tests needed for this file."
+Print: "  • New/changed exports since the last generation? Run /bestest scan to re-audit."
+Print: "  • Want more thorough coverage? Run /bestest coverage to identify gaps."
+Skip this file. Do NOT generate an empty test file. Continue to the next target.
+```
+
+## 11. Zero Testable Exports After Filtering
+
+**Trigger:** The target file is selected in Phase 1, but after Phase 2/3 analysis all its exports are filtered out (e.g., only re-exports, type-only exports, or constants with no runtime behavior).
+
+**Response:**
+```
+Print: "Source file {path} has no testable exports after analysis."
+Print: "  • If it only re-exports: tests would duplicate the underlying modules' coverage."
+Print: "  • If it only exports types/interfaces: no runtime behavior to test."
+Print: "Skipping this file. Add a note to the quality report: skipped ({reason})."
+Do NOT generate an empty test file. Continue to the next target.
+```

@@ -54,12 +54,13 @@ All reference files are relative to `./`.
 | `./references/metrics-schema.md` | Complete reference for `.bestest/state/metrics.json` — cross-spoke metrics store with update protocols and spoke responsibility matrix |
 | `./references/error-codes.md` | Error code catalog (E001–E017+) used by validate-skill.sh for structured diagnostic reporting |
 
-## Generation Guides (3)
+## Generation Guides (4)
 | File | Description |
 |------|-------------|
 | `./references/ai-generation-guide.md` | 7-phase AI test generation pipeline (JS/TS) — shared generation principles |
 | `./references/python-generation-guide.md` | Python-specific generation guide: pytest quality standards, scoring rubrics, and design patterns |
 | `./references/go-generation-guide.md` | Go-specific generation guide: testing package quality standards, testify patterns, and scoring rubrics |
+| `./references/java-generation-guide.md` | Java-specific generation guide: JUnit 5, Mockito, @ParameterizedTest, @Nested, Spring slice testing, Testcontainers |
 
 ## Generation Sub-Files — JS/TS (6)
 | File | Description |
@@ -141,6 +142,11 @@ All reference files are relative to `./`.
 |------|-------------|
 | `./references/data-source-discovery.md` | Shared discovery pattern for run/scan result lookup used by fix, coverage, report, doctor, and status spokes |
 
+## CLI Helper (1)
+| File | Description |
+|------|-------------|
+| `./references/bestest-cli.md` | Reference for `scripts/bestest-cli.py` — the deterministic helper layer (detect, config, report selection with companion filtering, locks, metrics merge, render, contracts) |
+
 ## Reference Infrastructure (5)
 | File | Description |
 |------|-------------|
@@ -149,3 +155,17 @@ All reference files are relative to `./`.
 | `./references/dot-bestest-schema.md` | Full `.bestest/` directory tree documentation *(created by T04)* |
 | `./references/parallel-dispatch.md` | Agent-agnostic parallel dispatch protocol for generate with 5+ targets *(created by S01)* |
 | `./references/generate/pipeline-shared.md` | Shared generation pipeline sections (parallel dispatch, priority scoring, HITL gate, error handling, downstream reference) referenced by all 4 generate spokes |
+
+## Contract Fixtures (7)
+| File | Description |
+|------|-------------|
+| `./scripts/fixtures/stack-profile.json` | Golden example of `.bestest/state/stack-profile.json` (schemaVersion 1.3) |
+| `./scripts/fixtures/scan-report.json` | Golden example of `scan-<timestamp>.json` (schemaVersion 1.2) |
+| `./scripts/fixtures/run-report.json` | Golden example of full-suite `run-<timestamp>.json` (schemaVersion 1.0) |
+| `./scripts/fixtures/run-report-companion.json` | Golden example of generate-companion run report (`suiteFilter: "generated"`, `companionTo: "generate"`) |
+| `./scripts/fixtures/doctor-report.json` | Golden example of `doctor-<timestamp>.json` (healthScore + dimensions-keyed-by-id) |
+| `./scripts/fixtures/coverage-report.json` | Golden example of `coverage-<timestamp>.json` (schemaVersion 1.0) |
+| `./scripts/fixtures/metrics.json` | Golden example of `.bestest/state/metrics.json` (schemaVersion 1.0) |
+| `./scripts/fixtures/config.yaml` | Canonical config.yaml fixture matching config-schema.md |
+
+`./scripts/validate-contracts.sh` validates these fixtures against the spokes' documented read/write fields — see the Contract Validation Codes (C001–C030) section in `references/error-codes.md`.

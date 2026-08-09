@@ -84,3 +84,39 @@ jobs:
           report_paths: .bestest/reports/junit-skill-validation.xml
           check_name: Bestest Skill Validation Results
           fail_on_failure: true
+
+  validate-contracts:
+    runs-on: ubuntu-latest
+    env:
+      SKILL_DIR: ${{ github.workspace }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run contract validation script
+        run: |
+          chmod +x "$SKILL_DIR/scripts/validate-contracts.sh"
+          "$SKILL_DIR/scripts/validate-contracts.sh"
+
+      - name: Convert validation output to JUnit XML
+        if: always()
+        run: |
+          chmod +x "$SKILL_DIR/scripts/validate-to-junit.sh"
+          "$SKILL_DIR/scripts/validate-contracts.sh" 2>&1 | tee contract-validation-output.txt
+          "$SKILL_DIR/scripts/validate-to-junit.sh" contract-validation-output.txt .bestest/reports/junit-contract-validation.xml
+
+      - name: Upload JUnit XML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-contract-validation-report
+          path: .bestest/reports/junit-contract-validation.xml
+          retention-days: 30
+
+      - name: Publish JUnit test report
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: .bestest/reports/junit-contract-validation.xml
+          check_name: Bestest Contract Validation Results
+          fail_on_failure: true

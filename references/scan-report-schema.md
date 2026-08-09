@@ -405,7 +405,7 @@ Reports use the pattern `scan-<timestamp>.json` where the timestamp is a compact
 ### Report Retention
 
 - Reports are retained up to the configurable limit defined by `reports.max_retained` in `.bestest/config.yaml` (default: 50)
-- After each scan, if the number of `scan-*.json` files exceeds `max_retained`, the oldest reports are deleted (see spoke-scan.md Phase 7 Step 6)
+- After each scan, if the number of `scan-*.json` files exceeds `reports.max_retained` (default: 50), the oldest reports are deleted (see spoke-scan.md Phase 7 Step 7)
 - The newest report is always preserved regardless of the retention limit
 - Downstream tooling can compare consecutive reports to detect:
   - Coverage regression (current coverage < previous coverage)

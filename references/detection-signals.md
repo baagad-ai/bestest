@@ -52,6 +52,8 @@ Multiple signals compound via noisy-OR: `confidence = min(0.99, 1 - Π(1 - w_i))
 | `java.version` in `pom.xml` | Parse XML field | JVM source version | medium (0.20) |
 | `JAVA_HOME` environment variable | Check env var | Java runtime installation path | medium (0.20) |
 | `java -version` output | Parse command output (first line, version pattern) | Installed Java major version | high (0.40) |
+| `deno.json` or `deno.jsonc` exists | File existence check | Deno runtime (JS/TS project — generation routed to JS/TS spoke) | medium (0.20) |
+| `bun.lockb` + `"bun"` field in package.json | File existence + JSON field | Bun runtime (JS/TS project — generation routed to JS/TS spoke) | medium (0.20) |
 
 ## Build Tool Detection
 

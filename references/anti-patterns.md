@@ -799,5 +799,5 @@ The scan report's `antiPatterns` array should include the primary pattern and op
 These anti-pattern definitions are consumed by:
 - **Scan report** (`references/scan-report-schema.md`) — `antiPatterns` array fields
 - **Scan spoke** (`references/spoke-scan.md`) — Step 4 (Analyze Test Quality)
-- **Generate spoke** (`references/spoke-generate.md`) — Phase 6 quality audit uses these categories to evaluate generated tests and ensure they score ≥70 on the quality rubric
+- **Generate spoke** (`references/spoke-generate.md`) — Phase 7 quality audit uses these categories to evaluate generated tests and ensure they score ≥ `quality_threshold × 100` (default 70) on the quality rubric
 - **AI Generation Guide** (`references/ai-generation-guide.md`) — References anti-pattern categories in the quality scoring rubric

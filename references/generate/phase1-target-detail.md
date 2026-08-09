@@ -9,16 +9,20 @@
 Before processing any target path through the targeting modes, validate the path to prevent filesystem traversal attacks, canonicalization issues, and invalid inputs. Apply these six validation steps, **in this exact order**, to every user-supplied path — ordering matters for security:
 
 ```
-1. Traversal rejection: Reject raw userPath containing ".." or starting with "/".
-   if (userPath contains ".." or starts with "/"):
+1. Traversal rejection: Reject raw userPath with a ".." path segment or starting with "/".
+   Split userPath on "/" (and "\\" for Windows) into segments.
+   if (any segment === ".." or userPath starts with "/"):
      error: "Invalid path: directory traversal detected."
      Exit.
+   (Segment-based, not substring: a legitimate filename like "file..name" must NOT be rejected.)
 
 2. Canonicalize: Resolve symlinks and relative segments (./) using path.resolve() or realpath.
    canonical = fs.realpathSync(path.resolve(userPath))
 
 3. Boundary check: Verify the canonical path is within the project root.
-   if (!canonical.startsWith(projectRoot)):
+   Prefix-collision-safe check — require the path to be the root itself OR to start with
+   root followed by a path separator. Without this, "/project-root-evil" would wrongly pass.
+   if (canonical != projectRoot AND !canonical.startsWith(projectRoot + "/")):
      error: "Path escapes project boundary: {userPath}"
      Exit.
 
@@ -37,16 +41,39 @@ Before processing any target path through the targeting modes, validate the path
      Exit.
 
 6. Sensitive file exclusion: Reject files matching sensitive filename patterns.
-   Sensitive patterns (case-insensitive): .env, .env.*, *.pem, *.key, *.p12, *.pfx, *.jks,
-     id_rsa*, id_ed25519*, id_ecdsa*, credentials.*, service-account*.json,
-     .netrc, .npmrc, .pypirc, .aws/*, .ssh/*, .gnupg/*, *.keystore, *.truststore
+   Sensitive basename patterns (case-insensitive): .env, .env.*, *.pem, *.key, *.p12, *.pfx,
+     *.jks, id_rsa*, id_ed25519*, id_ecdsa*, credentials.*, service-account*.json,
+     .netrc, .npmrc, .pypirc, *.keystore, *.truststore
+   Sensitive directory patterns (matched against the FULL canonical path, not basename):
+     .aws/, .ssh/, .gnupg/, .git/, .hg/, .svn/, node_modules/, .venv/, .tox/, secrets/
    basename = path.basename(canonical)
-   if (basename matches any sensitive pattern, case-insensitive):
+   if (basename matches any sensitive basename pattern, case-insensitive
+       OR canonical path contains any sensitive directory pattern):
      error: "Sensitive file rejected: {canonical}. Test generation for credential and key files is blocked for security."
      Exit.
 ```
 
+> **Note on directory patterns:** Patterns containing `/` (e.g., `.aws/*`) must be matched against the full canonical path, never `path.basename()` — a basename can never contain a `/`, so `.aws/` would be dead code under basename matching. This is a deliberate distinction from the basename-only patterns above.
+
 All six checks must pass before the path enters any targeting mode. If any check fails, print the error and exit — do not fall through to other modes.
+
+### Monorepo Path Boundary
+
+In monorepos (`monorepo.detected` is true in StackProfile / `monorepo.enabled` in config), the project root for the boundary check is the **package root**, not the repo root:
+
+```
+If monorepo is detected:
+  packageRoot = directory containing the nearest package.json (or pnpm-workspace.yaml member)
+  projectRoot (for the boundary check) = packageRoot
+  paths.src and paths.test globs are evaluated relative to packageRoot
+  Example: apps/web/src/utils.ts → package root is apps/web, so the boundary check
+           accepts apps/web/src/utils.ts and rejects apps/api/src/db.ts (different package).
+
+Else:
+  projectRoot = repo root (single-package behavior)
+```
+
+This prevents cross-package targeting from a single-package generate invocation while still allowing explicit cross-package paths when the user passes a full path. If `monorepo.detected` is true but no package.json is found near the target, fall back to the repo root with a warning.
 
 ---
 
@@ -164,17 +191,6 @@ Validate scan-report.json schemaVersion:
   Expected version: ≤ 1.2 (current known version).
   If schemaVersion is missing:
     Treat as version "1.0" (pre-versioning legacy). Print a note and continue.
-  If MAJOR version matches (1.x) and MINOR ≤ 2:
-    Proceed normally.
-  If MAJOR version matches but MINOR > 2:
-    Print: "⚠ scan-report.json schemaVersion {version} is newer than expected (≤ 1.2). Proceeding — unrecognized fields will be ignored."
-    Continue with warning.
-  If MAJOR version differs:
-    Print: "Error: scan-report.json schemaVersion {version} has an incompatible MAJOR version. Expected 1.x."
-    Print: "Update bestest to the latest version, or re-run /bestest scan to regenerate."
-    Exit.
-```
- a note and continue.
   If MAJOR version matches (1.x) and MINOR ≤ 2:
     Proceed normally.
   If MAJOR version matches but MINOR > 2:

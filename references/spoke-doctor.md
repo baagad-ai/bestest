@@ -548,12 +548,12 @@ Extract line coverage from recent run results and compare against the configured
 
 ### Execution Steps
 
-1. **Extract coverage data points** — From each run report with `coverage.collected === true`, extract `coverage.lines.pct`:
+1. **Extract coverage data points** — From each NON-companion run report with `coverage.collected === true`, extract `coverage.lines.pct`. Companion run reports (`companionTo` present, e.g., generated-test verification runs) reflect partial coverage and are excluded from the trend baseline:
 
    ```
    dataPoints = []
    For each run report (sorted chronologically):
-     If coverage.collected is true:
+     If coverage.collected is true AND companionTo is absent:
        dataPoints.push({ timestamp: report.timestamp, linesPct: coverage.lines.pct })
 
    If no data points with coverage:

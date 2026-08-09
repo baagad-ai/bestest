@@ -477,6 +477,14 @@ Select the base template for the detected provider, inject language-specific com
        Remove the language-specific cache steps
        Remove the language-specific environment variables
 
+   After removing jobs, PRUNE dangling dependencies:
+     For every remaining job with a `needs:` list (GitHub Actions) or `dependencies:`
+       (GitLab CI) that references a removed job, drop that entry from the list.
+       GitHub: if a `needs:` list becomes empty, remove the line entirely.
+       GitLab: if `dependencies:` references a removed job, remove that dependency.
+     This prevents pipeline failures from `needs: [fast-python]` pointing at a
+     job that no longer exists in a single-language project.
+
    If len(detectedLangNames) == 1:
      Print: "Single-language project detected ({detectedLangNames[0]}). Simplifying pipeline."
    Else:
@@ -497,6 +505,18 @@ Select the base template for the detected provider, inject language-specific com
      if [ "$COVERAGE" -lt {coverageTarget} ]
 
    And similar threshold comparisons in all provider formats.
+   ```
+
+3.5 **Inject mutation threshold** — Replace the default `MUTATION_THRESHOLD: 80` with the configured value from `mutation.threshold` in config.yaml (default 80):
+
+   ```
+   Replace all instances of:
+     MUTATION_THRESHOLD: 80
+   With:
+     MUTATION_THRESHOLD: {mutationThreshold}
+
+   Also replace in mutation gate scripts:
+     float('$SCORE') < float('$MUTATION_THRESHOLD')   # references the env var — value flows through
    ```
 
 4. **Inject per-language test commands** — For each detected language, replace the template's generic test commands with the specific commands from the commandMap:

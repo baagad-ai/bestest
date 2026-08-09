@@ -4,6 +4,8 @@ Shared validation pattern used across all bestest spokes. Every spoke runs pre-f
 
 This document is the normative reference. When adding a new spoke or modifying an existing one, the pre-flight section should conform to one of the patterns below.
 
+> **CLI helper:** The deterministic helper `scripts/bestest-cli.py` (see `references/bestest-cli.md`) implements several pre-flight operations — config read/validate, report discovery (`report latest-full` with companion filtering), and lock acquisition — with exact, testable behavior. Spokes SHOULD delegate to it when `python3` is available, using the prose steps in this document as the manual fallback (graceful degradation). The prose remains the normative contract; the CLI is the reference implementation.
+
 ---
 
 ## Standard 3-Step `.bestest/` Validation
@@ -104,7 +106,7 @@ touch "$LOCKFILE"
 
 # Acquire exclusive lock with 5-second timeout, write inside subshell
 (
-  if ! flock -s -w 5 200; then
+  if ! flock -x -w 5 200; then
     echo "⚠ [bestest] Could not acquire lock on $LOCKFILE within 5s. Proceeding without lock (best-effort)." >&2
     # Fall through to write anyway — metrics are observability, not gates.
   fi
@@ -127,9 +129,9 @@ touch "$LOCKFILE"
 ```
 
 Key points:
-- The subshell `( ... ) 200>"$LOCKFILE"` redirects fd 200 to the lock file; `flock -s -w 5 200` operates on that fd.
+- The subshell `( ... ) 200>"$LOCKFILE"` redirects fd 200 to the lock file; `flock -x -w 5 200` operates on that fd.
 - When the subshell exits (normally or via crash), the kernel closes fd 200 and releases the lock automatically.
-- `flock -s` means exclusive (writer) lock. Use `flock -s -s` for shared (reader) locks if needed — but spokes that only read metrics do not need to lock at all.
+- `flock -x` acquires an **exclusive (writer)** lock — correct for read-modify-write cycles. Use `flock -s` for **shared (reader)** locks only if a spoke needs to read a file while others may write; read-only spokes that never modify state do not need to lock at all. Note: `-s` is shared, `-x` is exclusive — this is a common source of confusion.
 
 ### Fallback Strategy: `mkdir`-based Lock (NFS / systems without `flock`)
 
@@ -385,10 +387,17 @@ Parse `generation.*` fields from config.yaml:
 
 | Field | Type | Default | Usage |
 |-------|------|---------|-------|
-| `generation.quality_threshold` | number | `0.7` | Minimum quality score (0–1). Tests below are flagged. |
+| `generation.quality_threshold` | number | `0.7` | Minimum quality gate, normalized 0–1. Converted to points at the gate: `threshold_pts = quality_threshold × 100` (default 70). |
 | `generation.verify_compilation` | boolean | `true` | Whether Phase 5 (compilation) runs. |
 | `generation.verify_pass` | boolean | `true` | Whether Phase 6 (execution) runs. |
 | `generation.max_retries` | number | `2` | Maximum fix-and-rerun attempts in Phase 6. |
+| `generation.max_files` | number | `50` | Two-tier budget: maximum files processed per generate invocation. |
+| `generation.max_retries_per_file` | number | `5` | Two-tier budget: maximum Phase 5/6 iterations per file. |
+| `generation.recompilation_guard` | boolean | `true` | Defer a file after 3 Phase 5 entries without a Phase 6 pass. |
+| `generation.parallel.enabled` | boolean | `true` | Allow parallel dispatch when target count meets threshold. |
+| `generation.parallel.min_targets` | number | `5` | Minimum source files to trigger parallel mode. |
+| `generation.parallel.group_size` | number | `5` | Max source files per worker when dispatching in parallel. |
+| `generation.parallel.depth_limit` | number | `1` | Max dispatch recursion depth (always 1 — workers never spawn workers). |
 
 ---
 

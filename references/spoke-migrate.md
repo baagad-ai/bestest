@@ -234,7 +234,7 @@ If total_file_count == 0:
 
 ### 1.2 Classify File Complexity
 
-For each test file, classify its migration complexity using the criteria from `references/migration-rules.md` Section 4.2:
+For each test file, classify its migration complexity using the criteria from `references/migration-rules.md` → Per-File Complexity Classification:
 
 ```
 For each file in test_files:

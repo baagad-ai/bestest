@@ -175,17 +175,18 @@ Advisory lock files for concurrency control. Created by `spoke-init`, acquired v
 |-----------|--------|
 | **Created by** | `spoke-init` (Phase 4 — Scaffold, creates empty directory) |
 | **Updated by** | All operational spokes write report files here |
-| **Read by** | `spoke-doctor`, `spoke-report`, `spoke-fix`, `spoke-coverage`, `spoke-migrate` — read historical reports for trend analysis, comparison, and diagnostics |
+| **Read by** | `spoke-doctor`, `spoke-report`, `spoke-fix`, `spoke-coverage`, `spoke-status`, `spoke-migrate` — read historical reports for trend analysis, comparison, and diagnostics |
 | **In gitignore** | Yes — reports are local artifacts, not committed |
-| **Retention** | `spoke-scan` rotates `scan-*.json` files based on `config.yaml` `state.max_retained` (default: 5). Other spokes do not auto-rotate. |
+| **Retention** | `spoke-scan` rotates `scan-*.json` files based on `config.yaml` `reports.max_retained` (default: 50). Other spokes do not auto-rotate. |
 
 #### Report File Patterns
 
 | Pattern | Created by | Read by | Timestamp Format |
 |---------|-----------|---------|------------------|
-| `scan-<timestamp>.json` | `spoke-scan` | `spoke-doctor`, `spoke-report`, `spoke-coverage`, `spoke-scan` (historical comparison) | `YYYYMMDDTHHmmssZ` (e.g., `scan-20240715T143045Z.json`) |
-| `run-<timestamp>.json` | `spoke-run` | `spoke-doctor`, `spoke-report`, `spoke-fix`, `spoke-coverage` | Same |
-| `fix-<timestamp>.json` | `spoke-fix` | `spoke-doctor`, `spoke-report` | Same |
+| `scan-<timestamp>.json` | `spoke-scan` | `spoke-doctor`, `spoke-report`, `spoke-coverage`, `spoke-status`, `spoke-scan` (historical comparison) | `YYYYMMDDTHHmmssZ` (e.g., `scan-20240715T143045Z.json`) |
+| `run-<timestamp>.json` | `spoke-run`; companion copies from `spoke-generate` (suiteFilter `"generated"`, `companionTo: "generate"`) and `spoke-scan` (`companionTo: scan-<ts>.json`) | `spoke-doctor`, `spoke-report`, `spoke-fix`, `spoke-coverage`, `spoke-status` — consumers exclude companion runs from latest-run selection | Same |
+| `coverage-<timestamp>.json` | `spoke-coverage` | `spoke-generate` (fallback gap source), `spoke-coverage` (historical comparison) | Same |
+| `fix-<timestamp>.json` | `spoke-fix` | `spoke-fix` (rollback/audit), `spoke-report`/`spoke-doctor` (planned, not yet implemented) | Same |
 | `doctor-<timestamp>.json` | `spoke-doctor` | `spoke-doctor` (historical comparison) | Same |
 | `report-<timestamp>.md` | `spoke-report` | User (human-readable) | Same |
 | `migration-<timestamp>.json` | `spoke-migrate` | `spoke-migrate` (rollback), `spoke-report` | Same |
@@ -311,7 +312,7 @@ See `references/pre-flight-protocol.md` for the shared validation pattern.
 ### Report Rotation
 
 Only `spoke-scan` implements automatic report rotation:
-- Controlled by `config.yaml` `state.max_retained` (default: 5).
+- Controlled by `config.yaml` `reports.max_retained` (default: 50).
 - Only rotates `scan-*.json` files — never touches other report types.
 - The newest report is never deleted.
 

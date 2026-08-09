@@ -1,6 +1,6 @@
 ---
 name: bestest
-version: "1.4.0"
+version: "2.0.0"
 description: Enterprise-grade testing architect skill. Detects your stack, recommends frameworks, generates production-quality tests, manages CI pipelines, and maintains living test documentation.
 triggers:
   - /bestest
@@ -100,17 +100,18 @@ The `migrate` command transforms test suites from one framework to another using
 | `bestest migrate junit4 junit5` | JUnit 4 → JUnit 5 (Java) |
 | `bestest migrate cypress playwright` | Cypress → Playwright (E2E) |
 
-**Argument parsing:** `bestest migrate <from> <to> [file] [--gradual]`
+**Argument parsing:** `bestest migrate <from> <to> [file] [--gradual] [--visibility]`
 
 - `<from>` — Source framework. Must be one of: `jest`, `junit4`, `cypress`. Validated against supported source frameworks.
 - `<to>` — Target framework. Must be a valid target for the given `<from>`: `jest` → `vitest`, `junit4` → `junit5`, `cypress` → `playwright`. Invalid combinations print supported paths and exit.
 - `[file]` — Optional. Migrate a single file instead of all files matching the source framework patterns.
 - `[--gradual]` — JUnit4→5 only. Updates build configuration (useJUnitPlatform + Jupiter dependencies) without transforming test files. Adds junit-vintage-engine for backward compatibility. Files can be migrated later with a second `bestest migrate junit4 junit5` (without `--gradual`).
+- `[--visibility]` — JUnit4→5 only. Removes `public` modifiers from migrated test classes and methods (JUnit 5 no longer requires public test members). Optional, applied during transformation.
 
 **Invalid path handling:** If `<from>` or `<to>` is not recognized, or the combination is unsupported, print all supported paths with examples and exit.
 
 **Migration pre-hooks:**
-1. Before migration: freshness-check on source framework docs via Context7 (resolve_library + get_library_docs for the target framework).
+1. Before migration: freshness-check the **target** framework docs via Context7 (resolve_library + get_library_docs for the target framework) so transformation rules reflect the current target-framework API.
 2. After migration: run `spoke-run.md` to verify migrated tests pass. If failures occur, `spoke-fix.md` is invoked for auto-fix.
 
 </migration_routing>
@@ -163,6 +164,7 @@ For polyglot projects where multiple languages have confidence ≥ 0.6:
    ```
    stackProfile.selectedLanguage = langFlag
    ```
+5. If the user specifies `--lang all` (non-interactive / CI batch mode), generate tests for **every** detected language with confidence ≥ 0.6, sequentially, in descending confidence order. No selection prompt — this enables automated batch generation in CI. Each language's spoke loads in turn. Output is aggregated per language.
 
 </multi_language>
 

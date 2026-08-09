@@ -24,7 +24,7 @@ The fix spoke is a downstream consumer of the run spoke. The run spoke produces 
 
 - `.bestest/` directory must exist with valid `config.yaml` (run `/bestest init` first)
 - At least one run report (`run-*.json`) OR scan report (`scan-*.json`) must exist in `.bestest/reports/` (run `/bestest run` or `/bestest scan` first)
-- Test framework must still be installed (Vitest, Jest, or pytest — same detection as run spoke)
+- Test framework must still be installed (Vitest, Jest, pytest, JUnit 5, or Go testing — same detection as run spoke)
 - For Python/pytest: virtual environment must be active (same detection as run spoke)
 - For `--flaky` mode: at least 2 run reports must exist for cross-run comparison
 - For `<test-path>` mode: the specified test file must exist on disk
@@ -58,14 +58,32 @@ If .bestest/config.yaml exists but is invalid YAML:
 ### 2. Check for run or scan reports
 
 ```
-Follow the Shared Data Source Discovery pattern from references/data-source-discovery.md:
+Follow the Shared Data Source Discovery pattern from references/data-source-discovery.md.
+
+Preferred (CLI): if python3 is available, run:
+  python3 <skill-dir>/scripts/bestest-cli.py report latest-full
+  - Returns { source: "run-report" | "scan-report" | "run-report-companion" | null, file, data }
+  - "run-report-companion" → warn: "Using companion run report — results reflect generated tests only."
+  - null → proceed to Step C (nothing found).
+  - Map result.source to dataSource (run-report → "run-report", scan-report → "scan-report").
+
+Fallback (manual — only when python3 is unavailable):
 
 Step A — Check for run reports (preferred):
   Glob for .bestest/reports/run-*.json files.
-  If run reports found:
+  Filter OUT companion run reports (suiteFilter === "generated" OR companionTo present)
+    — these are partial verification runs from /bestest generate, not full-suite results.
+  If non-companion run reports found:
     Print: "Found {N} run report(s). Using most recent: {filename}"
     Set dataSource = "run-report"
     Continue to Check 3.
+
+Step A2 — Companion run reports only:
+  If only companion run reports exist (no full-suite runs):
+    Print: "⚠ Only companion run report(s) found (generated-test verification runs)."
+    Print: "  These reflect generated tests only, not the full suite."
+    Print: "  Run /bestest run to capture full-suite results for accurate diagnosis."
+    Use the most recent companion run report for diagnosis of generated-test failures only.
 
 Step B — Fall back to scan reports:
   Glob for .bestest/reports/scan-*.json files.
@@ -86,7 +104,7 @@ Step C — Nothing found:
 ### 3. Check test framework is installed
 
 ```
-Read config.yaml → framework field (vitest, jest, or pytest).
+Read config.yaml → framework field (vitest, jest, pytest, junit5, or go_testing).
 
 If framework is "vitest" or "jest":
   Check package.json devDependencies for the framework package:
@@ -121,6 +139,29 @@ If framework is "pytest":
     Print: "Framework: pytest@{version} — detected and installed. Proceeding with fix."
     Continue.
 
+If framework is "junit5":
+  Check for the Java build tool (Gradle wrapper or Maven wrapper):
+    If ./gradlew exists: buildTool = "gradle", buildCmd = "./gradlew"
+    If ./mvnw exists: buildTool = "maven", buildCmd = "./mvnw"
+    If neither exists:
+      Print: "Config specifies junit5 but no Gradle or Maven wrapper was found."
+      Print: "JUnit 5 tests require a Java build tool (Gradle or Maven)."
+      Print: "Install or configure a build tool, then re-run /bestest fix."
+      Exit.
+
+  Check for JUnit 5 dependencies:
+    If buildTool is gradle: grep "junit-jupiter" build.gradle* 
+    If buildTool is maven: grep "junit-jupiter" pom.xml
+    If junit-jupiter is not found:
+      Print: "junit-jupiter dependency not found in the build configuration."
+      Print: "Add org.junit.jupiter:junit-jupiter to your test dependencies."
+      Exit.
+
+  Detect Java version:
+    Run: java -version
+    Print: "Framework: JUnit 5 (via {buildTool}) — detected and installed. Proceeding with fix."
+    Continue.
+
 If framework is "testing" (Go):
   Check for Go toolchain:
     Run: go version
@@ -153,13 +194,14 @@ If framework is "testing" (Go):
 
 ```
 If --flaky flag is set:
-  Count .bestest/reports/run-*.json files.
-  If fewer than 2 reports:
-    Print: "--flaky mode requires at least 2 run reports for cross-run comparison."
-    Print: "Found {N} report(s). Run /bestest run a few more times to build history."
+  Count non-companion run-*.json files (exclude suiteFilter === "generated" and companionTo).
+  If fewer than 2 full-suite reports:
+    Print: "--flaky mode requires at least 2 full-suite run reports for cross-run comparison."
+    Print: "Found {N} full-suite report(s). Companion/generated-only runs are excluded (they are partial)."
+    Print: "Run /bestest run a few more times to build history."
     Exit.
   If 2+ reports:
-    Print: "Found {N} run reports. Comparing across runs for flaky test detection."
+    Print: "Found {N} full-suite run reports. Comparing across runs for flaky test detection."
     Continue.
 ```
 
@@ -223,8 +265,9 @@ When operating from a scan report, the fix spoke works at **file granularity** i
 ### Execution Steps
 
 1. **Locate the most recent report** — Based on the `dataSource` determined in Pre-Flight Check 2:
-   - If `dataSource === "run-report"`: List all `run-*.json` files in `.bestest/reports/`, sort by filename (which embeds a timestamp), select the most recent.
+   - If `dataSource === "run-report"`: List all `run-*.json` files in `.bestest/reports/`, filter out companion reports (`suiteFilter === "generated"` or `companionTo` present), sort by filename (which embeds a timestamp), select the most recent.
    - If `dataSource === "scan-report"`: List all `scan-*.json` files in `.bestest/reports/`, sort by filename, select the most recent.
+   - If only companion run reports exist (see Pre-Flight Step A2): use the most recent companion report, and keep `dataSource = "run-report-companion"` so the user is reminded results are generated-tests-only.
 
 2. **Parse the report** — Read and parse the JSON file. Validate it contains the expected structure:
 
@@ -302,7 +345,7 @@ When operating from a scan report, the fix spoke works at **file granularity** i
    Print: "Run /bestest run a few times to build history, then re-run /bestest fix --flaky."
    Exit.
    ```
-   Otherwise, load the 5 most recent run reports (or all available if fewer than 5). For each test case across all loaded reports, build a pass/fail history:
+   Otherwise, load the 5 most recent NON-companion run reports (or all available if fewer than 5; companion/"generated" runs excluded to avoid mixing partial verification runs with full-suite results). For each test case across all loaded reports, build a pass/fail history:
    ```
    For each test case (identified by filePath + name):
      Collect status from each run report.
@@ -1392,7 +1435,7 @@ Re-run the fixed test(s) to confirm the fix resolves the failure without introdu
    Do NOT apply the fix. Flag for manual review.
    ```
 
-4. **For --flaky: 5x stability verification** — For tests that were identified as flaky, run the fixed test 5 times sequentially (reusing the flakiness testing pattern from `workflows/spoke-generate.md` Phase 7 Step 3):
+4. **For --flaky: 5x stability verification** — For tests that were identified as flaky, run the fixed test 5 times sequentially (reusing the flakiness testing pattern from `references/generate/phase7-quality-audit.md` Step 3):
    ```
    For i in 1..5:
      Vitest: npx vitest run <test-file>
@@ -1715,7 +1758,6 @@ If framework is "testing" (Go):
   Print: "  macOS: brew install go"
   Print: "  Linux: snap install go --classic"
   Print: "Or run /bestest init to reconfigure."
-Print: "Or run /bestest init to reconfigure."
 ```
 Exit with code 1. No diagnosis performed.
 
@@ -1925,8 +1967,11 @@ Follow this protocol on every invocation:
 2. Parse as JSON
 3. If parse fails (corruption):
    a. Log warning: "metrics.json corrupted — recreating with defaults"
-   b. Initialize fresh metrics with schemaVersion "1.0" and default values
-   c. Continue with step 5 (do NOT abort the spoke)
+   b. Backup the corrupt file: `cp .bestest/state/metrics.json .bestest/state/metrics.json.corrupt.$(date +%s)`
+      - Log the backup path so agents can locate it for forensic inspection
+      - This must happen BEFORE recreating defaults to preserve evidence
+   c. Initialize fresh metrics with schemaVersion "1.0" and default values
+   d. Continue with step 5 (do NOT abort the spoke)
 4. Validate schemaVersion — warn if MAJOR differs, proceed if MINOR differs
 5. Merge spoke-specific data:
    - Update lastUpdated to current ISO 8601 timestamp
@@ -1981,16 +2026,20 @@ The fix report feeds into the report spoke and doctor spoke. This section docume
 
 ### Report Spoke Expectations
 
-The report spoke (`workflows/spoke-report.md`) expects:
+> **Note:** As of bestest v2.0, `spoke-report` does NOT consume `fix-*.json` — it reads run and scan reports only (see its Input Data Contracts). The fix output fields below are the candidate data points for a future report integration; they are not currently read.
 
-1. **Multiple fix reports may exist** — the report spoke reads all `fix-*.json` files from `.bestest/reports/` for fix history and trends.
-2. **`classifications` array provides failure categorization trends** — the report can show what types of failures are most common over time.
+The report spoke (`references/spoke-report.md`) would consume the following if fix-report integration were enabled:
+
+1. **Multiple fix reports may exist** — fix-*.json files are written to `.bestest/reports/` for audit trail and future trend analysis.
+2. **`classifications` array provides failure categorization trends** — the report could show what types of failures are most common over time.
 3. **`fixesApplied` vs `fixesPending` ratio shows fix effectiveness** — high pending ratios indicate systemic issues.
 4. **Timestamps enable trend analysis** — fix frequency over time shows whether the codebase is getting healthier.
 
 ### Doctor Spoke Expectations
 
-The doctor spoke (`workflows/spoke-doctor.md`) expects:
+> **Note:** As of bestest v2.0, `spoke-doctor` does NOT consume `fix-*.json` — it reads run, scan, config, and project files (see its Input Data Contracts). The items below are candidate signals for a future integration, not current read paths.
+
+The doctor spoke (`references/spoke-doctor.md`) would consume the following if fix-report integration were enabled:
 
 1. **Recurring failures across fix reports** — if the same test or file appears in multiple fix reports, it's a chronic issue affecting the health score.
 2. **Fix success rate** — `verificationResults.passed / failuresAnalyzed` gives the auto-fix success rate. Low rates suggest the test suite needs architectural attention.

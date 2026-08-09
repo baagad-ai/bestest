@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0",
+  "timestamp": "2026-05-01T14:30:45.123Z",
+  "configSnapshot": {
+    "framework": "vitest",
+    "language": "typescript",
+    "version": "1.0"
+  },
+  "framework": {
+    "name": "vitest",
+    "version": "1.6.0"
+  },
+  "language": "typescript",
+  "suiteFilter": "generated",
+  "execution": {
+    "startTime": "2026-05-01T14:30:40.000Z",
+    "endTime": "2026-05-01T14:30:45.123Z",
+    "durationMs": 1123,
+    "exitCode": 0,
+    "timedOut": false
+  },
+  "summary": {
+    "totalTests": 6,
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0,
+    "totalTestFiles": 2,
+    "passedFiles": 2,
+    "failedFiles": 0
+  },
+  "tests": [
+    {
+      "file": "src/services/payment.test.ts",
+      "cases": [
+        {
+          "name": "processPayment returns receipt on success",
+          "status": "passed",
+          "durationMs": 22,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "coverage": {
+    "collected": true,
+    "lines": { "total": 312, "covered": 189, "pct": 60.6 },
+    "branches": { "total": 60, "covered": 30, "pct": 50.0 },
+    "functions": { "total": 30, "covered": 21, "pct": 70.0 },
+    "statements": { "total": 401, "covered": 245, "pct": 61.1 }
+  },
+  "errors": [],
+  "raw_output": null,
+  "companionTo": "generate"
+}

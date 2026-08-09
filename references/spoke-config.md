@@ -21,6 +21,7 @@ Parse the first argument after `config` to determine the action:
 |-------------|------|--------|
 | `show` | (none) or `<key>` | Display configuration — default if no sub-command given |
 | `set` | `<key> <value>` | Update a single configuration value |
+| `unset` | `<key>` | Remove a configuration key (reverts to defaults or drops optional field) |
 | `validate` | (none) | Check config.yaml against the schema for errors |
 | `reset` | (none) | Restore config.yaml to framework defaults |
 
@@ -127,21 +128,28 @@ Update a single configuration value in `.bestest/config.yaml` with full validati
 2. **Validate key exists in schema.** Parse `<key>` as a dot-path (e.g. `coverage.target`, `vitest.environment`, `framework`). Look up the key in the validation rules reference below. If the key is unknown:
    - Display: `Unknown config key: "<key>"`
    - List all valid keys grouped by section:
-     ```
-     Valid keys:
-       Core: framework, language, version
-       Coverage: coverage.enabled, coverage.target, coverage.provider, coverage.reporters
-       Paths: paths.test, paths.src, paths.ignore
-       E2E: e2e.enabled, e2e.framework
-       CI: ci.enabled, ci.provider
-       Vitest: vitest.config_path, vitest.globals, vitest.environment, vitest.setup_files, vitest.include
-       Jest: jest.config_path, jest.transform, jest.environment, jest.module_name_mapper
-       pytest: pytest.config_path, pytest.asyncio_mode, pytest.plugins, pytest.addopts, pytest.markers, pytest.testpaths
-       JUnit5: junit5.build_tool, junit5.test_src_dir, junit5.main_src_dir, junit5.dependency_management, junit5.coverage_provider, junit5.use_junit_platform, junit5.test_annotations, junit5.parallel_execution, junit5.java_version
-       Go: go.module_path, go.go_version, go.test_timeout, go.race_detection, go.verbose, go.cover_mode, go.build_tags, go.test_packages, go.testify.enabled, go.testify.packages, go.testify.suite, go.testify.mock, go.mocking_strategy, go.http_framework, go.parallel, go.fuzz
-       Monorepo: monorepo.enabled, monorepo.tool, monorepo.packages
-       Generation: generation.quality_threshold, generation.verify_compilation, generation.verify_pass, generation.max_retries
-     ```
+      ```
+      Valid keys:
+        Core: framework, language, version
+        Coverage: coverage.enabled, coverage.target, coverage.provider, coverage.reporters
+        Paths: paths.test, paths.src, paths.ignore
+        E2E: e2e.enabled, e2e.framework, e2e.config_path
+        Flaky: flaky.retries
+        API: api.enabled, api.framework, api.base_url
+        Mutation: mutation.enabled, mutation.threshold
+        Contract: contract.enabled
+        Chaos: chaos.enabled
+        Performance: performance.enabled
+        CI: ci.enabled, ci.provider
+        Vitest: vitest.config_path, vitest.globals, vitest.environment, vitest.setup_files, vitest.include
+        Jest: jest.config_path, jest.transform, jest.environment, jest.module_name_mapper
+        pytest: pytest.config_path, pytest.asyncio_mode, pytest.plugins, pytest.addopts, pytest.markers, pytest.testpaths
+        JUnit5: junit5.build_tool, junit5.test_src_dir, junit5.main_src_dir, junit5.dependency_management, junit5.coverage_provider, junit5.use_junit_platform, junit5.test_annotations, junit5.parallel_execution, junit5.java_version
+        Go: go.module_path, go.go_version, go.test_timeout, go.race_detection, go.verbose, go.cover_mode, go.build_tags, go.test_packages, go.testify.enabled, go.testify.packages, go.testify.suite, go.testify.mock, go.mocking_strategy, go.http_framework, go.parallel, go.fuzz
+        Monorepo: monorepo.enabled, monorepo.tool, monorepo.packages
+        Generation: generation.quality_threshold, generation.verify_compilation, generation.verify_pass, generation.max_retries, generation.max_files, generation.max_retries_per_file, generation.recompilation_guard
+        Reports: reports.max_retained
+      ```
    - Exit without modifying config.
 
 3. **Reject state.* keys.** If the key starts with `state.`, display:
@@ -203,6 +211,47 @@ Update a single configuration value in `.bestest/config.yaml` with full validati
 
 ```
 ✅ Updated <key> = <value>
+Config saved to .bestest/config.yaml
+```
+
+---
+
+## Workflow: unset
+
+Remove a configuration key from `.bestest/config.yaml`.
+
+### Steps
+
+1. Parse the single argument `<key>` as a dot-path. If missing, report usage: `bestest config unset <key>` and exit.
+
+2. **Validate key exists in schema.** Look up the key in the validation rules reference (same key set as `set`). If the key is unknown, display the valid-keys list and exit without modifying config.
+
+3. **Reject state.* keys.** If the key starts with `state.`, display:
+   ```
+   Error: <key> is managed by bestest and cannot be unset.
+   State fields are updated automatically by spoke executions.
+   ```
+   Exit without modifying config.
+
+4. **Reject required keys.** If the key is a required field (`framework`, `version`, `coverage`, `paths`, `e2e`, `api`, `ci`, `monorepo`, `generation`, `reports`, `state`), display:
+   ```
+   Error: <key> is a required section and cannot be removed.
+   Use `bestest config set <key> <value>` to change it instead.
+   ```
+   Exit without modifying config.
+
+5. **Remove the key.** Read `.bestest/config.yaml`, remove the dot-path key if present. Preserve the rest of the file exactly (structure, comments, other keys).
+
+6. **Post-update notice.** If the key was a framework-specific block or `coverage.target`-adjacent, display:
+   ```
+   Note: TESTING.md may need updating to reflect this change.
+   Run /bestest scan to regenerate affected sections.
+   ```
+
+### Output
+
+```
+✅ Unset <key>
 Config saved to .bestest/config.yaml
 ```
 
@@ -321,7 +370,7 @@ This section provides the complete validation table for all config fields, deriv
 
 | Field | Type | Required | Valid Values | Default | Read-Only |
 |-------|------|----------|--------------|---------|-----------|
-| `framework` | string | **Yes** | `vitest`, `jest`, `pytest`, `junit5`, `go_testing` | — | No |
+| `framework` | string | **Yes** | `vitest`, `jest`, `mocha`, `jasmine`, `pytest`, `junit5`, `testng`, `go_testing` | — | No |
 | `language` | string | No | `javascript`, `typescript`, `python`, `java`, `go` | auto-detected | No |
 | `version` | string | No | `"1.0"` | `"1.0"` | Yes (managed by bestest) |
 

@@ -5,11 +5,19 @@ Java requires compilation before test execution. This phase runs a 3-stage compi
 ## Execution
 
 ```
-# Global iteration budget check
-global_iterations += 1
-if global_iterations > generation.max_iterations (default: 10):
-  Emit diagnostic summary (see Global Iteration Budget in references/generate/pipeline-shared.md).
-  Halt. Do not proceed with this phase.
+# Two-tier iteration budget check (see Global Iteration Budget in references/generate/pipeline-shared.md)
+# Tier 1 — per-file retry depth
+file_iterations[<test-file>] += 1
+if file_iterations[<test-file>] > generation.max_retries_per_file (default: 5):
+  Print: "Per-file retry budget exhausted for {file} ({max_retries_per_file} iterations)."
+  Defer the file. Move to next file.
+  Return to the generation loop (Phase 1).
+
+# Tier 2 — file-processing breadth (maintained by the generation loop between files)
+# If files_processed >= generation.max_files (default: 50), break out of the generation loop
+# and emit the diagnostic summary.
+
+# Legacy compatibility: if only generation.max_iterations is set, both tiers inherit its value.
 
 # Recompilation guard
 if generation.recompilation_guard is true:
@@ -19,24 +27,27 @@ if generation.recompilation_guard is true:
     Skip to next file.
 
 If generation.verify_compilation is true:
-  Run three-stage verification on each generated test file.
+  Run compilation verification on each generated test file:
 
-  Stage 1 — Syntax check:
-    Command (Gradle): ./gradlew compileTestJava --console=plain 2>&1 | head -100
-    Command (Maven):  ./mvnw test-compile 2>&1 | tail -50
-    Verifies Java syntax is valid (no missing semicolons, type errors, etc.)
+  Step 1 — Compile test sources:
+    Command (Gradle): ./gradlew compileTestJava --console=plain
+    Command (Maven):  ./mvnw test-compile
+    Verifies Java syntax and that all imports resolve against the classpath.
     Capture all compilation errors.
 
-  Stage 2 — Full classpath resolution:
-    Command (Gradle): ./gradlew compileTestJava --console=plain 2>&1
-    Command (Maven):  ./mvnw test-compile 2>&1
-    Verifies all imports resolve, dependencies are on classpath.
-    Detect missing imports, wrong generic types, incompatible method signatures.
+  Step 2 — Diagnose & fix errors:
+    For each compilation error, classify:
+      - Missing import → add the import statement (and, with user approval, the test-scope
+        dependency to build.gradle / pom.xml).
+      - Unknown type / method → check the test matches the actual API signature; correct it.
+      - Generic type mismatch → fix the generic parameter to match the source declaration.
+    Re-run the Step 1 command after each fix until it passes (respect the two-tier iteration
+    budget and recompilation guard).
 
-  Stage 3 — Test discovery:
-    Command (Gradle): ./gradlew test --tests "com.example.*Test" --dry-run 2>&1
-    Command (Maven):  ./mvnw test -Dtest="com.example.*Test" -DfailIfNoTests=false (check discovery output)
-    Verifies JUnit Platform discovers the test class and its @Test methods.
+  Step 3 — Test discovery (dry-run):
+    Command (Gradle): ./gradlew test --tests "com.example.*Test" --dry-run
+    Command (Maven):  ./mvnw test -Dtest="com.example.*Test" -DfailIfNoTests=false
+    Confirms the test class is discoverable by the test runner before executing.
 
 Else:
   Skip this phase. Proceed to Phase 6.

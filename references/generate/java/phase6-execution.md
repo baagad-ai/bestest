@@ -5,11 +5,19 @@ Run generated tests, analyze failures, and fix tests (never source code) in a co
 ## Execution
 
 ```
-# Global iteration budget check
-global_iterations += 1
-if global_iterations > generation.max_iterations (default: 10):
-  Emit diagnostic summary (see Global Iteration Budget in references/generate/pipeline-shared.md).
-  Halt. Do not proceed with this phase.
+# Two-tier iteration budget check (see Global Iteration Budget in references/generate/pipeline-shared.md)
+# Tier 1 — per-file retry depth
+file_iterations[<test-file>] += 1
+if file_iterations[<test-file>] > generation.max_retries_per_file (default: 5):
+  Print: "Per-file retry budget exhausted for {file} ({max_retries_per_file} iterations)."
+  Defer the file. Move to next file.
+  Return to the generation loop (Phase 1).
+
+# Tier 2 — file-processing breadth (maintained by the generation loop between files)
+# If files_processed >= generation.max_files (default: 50), break out of the generation loop
+# and emit the diagnostic summary.
+
+# Legacy compatibility: if only generation.max_iterations is set, both tiers inherit its value.
 
 If generation.verify_pass is true:
   Run generated tests using the build tool.
@@ -71,7 +79,7 @@ while tests fail AND retry_count < max_retries:
     **Phase 6→5 Back-Loop Check:**
     If any fix altered imports, types, type annotations, or structural code (not just assertion values or mock return values):
       Return to Phase 5 (Compilation Verification) for recompilation before re-running tests.
-      Increment global_iterations on re-entry (see pipeline-shared.md Global Iteration Budget).
+      Increment file_iterations[<test-file>] on re-entry (see pipeline-shared.md Global Iteration Budget).
       The recompilation guard will catch pathological cycling.
       After successful recompilation, continue to re-run tests.
   Re-run tests.

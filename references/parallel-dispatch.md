@@ -59,7 +59,7 @@ THEN
   
   5. Merge quality scores:
      - overall_quality = weighted average of per-worker quality scores
-     - flag any individual file below generation.quality_threshold
+     - flag any individual file below quality_threshold × 100 (default 70)
   
   6. Present merged HITL (Human-In-The-Loop) gate:
      - Show all generated test files grouped by source file
@@ -97,7 +97,10 @@ You are a bestest generation worker. Your task:
       - Java: references/spoke-generate-java.md
       - Go: references/spoke-generate-go.md
    c. Generate test file per conventions in config
-   d. Self-assess quality score (0-1) for generated test
+   d. Self-assess quality score (0-100) for generated test — same rubric scale as the
+      sequential Phase 7 (Assertion Quality 30, Test Structure 20, Independence 20,
+      Coverage Value 15, Maintainability 15). NEVER use a 0-1 scale here; the merged
+      gate compares against quality_threshold × 100.
 3. Output a structured summary:
 
    {
@@ -107,11 +110,11 @@ You are a bestest generation worker. Your task:
        {
          "source_file": "<path>",
          "test_file": "<path>",
-         "quality_score": <0-1>,
+         "quality_score": <0-100>,
          "issues": ["<issue>" | null]
        }
      ],
-     "overall_quality": <weighted average 0-1>
+     "overall_quality": <weighted average 0-100>
    }
 
 CONSTRAINTS:
@@ -133,7 +136,7 @@ These constraints are non-negotiable and apply to ALL parallel dispatch scenario
 
 4. **HITL gate from orchestrator ONLY** — The human review gate fires once, after ALL workers complete. Individual workers do not present HITL gates. The orchestrator merges all results and presents a unified review.
 
-5. **Quality threshold per-file** — Each generated test file is scored independently. Files below `generation.quality_threshold` are flagged in the merged HITL presentation but do not block other files.
+5. **Quality threshold per-file** — Each generated test file is scored independently (0–100). Files below `quality_threshold × 100` (default 70) are flagged in the merged HITL presentation but do not block other files.
 
 6. **Failure isolation** — If one worker fails (crash, timeout, malformed output), other workers continue. The orchestrator reports the failed group and proceeds with available results.
 
@@ -166,24 +169,24 @@ When parallel dispatch was used, the orchestrator presents a **merged HITL gate*
   Workers: <N>  |  Files: <M>  |  Duration: <T>
 ═══════════════════════════════════════════════════
 
-  ✅ Worker 1 — 5 files — avg quality: 0.84
-     src/auth/login.test.ts .......... 0.91 ✓
-     src/auth/logout.test.ts ......... 0.88 ✓
-     src/utils/token.test.ts ......... 0.82 ✓
-     src/api/users.test.ts ........... 0.78 ✓
-     src/middleware/auth.test.ts ...... 0.81 ✓
+  ✅ Worker 1 — 5 files — avg quality: 84
+     src/auth/login.test.ts .......... 91 ✓
+     src/auth/logout.test.ts ......... 88 ✓
+     src/utils/token.test.ts ......... 82 ✓
+     src/api/users.test.ts ........... 78 ✓
+     src/middleware/auth.test.ts ...... 81 ✓
 
-  ⚠️ Worker 2 — 4 files — avg quality: 0.68
-     src/db/connection.test.ts ....... 0.72 ✓
-     src/db/migrations.test.ts ....... 0.65 ⚠ (below threshold 0.7)
-     src/services/user.test.ts ....... 0.71 ✓
-     src/services/order.test.ts ...... 0.64 ⚠ (below threshold 0.7)
+  ⚠️ Worker 2 — 4 files — avg quality: 68
+     src/db/connection.test.ts ....... 72 ✓
+     src/db/migrations.test.ts ....... 65 ⚠ (below threshold 70)
+     src/services/user.test.ts ....... 71 ✓
+     src/services/order.test.ts ...... 64 ⚠ (below threshold 70)
 
   ❌ Worker 3 — FAILED (timeout after 120s)
      src/legacy/processor.test.ts .... ⏳ not generated
 
 ───────────────────────────────────────────────────
-  Overall quality: 0.76  |  Pass: 8  |  Flag: 2  |  Fail: 1
+  Overall quality: 76  |  Pass: 8  |  Flag: 2  |  Fail: 1
 ───────────────────────────────────────────────────
 
   Actions: [A]pprove all passing  [S]elect files  [R]egenerate flagged  [E]dit
@@ -194,7 +197,7 @@ When parallel dispatch was used, the orchestrator presents a **merged HITL gate*
 
 1. **Quality aggregation**: `overall_quality = sum(per_file_quality) / total_files`. Failed workers contribute 0 to the numerator but count in the denominator.
 
-2. **Per-file threshold**: Files scoring below `generation.quality_threshold` (default: 0.7) are flagged with ⚠. They are written to disk but highlighted for manual review.
+2. **Per-file threshold**: Files scoring below `quality_threshold × 100` (default: 70) are flagged with ⚠. They are written to disk but highlighted for manual review.
 
 3. **Failed worker isolation**: If a worker fails (timeout, crash, malformed output), the orchestrator reports it as ❌ with the affected files. Other workers' results are presented normally.
 

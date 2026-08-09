@@ -13,7 +13,7 @@ The generate spoke is the primary value delivery command — it transforms scan 
 - Scan report with `gaps[]` and `testInventory[]` arrays (run `/bestest scan` first for optimal targeting)
 - Scan report is not strictly required — the spoke can generate in degraded mode without it, using filesystem scanning instead of gap targeting
 
-> **Shared pipeline:** This spoke implements the 7-phase generation pipeline. Shared sections (Parallel Dispatch Decision, Priority Scoring Formula, Default Targeting, Pre-read Instruction, Content Boundary Notice, Source Sanitization Protocol, Taint Notice, HITL Gate, Error Handling stub, Config State Update, Downstream Reference) are defined in `references/generate/pipeline-shared.md`. Only language-specific phases and deltas are documented below. The Pipeline Skeleton in pipeline-shared.md defines the canonical 7-phase structure every generate spoke follows.
+> **Shared pipeline:** This spoke implements the 7-phase generation pipeline. Shared sections (Parallel Dispatch Decision, Priority Scoring Formula, Default Targeting, Strategy Preview Gate, Pre-read Instruction, Content Boundary Notice, Source Sanitization Protocol, Taint Notice, HITL Gate, Error Handling stub, Config State Update, Downstream Reference) are defined in `references/generate/pipeline-shared.md`. Only language-specific phases and deltas are documented below. The Pipeline Skeleton in pipeline-shared.md defines the canonical 7-phase structure every generate spoke follows.
 
 ## Pre-Flight Checks
 
@@ -58,12 +58,45 @@ Else:
 
 Confidence gate: See SKILL.md "Confidence Gate (R5)" — the orchestrator checks confidence before loading this spoke. If you reached this spoke, confidence already passed the gate.
 
+### 3.5 Check JS/TS toolchain
+
+```
+Check Node.js is available: run `node --version`.
+If node command fails:
+  Print: "Node.js is required to generate and verify tests but was not found on PATH."
+  Print: "Install Node.js 18+: https://nodejs.org/"
+  Exit.
+
+Check the package manager:
+  If pnpm-lock.yaml exists: packageManager = "pnpm"
+  Else if yarn.lock exists: packageManager = "yarn"
+  Else if bun.lockb exists: packageManager = "bun"
+  Else: packageManager = "npm"
+
+Check node_modules exists:
+  If node_modules/ does not exist:
+    Print: "node_modules not found. Install dependencies before generating tests:"
+    Print: "  {packageManager} install"
+    Print: "Generation can proceed, but Phase 5 (compilation) will fail until dependencies are installed."
+    Continue with a warning (do not hard-exit — some projects use zero-dependency test setups).
+
+Detect TypeScript compiler:
+  If package.json devDependencies includes "typescript": compiler = "tsc"
+  If using tsc, Phase 5 uses: npx tsc --noEmit --pretty <test-file-path>
+```
+
 ### 4. Check for scan report
 
 ```
 If no scan report exists in .bestest/reports/:
-  Print: "Warning: No scan report found. Generation will use filesystem scanning."
-  Set mode = "filesystem-scan", gaps = [], testInventory = [].
+  Check for the most recent coverage-*.json report (from /bestest coverage):
+    If found:
+      Print: "No scan report found. Using most recent coverage report for gap targeting."
+      Extract gaps[] (if present) from the coverage report.
+      Set mode = "coverage-guided".
+    Else:
+      Print: "Warning: No scan report found. Generation will use filesystem scanning."
+      Set mode = "filesystem-scan", gaps = [], testInventory = [].
 Else:
   Load most recent scan report. Extract gaps[], testInventory[], configSnapshot.
   Set mode = "scan-guided".
@@ -85,7 +118,7 @@ See references/generate/phase1-target-detail.md for full validation algorithm.
 
 Determine which source files to generate tests for. Four targeting modes operate with priority ordering: explicit path overrides all other modes.
 
-> **On-demand load:** For path validation rules (5-step security validation, traversal rejection, canonicalization, boundary checks, file type verification), detailed targeting mode logic, and pre-flight detail (state corruption handling, framework detection fallback, schema version validation algorithm), read `references/generate/phase1-target-detail.md`.
+> **On-demand load:** For path validation rules (6-step security validation: traversal rejection → canonicalize → boundary check → existence → file type → sensitive-file exclusion), detailed targeting mode logic, and pre-flight detail (state corruption handling, framework detection fallback, schema version validation algorithm), read `references/generate/phase1-target-detail.md`.
 
 ### Targeting Modes (Summary)
 
@@ -94,6 +127,8 @@ Determine which source files to generate tests for. Four targeting modes operate
 | **Explicit path** | `<path>` argument provided | Resolved file/directory |
 | **`--untested`** | Flag set | Gaps with `hasTest == false` or files with no matching test |
 | **`--type <kind>`** | `unit \| integration \| e2e` | Files classified by type heuristics |
+
+> **`--type` semantics by language:** JS/TS and Python use test-tier types (`unit | integration | e2e`). Java uses Spring-annotation code types (`controller | service | repository | component | configuration | utility`). Go uses code types (`handler | service | repository | utility | model | middleware`). See each language's spoke for its exact kind set.
 | **`--critical`** | Flag set | Critical-priority gaps or high-impact files by heuristics |
 
 > **Shared section:** See Default (no flags) in `references/generate/pipeline-shared.md`.
@@ -134,11 +169,13 @@ Else:
 
 Use the Context7 helper from `references/context7-helper.md` to fetch version-specific documentation. For each framework, call `resolve_library({ libraryName, query })` then `get_library_docs({ libraryId, query, tokens })`.
 
+> **Sanitization note:** The library names below are static allowlisted values from this spoke — never interpolate user-supplied strings into `libraryName`. If a name is not in the Common Library Mappings table in `references/context7-helper.md`, do not call `resolve_library` with it; fall back to static patterns instead (see Graceful Fallback).
+
 **Fetch targets:**
 - **Vitest** (libraryName: `"vitest"`, query: `"vi.mock vi.fn vi.spyOn useFakeTimers mocking patterns"`, tokens: 5000): Produces version-accurate Vitest mocking and assertion patterns.
 - **Vitest coverage** (query: `"coverage configuration v8 istanbul"`, tokens: 3000): Coverage command and configuration patterns.
 - **Jest** (libraryName: `"jest"`, query: `"jest.mock jest.fn jest.spyOn useFakeTimers"`, tokens: 5000): Jest mocking and assertion patterns. Only fetched when framework is jest.
-- **React Testing Library** (libraryName: `"testing-library react"`, query: `"render screen queries getByRole getByText waitFor"`, tokens: 5000): RTL query and interaction patterns. Only fetched when frontend is react.
+- **React Testing Library** (libraryName: `"react testing library"`, query: `"render screen queries getByRole getByText waitFor"`, tokens: 5000): RTL query and interaction patterns. Only fetched when frontend is react.
 
 > **Shared section:** See Graceful Fallback (Context7) in `references/generate/pipeline-shared.md`. For JS/TS, the static fallback source is `references/ai-generation-guide.md`.
 
@@ -150,7 +187,23 @@ For each side-effect dependency: Network calls → `vi.mock('axios')` or mock gl
 
 Estimate cyclomatic complexity by counting branching (`if`, `switch`, ternary, `&&`, `||`), loops (`for`, `while`, `map`, `filter`), and error handling (`try/catch`). Map to test count: complexity 1-3 → 2-3 tests, 4-8 → 4-6, 9-15 → 6-10, 16+ → 10+ (consider suggesting source refactoring).
 
-### Step 6: Source Sanitization (Structural Injection Mitigation)
+### Step 6: Check for shared test utilities
+
+```
+If a test utils/helpers module exists in the project (common patterns: tests/utils.ts,
+tests/helpers.ts, test-utils/, __tests__/helpers, src/test/):
+  Read it to discover reusable utilities:
+    - Render helpers (renderWithRouter, renderWithProviders) → reuse for component testing
+    - Data factories (makeUser, createOrder) → reuse instead of inline fixture objects
+    - API helpers (mockApi, serverSetup for MSW) → reuse for route/integration testing
+    - Mock helpers (mockFetch, mockResolvedOnce) → reuse for async testing
+  If a suitable utility already exists, reference it instead of creating a new one.
+  If no suitable utility exists, generate helpers inside the test file (not in a shared module).
+Also check for test setup files configured in vitest.setup_files / jest.setupFiles:
+  They may install global mocks or extend matchers that generated tests should rely on.
+```
+
+### Step 7: Source Sanitization (Structural Injection Mitigation)
 
 > **Critical security step.** This step MUST execute between Phase 2 and Phase 3.
 
@@ -196,6 +249,8 @@ For each export in the target source file:
 - **API route:** Status codes (200, 201, 400, 401, 404, 500). Response body shape. Error message format. Authentication/authorization checks.
 - **State management:** State after dispatch. Immutable updates. Edge cases (empty state, max size). Side effects triggered by state changes.
 - **Async operation:** Successful resolution with expected data. Error handling (network failure, timeout, invalid response). Cleanup on cancellation. Race condition handling.
+
+> **Shared section:** See Strategy Preview Gate in `references/generate/pipeline-shared.md` — present the strategy summary to the user between Phase 3 and Phase 4 (skipped for runs with 1 file / ≤3 exports).
 
 ---
 
@@ -269,6 +324,7 @@ After execution verification completes (whether tests pass or fail), write a `ru
 **What to include:**
 - `schemaVersion`: "1.0"
 - `timestamp`: Generation completion timestamp
+- `configSnapshot`: Deep snapshot of `.bestest/config.yaml` at generation time (same shape as spoke-run Phase 4)
 - `framework`: From config
 - `language`: From config
 - `suiteFilter`: "generated" (to distinguish from full suite runs)
@@ -277,6 +333,7 @@ After execution verification completes (whether tests pass or fail), write a `ru
 - `tests[]`: Per-file results for generated tests only
 - `coverage`: If collected during verification
 - `errors[]`: Any errors from failed verification runs
+- `raw_output`: Raw framework output when JSON parsing was unavailable, otherwise `null`
 - `companionTo`: "generate" (marks this as generation-related, not a full suite run)
 
 **When to skip:** If `generation.verify_pass` is `false`, or if tests could not be executed (compilation failure), skip writing the companion run report.

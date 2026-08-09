@@ -22,6 +22,7 @@ stages:
 
 variables:
   COVERAGE_THRESHOLD: "80"
+  MUTATION_THRESHOLD: "80"
   NODE_VERSION: "20"
   PYTHON_VERSION: "3.12"
   JAVA_VERSION: "17"
@@ -61,7 +62,7 @@ fast-js:
     - npx vitest run --reporter=verbose --reporter=junit --outputFile=.bestest/reports/junit-js.xml src/**/*.test.{ts,tsx} --coverage
     - COVERAGE=$(cat coverage/coverage-summary.json | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).total.lines.pct))")
     - echo "JS/TS Coverage: ${COVERAGE}%"
-    - test $(echo "$COVERAGE >= $COVERAGE_THRESHOLD" | bc -l) -eq 1
+    - test "$(python3 -c "print(1 if float('$COVERAGE') >= float('$COVERAGE_THRESHOLD') else 0)")" -eq 1
   coverage: '/Coverage: (\d+)%/'
   artifacts:
     paths:
@@ -92,7 +93,7 @@ fast-python:
     - pytest tests/unit/ -m unit -v --tb=short --cov --cov-report=json:coverage.json --junitxml=.bestest/reports/junit-python.xml
     - COVERAGE=$(python -c "import json; print(json.load(open('coverage.json'))['totals']['percent_covered'])")
     - echo "Python Coverage: ${COVERAGE}%"
-    - test $(echo "$COVERAGE >= $COVERAGE_THRESHOLD" | bc -l) -eq 1
+    - test "$(python3 -c "print(1 if float('$COVERAGE') >= float('$COVERAGE_THRESHOLD') else 0)")" -eq 1
   coverage: '/Coverage: (\d+)%/'
   artifacts:
     paths:
@@ -151,7 +152,7 @@ fast-go:
     - gotestsum --junitfile .bestest/reports/junit-go.xml -- -short -v -coverprofile=coverage.out -covermode=atomic ./...
     - COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
     - echo "Go Coverage: ${COVERAGE}%"
-    - test $(echo "$COVERAGE >= $COVERAGE_THRESHOLD" | bc -l) -eq 1
+    - test "$(python3 -c "print(1 if float('$COVERAGE') >= float('$COVERAGE_THRESHOLD') else 0)")" -eq 1
   coverage: '/Coverage: (\d+)%/'
   artifacts:
     paths:
@@ -312,7 +313,12 @@ slow-java:
       when: on_success
   <<: *retry-flaky
   script:
-    - ./gradlew e2eTest --no-daemon
+    - |
+      if [ -x ./gradlew ] || [ -f build.gradle ]; then
+        ./gradlew e2eTest --no-daemon
+      else
+        ./mvnw verify -DskipUnitTests
+      fi
 
 # ============================================================================
 # Stage 4: Quality — Mutation Testing (Scheduled only)
@@ -335,9 +341,9 @@ quality-mutation:
     - npm ci
   script:
     - npx stryker run
-    - SCORE=$(jq '.mutationScore' reports/mutation/json)
+    - SCORE=$(python3 -c "import json; print(json.load(open('reports/mutation/mutation.json')).get('mutationScore', 0))" 2>/dev/null || echo 0)
     - echo "Mutation Score: ${SCORE}%"
-    - test $(echo "$SCORE >= 80" | bc -l) -eq 1
+    - test "$(python3 -c "print(1 if float('$SCORE') >= float('$MUTATION_THRESHOLD') else 0)")" -eq 1
 
 quality-go-nightly:
   stage: quality
@@ -355,7 +361,40 @@ quality-go-nightly:
     - gotestsum --junitfile .bestest/reports/junit-go-nightly.xml -- -v -race -coverprofile=coverage-nightly.out -covermode=atomic ./...
     - COVERAGE=$(go tool cover -func=coverage-nightly.out | grep total | awk '{print $3}' | tr -d '%')
     - echo "Go Nightly Coverage: ${COVERAGE}%"
-    - test $(echo "$COVERAGE >= $COVERAGE_THRESHOLD" | bc -l) -eq 1
+    - test "$(python3 -c "print(1 if float('$COVERAGE') >= float('$COVERAGE_THRESHOLD') else 0)")" -eq 1
   artifacts:
     reports:
       junit: .bestest/reports/junit-go-nightly.xml
+
+quality-python-mutation:
+  stage: quality
+  image: python:${PYTHON_VERSION}
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+  before_script:
+    - pip install -r requirements.txt mutmut pytest pytest-cov
+  script:
+    - mutmut run
+    - SCORE=$(python3 -c "import json; print(json.load(open('reports/mutation/mutation.json')).get('mutationScore', 0))" 2>/dev/null || echo 0)
+    - echo "Python Mutation Score: ${SCORE}%"
+    - test "$(python3 -c "print(1 if float('$SCORE') >= float('$MUTATION_THRESHOLD') else 0)")" -eq 1
+
+quality-java-mutation:
+  stage: quality
+  image: eclipse-temurin:${JAVA_VERSION}
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+  script:
+    - |
+      if [ -x ./gradlew ]; then
+        ./gradlew test pitest --no-daemon
+      else
+        ./mvnw test org.pitest:pitest-maven:mutationCoverage
+      fi
+    - SCORE=$(python3 -c "import json; print(json.load(open('target/pit-reports/mutations.json')).get('mutationScore', 0))" 2>/dev/null || echo 0)
+    - echo "Java Mutation Score: ${SCORE}%"
+    - test "$(python3 -c "print(1 if float('$SCORE') >= float('$MUTATION_THRESHOLD') else 0)")" -eq 1

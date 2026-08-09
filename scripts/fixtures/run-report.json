@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "1.0",
+  "timestamp": "2026-05-01T14:30:45.123Z",
+  "configSnapshot": {
+    "framework": "vitest",
+    "language": "typescript",
+    "version": "1.0"
+  },
+  "framework": {
+    "name": "vitest",
+    "version": "1.6.0"
+  },
+  "language": "typescript",
+  "suiteFilter": "all",
+  "execution": {
+    "startTime": "2026-05-01T14:30:40.000Z",
+    "endTime": "2026-05-01T14:30:45.123Z",
+    "durationMs": 5123,
+    "exitCode": 0,
+    "timedOut": false
+  },
+  "summary": {
+    "totalTests": 42,
+    "passed": 39,
+    "failed": 1,
+    "skipped": 2,
+    "todo": 0,
+    "totalTestFiles": 8,
+    "passedFiles": 7,
+    "failedFiles": 1
+  },
+  "tests": [
+    {
+      "file": "src/utils/format.test.ts",
+      "cases": [
+        {
+          "name": "formatDate returns ISO for valid input",
+          "status": "passed",
+          "durationMs": 12,
+          "error": null
+        },
+        {
+          "name": "formatDate throws on invalid input",
+          "status": "failed",
+          "durationMs": 8,
+          "error": "Expected throw but got undefined"
+        }
+      ]
+    }
+  ],
+  "coverage": {
+    "collected": true,
+    "lines": { "total": 1842, "covered": 1523, "pct": 82.7 },
+    "branches": { "total": 312, "covered": 234, "pct": 75.0 },
+    "functions": { "total": 198, "covered": 167, "pct": 84.3 },
+    "statements": { "total": 2104, "covered": 1756, "pct": 83.5 }
+  },
+  "errors": [
+    {
+      "type": "test_failure",
+      "file": "src/utils/format.test.ts",
+      "testName": "formatDate throws on invalid input",
+      "message": "Expected throw but got undefined"
+    }
+  ],
+  "raw_output": null
+}

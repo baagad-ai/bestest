@@ -21,6 +21,7 @@ pipeline {
 
     environment {
         COVERAGE_THRESHOLD = '80'
+        MUTATION_THRESHOLD = '80'
         NODE_VERSION       = '20'
         PYTHON_VERSION     = '3.12'
         JAVA_VERSION       = '17'
@@ -54,10 +55,10 @@ pipeline {
                         sh '''
                             npx vitest run --reporter=verbose --reporter=junit --outputFile=.bestest/reports/junit-js.xml src/**/*.test.{ts,tsx} --coverage
 
-                            COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+                            COVERAGE=$(python3 -c "import json; print(json.load(open('coverage/coverage-summary.json'))['total']['lines']['pct'])")
                             echo "JS/TS Coverage: ${COVERAGE}%"
 
-                            if [ "$(echo "$COVERAGE < $COVERAGE_THRESHOLD" | bc -l)" -eq 1 ]; then
+                            if [ "$(python3 -c "print(1 if float('$COVERAGE') < float('$COVERAGE_THRESHOLD') else 0)")" -eq 1 ]; then
                                 echo "ERROR: Coverage ${COVERAGE}% is below threshold ${COVERAGE_THRESHOLD}%"
                                 exit 1
                             fi
@@ -85,7 +86,7 @@ pipeline {
                             COVERAGE=$(python -c "import json; print(json.load(open('coverage.json'))['totals']['percent_covered'])")
                             echo "Python Coverage: ${COVERAGE}%"
 
-                            if [ "$(echo "$COVERAGE < $COVERAGE_THRESHOLD" | bc -l)" -eq 1 ]; then
+                            if [ "$(python3 -c "print(1 if float('$COVERAGE') < float('$COVERAGE_THRESHOLD') else 0)")" -eq 1 ]; then
                                 echo "ERROR: Coverage ${COVERAGE}% is below threshold ${COVERAGE_THRESHOLD}%"
                                 exit 1
                             fi
@@ -134,7 +135,7 @@ pipeline {
                             COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
                             echo "Go Coverage: ${COVERAGE}%"
 
-                            if [ "$(echo "$COVERAGE < $COVERAGE_THRESHOLD" | bc -l)" -eq 1 ]; then
+                            if [ "$(python3 -c "print(1 if float('$COVERAGE') < float('$COVERAGE_THRESHOLD') else 0)")" -eq 1 ]; then
                                 echo "ERROR: Coverage ${COVERAGE}% is below threshold ${COVERAGE_THRESHOLD}%"
                                 exit 1
                             fi
@@ -300,10 +301,10 @@ pipeline {
                 sh '''
                     npx stryker run
 
-                    SCORE=$(jq '.mutationScore' reports/mutation/json)
+                    SCORE=$(python3 -c "import json; print(json.load(open('reports/mutation/mutation.json')).get('mutationScore', 0))" 2>/dev/null || echo 0)
                     echo "Mutation Score: ${SCORE}%"
 
-                    if [ "$(echo "$SCORE < 80" | bc -l)" -eq 1 ]; then
+                    if [ "$(python3 -c "print(1 if float('$SCORE') < float('$MUTATION_THRESHOLD') else 0)")" -eq 1 ]; then
                         echo "ERROR: Mutation score ${SCORE}% is below threshold 80%"
                         exit 1
                     fi

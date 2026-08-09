@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/baagad-ai/bestest/actions/workflows/validate-plugin.yml/badge.svg)](https://github.com/baagad-ai/bestest/actions/workflows/validate-plugin.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.4.0-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)](CHANGELOG.md)
 
 **Detect your stack · Pick the right framework · Generate tests that actually work · Ship with confidence**
 
@@ -120,7 +120,7 @@ stack-profile.json
 
 ### The Spoke Architecture
 
-bestest uses a **lean orchestrator + spoke** pattern. Only one spoke loads per command, keeping context windows small while supporting 16 commands across 4 languages.
+bestest uses a **lean orchestrator + spoke** pattern. Only one spoke loads per command, keeping context windows small while supporting 19 commands across 4 languages.
 
 ```
 SKILL.md (orchestrator — routing, principles, reference index)
@@ -139,7 +139,7 @@ SKILL.md (orchestrator — routing, principles, reference index)
 │   ├── spoke-ci.md                   ← /bestest ci
 │   └── ... (19 spokes total)
 └── scripts/
-    └── validate-skill.sh             ← 304 consistency checks
+    └── validate-skill.sh             ← 345 consistency checks
 ```
 
 ### The 7-Phase Generation Pipeline
@@ -216,7 +216,7 @@ All state lives in `.bestest/` inside your repo — version-controlled, auditabl
 
 ## Validation
 
-bestest validates itself. A CI pipeline runs **304 automated checks** across 7 domains:
+bestest validates itself. A CI pipeline runs **345 structural checks + 77 golden-fixture contract checks** across multiple domains:
 
 - File structure integrity
 - Cross-reference validity (no phantom file references)
@@ -225,13 +225,20 @@ bestest validates itself. A CI pipeline runs **304 automated checks** across 7 d
 - Spoke consistency (shared sections match)
 - Template validity
 - Version parity
+- Behavioral field contracts (every spoke reads only fields the schemas define)
+
+## Runtime Model
+
+bestest is a **skill**, not a CLI tool. It's a directory of markdown instructions that AI coding agents (GSD/pi, Claude Code, Cursor, opencode, etc.) load as guidance. When you run `/bestest generate`, the agent reads the corresponding spoke file and follows it step-by-step — running real commands, reading your source, and writing real test files. There is no daemon or binary to install.
+
+Alongside the prose spec, bestest ships a small **deterministic helper** (`scripts/bestest-cli.py`, stdlib-only Python) that the agent uses for mechanical operations — report selection (with companion-run filtering), config read/write/validate, concurrency locks, and metrics merges. It's optional: if `python3` isn't available, the agent follows the documented manual steps instead. See `references/bestest-cli.md`.
 
 ## Documentation
 
 | File | Description |
 |---|---|
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to add spokes, languages, and contribute |
-| [CHANGELOG.md](CHANGELOG.md) | Version history (currently v1.4.0) |
+| [CHANGELOG.md](CHANGELOG.md) | Version history (currently v2.0.0) |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting policy |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Contributor Covenant v2.1 |
 | [LICENSE](LICENSE) | MIT License |

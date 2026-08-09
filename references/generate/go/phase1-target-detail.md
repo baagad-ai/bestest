@@ -7,16 +7,22 @@ Detailed targeting modes, path validation, preflight checks, Go naming conventio
 Before processing any target path through the targeting modes, validate the path to prevent filesystem traversal attacks, canonicalization issues, and invalid inputs. Apply these six validation steps, **in this exact order**, to every user-supplied path — ordering matters for security:
 
 ```
-1. Traversal rejection: Reject raw userPath containing ".." or starting with "/".
-   if strings.Contains(userPath, "..") || strings.HasPrefix(userPath, "/"):
-     fmt.Println("Invalid path: directory traversal detected.")
-     Exit.
+1. Traversal rejection: Reject raw userPath with a ".." path segment or starting with "/".
+   for _, seg := range strings.Split(filepath.ToSlash(userPath), "/") {
+     if seg == ".." || strings.HasPrefix(userPath, "/") {
+       fmt.Println("Invalid path: directory traversal detected.")
+       Exit.
+     }
+   }
+   (Segment-based, not substring: a legitimate filename like "file..name" must NOT be rejected.)
 
 2. Canonicalize: Resolve symlinks and relative segments (./) using filepath.EvalSymlinks() + filepath.Clean().
    canonical, err := filepath.EvalSymlinks(filepath.Clean(userPath))
 
 3. Boundary check: Verify the canonical path is within the project root.
-   if !strings.HasPrefix(canonical, projectRoot):
+   Prefix-collision-safe check — require root itself OR root followed by a separator,
+   so a sibling like /project-root-evil cannot pass.
+   if canonical != projectRoot && !strings.HasPrefix(canonical, projectRoot+string(os.PathSeparator)):
      fmt.Printf("Path escapes project boundary: %s\n", userPath)
      Exit.
 
@@ -31,9 +37,11 @@ Before processing any target path through the targeting modes, validate the path
      Exit.
 
 6. Sensitive file exclusion: Reject files matching sensitive filename patterns.
-   Sensitive patterns (case-insensitive): .env, .env.*, *.pem, *.key, *.p12, *.pfx, *.jks,
-     id_rsa*, id_ed25519*, id_ecdsa*, credentials.*, service-account*.json,
-     .netrc, .npmrc, .pypirc, .aws/*, .ssh/*, .gnupg/*, *.keystore, *.truststore
+   Sensitive BASENAME patterns (case-insensitive): .env, .env.*, *.pem, *.key, *.p12,
+     *.pfx, *.jks, id_rsa*, id_ed25519*, id_ecdsa*, credentials.*, service-account*.json,
+     .netrc, .npmrc, .pypirc, *.keystore, *.truststore
+   Sensitive DIRECTORY patterns (matched against the FULL canonical path, not basename):
+     .aws/, .ssh/, .gnupg/, .git/, .hg/, .svn/, node_modules/, .venv/, .tox/, secrets/
    basename := filepath.Base(canonical)
    if matchSensitive(basename):
      fmt.Printf("Sensitive file rejected: %s. Test generation for credential and key files is blocked for security.\n", canonical)
@@ -41,6 +49,23 @@ Before processing any target path through the targeting modes, validate the path
 ```
 
 All six checks must pass before the path enters any targeting mode. If any check fails, print the error and exit — do not fall through to other modes.
+
+### Monorepo Path Boundary
+
+In monorepos (`monorepo.detected` is true in StackProfile / `monorepo.enabled` in config), the project root for the boundary check is the **package root**, not the repo root:
+
+```
+If monorepo is detected:
+  packageRoot = directory containing the nearest package manifest
+  projectRoot (for the boundary check) = packageRoot
+  paths.src and paths.test globs are evaluated relative to packageRoot
+
+Else:
+  projectRoot = repo root (single-package behavior)
+```
+
+This prevents cross-package targeting from a single-package generate invocation while still allowing explicit cross-package paths when the user passes a full path. If `monorepo.detected` is true but no package manifest is found near the target, fall back to the repo root with a warning.
+
 
 ## Targeting Modes (Full Detail)
 
@@ -166,6 +191,17 @@ If no go.mod found:
   Print: "Error: No go.mod found. bestest requires a Go module."
   Print: "Initialize a module: go mod init <module-path>"
   Exit.
+
+Check CGO status:
+  Run: go env CGO_ENABLED
+  If CGO_ENABLED is 0:
+    Note: "CGO is disabled. Packages importing net, os/user, or cgo-based dependencies
+           (e.g., SQLite drivers) may fail to build in tests."
+    Do NOT exit — proceed, but prefer pure-Go test strategies for affected packages.
+  If CGO_ENABLED is 1:
+    Note: "CGO enabled. Integration with cgo-based dependencies is available for tests."
+  (This check matters because CGO affects `go build`/`go test` behavior and some mocking
+  strategies. It informs the dependency-identification step in Phase 2.)
 
 Check for testify in go.mod:
   Run: grep "github.com/stretchr/testify" go.mod

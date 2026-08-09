@@ -12,6 +12,11 @@ Every state-changing spoke (scan, run, fix, generate, migrate, doctor, coverage,
 {
   "schemaVersion": "1.0",
   "lastUpdated": "string (ISO 8601)",
+  "lastWriteConflict": {
+    "timestamp": "string (ISO 8601)",
+    "spoke": "string",
+    "action": "string"
+  },
   "healthScore": {
     "overall": 0.0,
     "breakdown": {
@@ -70,6 +75,7 @@ Every state-changing spoke (scan, run, fix, generate, migrate, doctor, coverage,
       {
         "timestamp": "string (ISO 8601)",
         "spoke": "string",
+        "scope": "string (suite filter: \"all\" | \"unit\" | \"integration\" | \"e2e\" | \"generated\")",
         "total": 0,
         "passed": 0,
         "failed": 0,
@@ -221,7 +227,7 @@ Run history across all spokes that execute tests.
 | `history[].total/passed/failed/skipped` | Run result counts. |
 | `history[].duration_ms` | Total test execution time in milliseconds. |
 | `history[].coverage` | Coverage snapshot from this run (same shape as `coverage.current`). |
-| `history[].scope` | string | Optional | Test suite filter used during this run: `"all"`, `"unit"`, `"e2e"`, `"integration"`, or `"generated"` (for companion run reports from generate). Default: `"all"`. |
+| `history[].scope` | string | Optional | Test suite filter used during this run: `"all"`, `"unit"`, `"e2e"`, `"integration"`, or `"generated"` (for companion run reports from generate). Default: `"all"`. Mapped from the run report's `suiteFilter` field — run report `suiteFilter: "generated"` → metrics `history[].scope: "generated"`; `suiteFilter: "all"` → `scope: "all"`. Consumers (report, doctor, status) should use this field to distinguish companion/generated runs from full-suite runs when reading run history. |
 | `history[].topFailures` | array | Optional | Bounded array (max 5) of `{file: string, name: string, error: string, category: string}` for the most impactful failures in this run. Empty if all tests passed. |
 | `historyMaxLength` | Maximum entries in `history`. Oldest entries evicted on insert. Default: 100. |
 
@@ -302,6 +308,7 @@ Every state-changing spoke follows this shared protocol when writing to `metrics
    - Recalculate derived values (healthScore, overallFlakeRate, etc.)
 6. Write back to .bestest/state/metrics.json (atomic write: write to temp file, then rename)
 7. Update config.yaml state.last_metrics with current timestamp
+   - Acquire .bestest/.config.lock before this write (per Ordered Locking Rule in references/pre-flight-protocol.md → Concurrency Lock Protocol: config → metrics ordering; when both files are written, lock config first, then metrics, and release in reverse)
 8. Release lock on .bestest/state/.metrics.lock
    - flock: released automatically when the subshell/process exits
    - mkdir: remove the lock directory with rm -rf

@@ -1,0 +1,117 @@
+{
+  "schemaVersion": "1.0",
+  "lastUpdated": "2026-05-01T14:30:45.123Z",
+  "lastWriteConflict": {
+    "timestamp": "2026-05-01T14:29:00.000Z",
+    "spoke": "spoke-scan",
+    "action": "best-effort metrics write without lock"
+  },
+  "healthScore": {
+    "overall": 82.0,
+    "breakdown": {
+      "coverage": 80.0,
+      "flakiness": 95.0,
+      "passRate": 96.0,
+      "freshness": 70.0,
+      "mutation": 0.0
+    }
+  },
+  "coverage": {
+    "current": {
+      "lines": 82.7,
+      "branches": 75.0,
+      "functions": 84.3,
+      "statements": 83.5
+    },
+    "target": 80.0,
+    "trend": [
+      {
+        "timestamp": "2026-05-01T14:30:45.123Z",
+        "lines": 82.7,
+        "branches": 75.0,
+        "functions": 84.3,
+        "statements": 83.5
+      }
+    ],
+    "trendMaxLength": 50
+  },
+  "tests": {
+    "total": 142,
+    "passing": 135,
+    "failing": 3,
+    "skipped": 4,
+    "byType": {
+      "unit": 120,
+      "integration": 18,
+      "e2e": 4
+    }
+  },
+  "flakiness": {
+    "flakyTests": [
+      {
+        "file": "src/services/payment.test.ts",
+        "name": "processPayment > handles timeout",
+        "failPassRatio": 0.4,
+        "signals": ["uncontrolled-time"],
+        "lastSeen": "2026-05-01T14:30:45.123Z"
+      }
+    ],
+    "overallFlakeRate": 0.05
+  },
+  "runs": {
+    "total": 12,
+    "history": [
+      {
+        "timestamp": "2026-05-01T14:30:45.123Z",
+        "spoke": "spoke-run",
+        "scope": "all",
+        "total": 42,
+        "passed": 39,
+        "failed": 1,
+        "skipped": 2,
+        "duration_ms": 5123,
+        "coverage": {
+          "lines": 82.7,
+          "branches": 75.0,
+          "functions": 84.3,
+          "statements": 83.5
+        }
+      }
+    ],
+    "historyMaxLength": 100
+  },
+  "modules": {
+    "entries": [
+      {
+        "path": "src/utils",
+        "tests": 28,
+        "passing": 28,
+        "coverage": 91.0
+      }
+    ]
+  },
+  "slowest": [
+    {
+      "file": "src/api/users.test.ts",
+      "name": "GET /users returns 200",
+      "durationMs": 482
+    }
+  ],
+  "failures": [
+    {
+      "file": "src/utils/format.test.ts",
+      "name": "formatDate throws on invalid input",
+      "error": "Expected throw but got undefined",
+      "category": "test_bug",
+      "lastSeen": "2026-05-01T14:30:45.123Z"
+    }
+  ],
+  "activity": [
+    {
+      "timestamp": "2026-05-01T14:30:45.123Z",
+      "spoke": "spoke-run",
+      "action": "run",
+      "summary": "Executed full suite: 42 tests, 1 failed"
+    }
+  ]
+}

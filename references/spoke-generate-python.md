@@ -14,7 +14,7 @@ The generate spoke is the primary value delivery command — it transforms scan 
 - Scan report is not strictly required — the spoke can generate in degraded mode without it, using filesystem scanning instead of gap targeting
 - Python virtual environment detected (one of: `VIRTUAL_ENV` env var, `.venv/` directory, Poetry environment, Conda environment)
 
-> **Shared pipeline:** This spoke implements the 7-phase generation pipeline. Shared sections (Parallel Dispatch Decision, Priority Scoring Formula, Default Targeting, Pre-read Instruction, Content Boundary Notice, Source Sanitization Protocol, Taint Notice, HITL Gate, Error Handling stub, Config State Update, Downstream Reference) are defined in `references/generate/pipeline-shared.md`. Only language-specific phases and deltas are documented below. The Pipeline Skeleton in pipeline-shared.md defines the canonical 7-phase structure every generate spoke follows.
+> **Shared pipeline:** This spoke implements the 7-phase generation pipeline. Shared sections (Parallel Dispatch Decision, Priority Scoring Formula, Default Targeting, Strategy Preview Gate, Pre-read Instruction, Content Boundary Notice, Source Sanitization Protocol, Taint Notice, HITL Gate, Error Handling stub, Config State Update, Downstream Reference) are defined in `references/generate/pipeline-shared.md`. Only language-specific phases and deltas are documented below. The Pipeline Skeleton in pipeline-shared.md defines the canonical 7-phase structure every generate spoke follows.
 
 ## Pre-Flight Checks
 
@@ -85,8 +85,14 @@ Confidence gate: See SKILL.md "Confidence Gate (R5)" — the orchestrator checks
 
 ```
 If no scan report exists in .bestest/reports/:
-  Print: "Warning: No scan report found. Generation will use filesystem scanning."
-  Set mode = "filesystem-scan", gaps = [], testInventory = [].
+  Check for the most recent coverage-*.json report (from /bestest coverage):
+    If found:
+      Print: "No scan report found. Using most recent coverage report for gap targeting."
+      Extract gaps[] (if present) from the coverage report.
+      Set mode = "coverage-guided".
+    Else:
+      Print: "Warning: No scan report found. Generation will use filesystem scanning."
+      Set mode = "filesystem-scan", gaps = [], testInventory = [].
 Else:
   Load most recent scan report. Extract gaps[], testInventory[], configSnapshot.
   Set mode = "scan-guided".
@@ -108,7 +114,7 @@ See references/generate/python/phase1-target-detail.md for full validation algor
 
 Determine which source files to generate tests for. Four targeting modes operate with priority ordering: explicit path overrides all other modes. Target file patterns for Python: `**/*.py` excluding `test_*.py`, `*_test.py`, `conftest.py`, `__init__.py`, and files in `migrations/`.
 
-> **On-demand load:** For path validation rules (5-step security validation), detailed targeting mode logic, Python naming conventions, priority scoring formula, and pre-flight detail, read `references/generate/python/phase1-target-detail.md`.
+> **On-demand load:** For path validation rules (6-step security validation: traversal rejection → canonicalize → boundary check → existence → file type → sensitive-file exclusion), detailed targeting mode logic, Python naming conventions, priority scoring formula, and pre-flight detail, read `references/generate/python/phase1-target-detail.md`.
 
 ### Targeting Modes (Summary)
 
@@ -156,14 +162,16 @@ Else:
 
 ### Step 3: Fetch framework documentation via Context7
 
-Use the Context7 helper from SKILL.md to fetch version-specific documentation. For each framework, call `resolve_library({ libraryName, query })` then `get_library_docs({ libraryId, query, tokens })`.
+Use the Context7 helper from `references/context7-helper.md` to fetch version-specific documentation. For each framework, call `resolve_library({ libraryName, query })` then `get_library_docs({ libraryId, query, tokens })`.
+
+> **Sanitization note:** The library names below are static allowlisted values from this spoke — never interpolate user-supplied strings into `libraryName`. If a name is not in the Common Library Mappings table in `references/context7-helper.md`, do not call `resolve_library` with it; fall back to static patterns instead (see Graceful Fallback).
 
 **Fetch targets:**
 - **pytest** (libraryName: `"pytest"`, query: `"pytest.mark.parametrize pytest.raises fixture conftest mocker pytest-mock"`, tokens: 5000): Produces version-accurate pytest patterns for fixtures, parametrize, markers, and assertion introspection.
 - **pytest-asyncio** (libraryName: `"pytest-asyncio"`, query: `"pytest.mark.asyncio async fixture event loop"`, tokens: 3000): Async test patterns. Only fetched when async is detected.
 - **FastAPI** (libraryName: `"fastapi"`, query: `"TestClient httpx testing dependency injection override"`, tokens: 5000): FastAPI testing patterns with httpx. Only fetched when FastAPI is detected.
 - **Flask** (libraryName: `"flask"`, query: `"test_client testing application context"`, tokens: 3000): Flask test client patterns. Only fetched when Flask is detected.
-- **Django** (libraryName: `"django"`, query: `"TestCase Client pytest-django django_db marker"`, tokens: 5000): Django testing patterns. Only fetched when Django is detected.
+- **Django** (libraryName: `"django"`, query: `"TestCase Client pytest-django django_db marker"`, tokens: 5000): Django testing patterns. Only fetched when Django is detected. Note: if `resolve_library("django")` returns no match, use the mapped library `"django rest framework"` (see `references/context7-helper.md` mappings) or fall back to static patterns.
 - **Hypothesis** (libraryName: `"hypothesis"`, query: `"given strategies property-based testing"`, tokens: 3000): Property-based testing patterns. Only fetched when complexity warrants it.
 
 > **Shared section:** See Graceful Fallback (Context7) in `references/generate/pipeline-shared.md`. For Python, the static fallback source is `references/python-generation-guide.md`.
@@ -324,6 +332,7 @@ After execution verification completes (whether tests pass or fail), write a `ru
 **What to include:**
 - `schemaVersion`: "1.0"
 - `timestamp`: Generation completion timestamp
+- `configSnapshot`: Deep snapshot of `.bestest/config.yaml` at generation time (same shape as spoke-run Phase 4)
 - `framework`: From config
 - `language`: From config
 - `suiteFilter`: "generated" (to distinguish from full suite runs)
@@ -332,6 +341,7 @@ After execution verification completes (whether tests pass or fail), write a `ru
 - `tests[]`: Per-file results for generated tests only
 - `coverage`: If collected during verification
 - `errors[]`: Any errors from failed verification runs
+- `raw_output`: Raw framework output when JSON parsing was unavailable, otherwise `null`
 - `companionTo`: "generate" (marks this as generation-related, not a full suite run)
 
 **When to skip:** If `generation.verify_pass` is `false`, or if tests could not be executed (compilation failure), skip writing the companion run report.

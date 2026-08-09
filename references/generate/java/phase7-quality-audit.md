@@ -2,6 +2,8 @@
 
 Score each generated test file against the assertion quality rubric. Detect anti-patterns from `references/anti-patterns.md` and Java-specific anti-patterns. Run stability testing.
 
+> **Guide:** See `references/java-generation-guide.md` for the Java-specific generation patterns (Mockito, @ParameterizedTest, @Nested, Spring slices, Testcontainers) that inform these scores.
+
 ## Step 1: Assertion quality scoring
 
 Score each test file on the 0-100 rubric:

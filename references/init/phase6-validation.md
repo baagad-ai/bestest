@@ -83,7 +83,7 @@ go.mod                        — exists with testify dependency added
 ### Config Validation
 
 Read `.bestest/config.yaml` and verify:
-- `framework` field is present and is one of: `vitest`, `jest`, `pytest`, `junit5`, `go_testing`
+- `framework` field is present and is one of: `vitest`, `jest`, `mocha`, `jasmine`, `pytest`, `junit5`, `testng`, `go_testing` (full set per `references/config-schema.md`). Note: operational spokes (run/fix/ci) currently implement `vitest`, `jest`, `pytest`, `junit5`, `go_testing`; `mocha`, `jasmine`, and `testng` are legacy-detection values without generation support.
 - `language` field is present for Python projects (value: `python`), Java projects (value: `java`), and Go projects (value: `go`)
 - `coverage.target` is a number between 0 and 100
 - `paths.test` and `paths.src` are non-empty strings

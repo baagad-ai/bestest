@@ -128,7 +128,7 @@ while IFS= read -r filepath; do
   rel="${filepath#$SKILL_DIR/}"
   check "references file '$rel' is listed in reference_index" "E004" "critical" \
     "echo '$INDEX_REFS' | grep -qF '$rel'"
-done <<< "$(find "$SKILL_DIR/references" -name '*.md' -not -path '*/templates/*' -not -name 'error-codes.md' | sort)"
+done <<< "$(find "$SKILL_DIR/references" -name '*.md' -not -path '*/templates/*' -not -name 'error-codes.md' -not -name 'reference-index.md' | sort)"
 
 # ─── Domain 3: Spoke Existence & Non-Empty ────────────────────────────────
 echo "── Domain 3: Spoke Existence & Non-Empty ──"

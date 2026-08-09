@@ -144,10 +144,13 @@ Read all available run and scan reports from `.bestest/reports/`, sorted chronol
      - coverage: { collected, lines: { total, covered, pct }, branches: { total, covered, pct }, functions: { total, covered, pct }, statements: { total, covered, pct } }
      - execution.durationMs: total execution time
      - suiteFilter: which suite was run
+     - companionTo: present → this is a partial verification run (generated-test or scan companion); absent → full-suite run
      - framework: { name, version }
      - language: string ("javascript", "typescript", "python", "java", "go")
      - errors: array of error objects (for failure counts)
    ```
+
+   **Companion run labeling:** Run reports with `companionTo` present (e.g., `"generate"` or a scan-report filename) are partial verification runs — they cover generated tests only, not the full suite. In every trend/history table, mark these runs with a `(generated)` / `(scan companion)` tag instead of merging them silently with full-suite runs. Never treat a companion run as the "latest full-suite run" for pass-rate or coverage baselines.
 
    After loading all run reports, build a language inventory:
    ```
@@ -228,13 +231,18 @@ For each pair of consecutive run reports (sorted by timestamp):
     }
 ```
 
-For the most recent run, also compute the overall pass rate:
+For the most recent FULL-SUITE run, also compute the overall pass rate:
 ```
-latestRun = runReports[last]
+latestRun = last run report where companionTo is absent
+           (fall back to runReports[last] if all runs are companions)
 passRate = latestRun.summary.passed / latestRun.summary.totalTests * 100
 ```
 
+Guard against divide-by-zero: if `latestRun.summary.totalTests === 0`, set `passRate = 0` and note "no tests executed in this run".
+
 If only one run report exists, skip trend comparison and show only the single data point.
+
+**Companion-run handling:** Companion run reports (`companionTo` present) must be excluded from pass/fail trend comparisons by default — they represent partial verification runs (generated tests only). If you include them in history tables, tag each with `(generated)` / `(scan companion)` and exclude them from the latest-run baseline calculation above.
 
 **Per-language pass/fail breakdown (multi-language only):**
 
@@ -262,10 +270,17 @@ Extract coverage percentages from consecutive run or scan reports to show covera
 
 ```
 Collect coverage data points from all sources, sorted by timestamp:
-  For each run report with coverage.collected === true:
+  For each run report with coverage.collected === true (excluding companion reports —
+    `companionTo` present means generated-test-only coverage; include only when tagged
+    and no full-suite coverage exists):
     Add data point: { timestamp, source: "run", lines: pct, branches: pct, functions: pct, statements: pct }
   For each scan report with coverage data:
     Add data point: { timestamp, source: "scan", lines: pct, branches: pct, functions: pct, statements: pct }
+
+Deduplicate same-timestamp points:
+  A scan writes both scan-<ts>.json and a companion run-<ts>.json with the same timestamp,
+  so the same execution can appear twice. When two points share a timestamp, keep one
+  (prefer "scan" over a scan companion; prefer a full-suite run over a generated companion).
 
 Sort all data points by timestamp ascending.
 
@@ -776,7 +791,7 @@ A compact table of recent run results for quick reference. Present when run repo
 No run history available. Run /bestest run to capture test execution data.
 ```
 
-Limited to the 10 most recent runs, sorted newest first.
+Limited to the 10 most recent runs, sorted newest first. Runs with `companionTo` set are tagged `(generated)` or `(scan companion)` in the Suite column (e.g., `generated (companion)`) so partial verification runs are never mistaken for full-suite results.
 
 ---
 
@@ -1070,8 +1085,11 @@ Follow this protocol on every invocation:
 2. Parse as JSON
 3. If parse fails (corruption):
    a. Log warning: "metrics.json corrupted — recreating with defaults"
-   b. Initialize fresh metrics with schemaVersion "1.0" and default values
-   c. Continue with step 5 (do NOT abort the spoke)
+   b. Backup the corrupt file: `cp .bestest/state/metrics.json .bestest/state/metrics.json.corrupt.$(date +%s)`
+      - Log the backup path so agents can locate it for forensic inspection
+      - This must happen BEFORE recreating defaults to preserve evidence
+   c. Initialize fresh metrics with schemaVersion "1.0" and default values
+   d. Continue with step 5 (do NOT abort the spoke)
 4. Validate schemaVersion — warn if MAJOR differs, proceed if MINOR differs
 5. Merge spoke-specific data:
    - Update lastUpdated to current ISO 8601 timestamp
@@ -1133,6 +1151,7 @@ Source: `references/spoke-run.md` — run-results.json shape
 | `coverage.statements.pct` | Coverage History | Statement coverage percentage |
 | `execution.durationMs` | Duration Trends, Run History | Execution time tracking |
 | `suiteFilter` | Run History | Filter context for each run |
+| `companionTo` | Run History, Pass/Fail Trends, Coverage Trends | Distinguishes full-suite runs from partial verification runs (generated / scan companions). Companion runs are tagged and excluded from latest-run baselines. |
 | `framework.name` | Report Header | Framework identification |
 | `framework.version` | Report Header | Version tracking |
 | `language` | Report Header, Coverage Heatmap, Coverage History, Run History, Pass/Fail Trends | Language detection for multi-language breakdown |

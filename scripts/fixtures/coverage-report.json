@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1.0",
+  "timestamp": "2026-05-01T14:30:45.123Z",
+  "configSnapshot": {
+    "framework": "vitest",
+    "language": "typescript",
+    "version": "1.0",
+    "coverage": {
+      "enabled": true,
+      "target": 80,
+      "provider": "v8"
+    }
+  },
+  "targetComparison": {
+    "lines": { "actual": 82.7, "target": 80, "delta": 2.7, "status": "met" },
+    "branches": { "actual": 75.0, "target": 80, "delta": -5.0, "status": "unmet" },
+    "functions": { "actual": 84.3, "target": 80, "delta": 4.3, "status": "met" },
+    "statements": { "actual": 83.5, "target": 80, "delta": 3.5, "status": "met" }
+  },
+  "gaps": [
+    {
+      "sourcePath": "src/services/payment.ts",
+      "hasTest": false,
+      "coverage": 0,
+      "priority": "critical",
+      "reason": "No test file. Imported by 6 modules."
+    }
+  ],
+  "summary": {
+    "totalGaps": 23,
+    "byPriority": {
+      "critical": 3,
+      "high": 7,
+      "medium": 9,
+      "low": 4
+    },
+    "coverageDeltas": {
+      "lines": { "actual": 82.7, "target": 80, "delta": 2.7, "status": "met" },
+      "branches": { "actual": 75.0, "target": 80, "delta": -5.0, "status": "unmet" },
+      "functions": { "actual": 84.3, "target": 80, "delta": 4.3, "status": "met" },
+      "statements": { "actual": 83.5, "target": 80, "delta": 3.5, "status": "met" }
+    },
+    "untestedFiles": 10,
+    "underCoveredFiles": 13
+  }
+}

@@ -5,11 +5,19 @@ Go's strict compilation rules mean every generated test must pass `go vet`, `go 
 ## Execution
 
 ```
-# Global iteration budget check
-global_iterations += 1
-if global_iterations > generation.max_iterations (default: 10):
-  Emit diagnostic summary (see Global Iteration Budget in references/generate/pipeline-shared.md).
-  Halt. Do not proceed with this phase.
+# Two-tier iteration budget check (see Global Iteration Budget in references/generate/pipeline-shared.md)
+# Tier 1 — per-file retry depth
+file_iterations[<test-file>] += 1
+if file_iterations[<test-file>] > generation.max_retries_per_file (default: 5):
+  Print: "Per-file retry budget exhausted for {file} ({max_retries_per_file} iterations)."
+  Defer the file. Move to next file.
+  Return to the generation loop (Phase 1).
+
+# Tier 2 — file-processing breadth (maintained by the generation loop between files)
+# If files_processed >= generation.max_files (default: 50), break out of the generation loop
+# and emit the diagnostic summary.
+
+# Legacy compatibility: if only generation.max_iterations is set, both tiers inherit its value.
 
 # Recompilation guard
 if generation.recompilation_guard is true:
@@ -51,6 +59,7 @@ When compilation fails, analyze errors and apply common fixes:
 | **Syntax error** (`syntax error`) | Fix the test code structure (missing braces, incorrect slice syntax, wrong var declaration). |
 | **Wrong package declaration** (`found packages X and Y`) | Ensure the test file's package declaration matches the source file's package (or uses `xxx_test` for black-box). |
 | **Missing `go.sum` entry** | Run `go mod tidy` to update go.sum with new testify dependency. |
+| **Missing test dependency in go.mod** | With user approval (HITL), add the dependency: `go get <module>@latest` then `go mod tidy`. If the user declines, note the missing dependency in the quality report and continue — do NOT modify go.mod without approval. |
 | **Build tag mismatch** | Add required build tags: `go test -tags=integration ./...` |
 
 ## Fix Loop

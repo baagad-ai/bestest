@@ -18,7 +18,9 @@ Before processing any target path through the targeting modes below, validate th
    canonical = os.path.realpath(user_path)
 
 3. Boundary check: Verify the canonical path is within the project root.
-   if not canonical.startswith(project_root):
+   Prefix-collision-safe check — require root itself OR root followed by a separator,
+   so a sibling like /project-root-evil cannot pass.
+   if canonical != project_root and not canonical.startswith(project_root + os.sep):
      print(f"Path escapes project boundary: {user_path}")
      Exit.
 
@@ -33,11 +35,14 @@ Before processing any target path through the targeting modes below, validate th
      Exit.
 
 6. Sensitive file exclusion: Reject files matching sensitive filename patterns.
-   Sensitive patterns (case-insensitive): .env, .env.*, *.pem, *.key, *.p12, *.pfx, *.jks,
-     id_rsa*, id_ed25519*, id_ecdsa*, credentials.*, service-account*.json,
-     .netrc, .npmrc, .pypirc, .aws/*, .ssh/*, .gnupg/*, *.keystore, *.truststore
+   Sensitive BASENAME patterns (case-insensitive): .env, .env.*, *.pem, *.key, *.p12,
+     *.pfx, *.jks, id_rsa*, id_ed25519*, id_ecdsa*, credentials.*, service-account*.json,
+     .netrc, .npmrc, .pypirc, *.keystore, *.truststore
+   Sensitive DIRECTORY patterns (matched against the FULL canonical path, not basename):
+     .aws/, .ssh/, .gnupg/, .git/, .hg/, .svn/, node_modules/, .venv/, .tox/, secrets/
    basename = os.path.basename(canonical)
-   if fnmatch.fnmatch(basename.lower(), any sensitive pattern):
+   if fnmatch.fnmatch(basename.lower(), any sensitive basename pattern) \
+      or any(f"/{d}" in canonical or canonical.startswith(d) for d in sensitive_dirs):
      print(f"Sensitive file rejected: {canonical}. Test generation for credential and key files is blocked for security.")
      Exit.
 ```
@@ -45,6 +50,23 @@ Before processing any target path through the targeting modes below, validate th
 All six checks must pass before the path enters any targeting mode below. If any check fails, print the error and exit — do not fall through to other modes.
 
 ---
+
+### Monorepo Path Boundary
+
+In monorepos (`monorepo.detected` is true in StackProfile / `monorepo.enabled` in config), the project root for the boundary check is the **package root**, not the repo root:
+
+```
+If monorepo is detected:
+  packageRoot = directory containing the nearest package manifest
+  projectRoot (for the boundary check) = packageRoot
+  paths.src and paths.test globs are evaluated relative to packageRoot
+
+Else:
+  projectRoot = repo root (single-package behavior)
+```
+
+This prevents cross-package targeting from a single-package generate invocation while still allowing explicit cross-package paths when the user passes a full path. If `monorepo.detected` is true but no package manifest is found near the target, fall back to the repo root with a warning.
+
 
 ## Targeting Modes
 
@@ -97,7 +119,7 @@ If --type <kind> is specified (kind = unit | integration | e2e):
 
 ```
 If --critical flag is set:
-  Priorize entry points, authentication modules, data handling, payment logic, error-prone modules.
+  Prioritize entry points, authentication modules, data handling, payment logic, error-prone modules.
   If mode is "scan-guided":
     Filter gaps[] where priority is "critical".
     If no critical gaps: expand to "high" priority.
@@ -177,17 +199,33 @@ Wait for user choice. Do NOT proceed with corrupted state.
 
 ## Schema version validation
 
-Validate `stack-profile.json` schemaVersion ≤ 1.3 and `scan-report.json` schemaVersion ≤ 1.2. If MAJOR version differs → error and exit. If MINOR exceeds expected → warning and continue. If missing → treat as "1.0" legacy.
-annot be read."
-Print: "  Options:"
-Print: "    (a) Regenerate — delete .bestest/ and re-run /bestest init."
-Print: "    (b) Manual fix — edit the file to correct the JSON syntax."
-Print: "    (c) Abort — exit without proceeding."
-Wait for user choice. Do NOT proceed with corrupted state.
+```
+Validate stack-profile.json schemaVersion (if loaded):
+  Expected version: ≤ 1.3 (current known version).
+  If schemaVersion is missing:
+    Treat as version "1.0" (pre-versioning legacy). Print a note and continue.
+  If MAJOR version matches (1.x) and MINOR ≤ 3:
+    Proceed normally.
+  If MAJOR version matches but MINOR > 3:
+    Print: "⚠ stack-profile.json schemaVersion {version} is newer than expected (≤ 1.3). Proceeding — unrecognized fields will be ignored."
+    Continue with warning.
+  If MAJOR version differs:
+    Print: "Error: stack-profile.json schemaVersion {version} has an incompatible MAJOR version. Expected 1.x."
+    Print: "Update bestest to the latest version, or re-run /bestest init to regenerate."
+    Exit.
+
+Validate scan-report.json schemaVersion (if loaded):
+  Expected version: ≤ 1.2 (current known version).
+  If schemaVersion is missing:
+    Treat as version "1.0" (pre-versioning legacy). Print a note and continue.
+  If MAJOR version matches (1.x) and MINOR ≤ 2:
+    Proceed normally.
+  If MAJOR version matches but MINOR > 2:
+    Print: "⚠ scan-report.json schemaVersion {version} is newer than expected (≤ 1.2). Proceeding — unrecognized fields will be ignored."
+    Continue with warning.
+  If MAJOR version differs:
+    Print: "Error: scan-report.json schemaVersion {version} has an incompatible MAJOR version. Expected 1.x."
+    Print: "Update bestest to the latest version, or re-run /bestest scan to regenerate."
+    Exit.
 ```
 
----
-
-## Schema version validation
-
-Validate `stack-profile.json` schemaVersion ≤ 1.3 and `scan-report.json` schemaVersion ≤ 1.2. If MAJOR version differs → error and exit. If MINOR exceeds expected → warning and continue. If missing → treat as "1.0" legacy.

@@ -365,8 +365,7 @@ framework and captures structured results including pass/fail counts,
 timing, and failure details.
 
 Usage:
-  /bestest run [test-pattern]
-  /bestest run --watch          → Run in watch mode
+  /bestest run [suite]          → suite: unit | integration | e2e | all | affected
   /bestest run --coverage       → Run with coverage collection
 
 Prerequisites:
@@ -405,8 +404,7 @@ causes, and applies targeted fixes with verification.
 
 Usage:
   /bestest fix [test-file]
-  /bestest fix --flaky             → Target flaky tests only
-  /bestest fix --report <path>     → Fix from a specific run report
+  /bestest fix --flaky             → Target flaky tests only (requires ≥2 full-suite run reports)
 
 Prerequisites:
   .bestest/ with config.yaml
@@ -479,10 +477,7 @@ Generate human-readable test reports. Produces formatted reports from
 scan, run, and coverage data for sharing with the team.
 
 Usage:
-  /bestest report [type]
-  /bestest report summary         → Overall test health summary
-  /bestest report coverage        → Coverage trend report
-  /bestest report flaky           → Flaky test report
+  /bestest report
 
 Prerequisites:
   .bestest/ with config.yaml
@@ -490,7 +485,7 @@ Prerequisites:
 
 What it does:
   1. Reads available reports from .bestest/reports/
-  2. Aggregates data by report type
+  2. Aggregates data into summary, trends, and history
   3. Generates a formatted Markdown report
 
 Output:
@@ -498,7 +493,6 @@ Output:
 
 Examples:
   /bestest report
-  /bestest report summary
 
 See also:
   /bestest scan
@@ -547,16 +541,16 @@ See also:
 ```
 ─── /bestest expand ───
 
-Add new test types to the project. Extends the testing strategy to
-include integration tests, E2E tests, snapshot tests, or other types
-beyond what init configured.
+Add a new test type to the project. Extends the testing strategy beyond
+what init configured.
+
+Supported types: e2e, api, mutation, contract, chaos, performance
 
 Usage:
   /bestest expand <type>
-  /bestest expand integration
   /bestest expand e2e
-  /bestest expand snapshot
-  /bestest expand visual
+  /bestest expand api
+  /bestest expand mutation
 
 Prerequisites:
   .bestest/ with config.yaml
@@ -575,9 +569,9 @@ Output:
   Updated TESTING.md
 
 Examples:
-  /bestest expand integration
   /bestest expand e2e
-  /bestest expand snapshot
+  /bestest expand api
+  /bestest expand mutation
 
 See also:
   /bestest init
@@ -623,7 +617,8 @@ Output:
 
 Examples:
   /bestest migrate jest vitest
-  /bestest migrate cypress playwright --gradual
+  /bestest migrate junit4 junit5 --gradual   (--gradual is JUnit4→5 only)
+  /bestest migrate cypress playwright
 
 See also:
   /bestest init

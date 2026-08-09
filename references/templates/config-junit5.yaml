@@ -37,6 +37,11 @@ paths:
 e2e:
   enabled: {{e2e_enabled}}
   framework: {{e2e_framework}}
+  # config_path: playwright.config.ts  # uncomment when E2E is enabled
+
+# Flaky-test retry policy for generated CI pipelines and E2E suites
+flaky:
+  retries: 2
 
 # API testing settings
 # MockMvc for Spring MVC, WebTestClient for WebFlux, null for non-HTTP
@@ -76,7 +81,7 @@ junit5:
 
 # Test generation behavior
 generation:
-  # quality_threshold: minimum self-assessed quality score (0-1)
+  # quality_threshold: minimum quality gate, normalized 0-1 (0.7 = score 70 on the 0-100 rubric)
   quality_threshold: 0.7
   # verify_compilation: run javac/gradle compile after generation
   verify_compilation: true

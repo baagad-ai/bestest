@@ -137,6 +137,8 @@ In SKILL.md `<routing>` section:
 - [ ] Language added to reference_index in SKILL.md
 - [ ] reference-index.md updated with new spoke file and language sub-files
 - [ ] pipeline-shared.md sections reviewed for language-specific applicability (e.g., HITL Gate Core, Downstream Reference Core, Metrics Update Core)
+- [ ] Add a run-report companion fixture to `scripts/fixtures/` for the new language (see `scripts/fixtures/run-report-companion.json`) and re-run `scripts/validate-contracts.sh`
+- [ ] CLI smoke test: run `python3 <skill-dir>/scripts/bestest-cli.py detect` on a representative project of the new language
 - [ ] StackProfile schema updated with language identifier
 - [ ] Version bumped in SKILL.md frontmatter
 - [ ] CHANGELOG.md entry added
@@ -156,11 +158,13 @@ In SKILL.md `<routing>` section:
 
 Validate changes using the built-in validation scripts:
 
-1. **Run `scripts/validate-plugin.sh`** — 298 automated checks covering file structure, cross-references, schema compliance, and content completeness.
-2. **Run `scripts/validate-skill.sh`** — 304 automated consistency checks across 7 validation domains.
-3. **Routing consistency** — Every spoke in the routing table should appear in the reference_index and vice versa.
-4. **Schema validation** — Ensure example JSON in schema docs is valid JSON.
-5. **Dry run** — Invoke `/bestest <your-command>` in a test repo and verify the spoke loads and produces expected output.
+1. **Run `scripts/validate-plugin.sh`** — automated checks covering file structure, cross-references, schema compliance, and content completeness.
+2. **Run `scripts/validate-skill.sh`** — automated consistency checks across 9 validation domains.
+3. **Run `scripts/validate-contracts.sh`** — golden-fixture contract checks (C001–C030) verifying every spoke's documented read/write fields exist in `scripts/fixtures/`. When you add a new report type or change a report field, update the corresponding fixture and re-run this.
+4. **Routing consistency** — Every spoke in the routing table should appear in the reference_index and vice versa.
+5. **Schema validation** — Ensure example JSON in schema docs is valid JSON.
+6. **Dry run** — Invoke `/bestest <your-command>` in a test repo and verify the spoke loads and produces expected output.
+7. **CLI changes** — If you modify `scripts/bestest-cli.py`, run `python3 -m py_compile scripts/bestest-cli.py` and smoke-test affected subcommands against a fixture repo (see `references/bestest-cli.md`).
 
 ---
 
@@ -231,6 +235,19 @@ bestest/
 │       └── ...
 │
 └── scripts/
-    ├── validate-plugin.sh            # 298 automated integrity checks
-    └── validate-skill.sh             # 304 automated consistency checks
+    ├── validate-plugin.sh            # integrity checks
+    ├── validate-skill.sh             # consistency checks
+    ├── validate-contracts.sh         # golden-fixture contract checks (C001–C030)
+    ├── bestest                       # thin wrapper → bestest-cli.py
+    ├── bestest-cli.py                # deterministic helper layer (detect/config/report/lock/metrics/render/contracts)
+    ├── fixtures/                     # golden JSON fixtures for contract validation
+    │   ├── stack-profile.json
+    │   ├── scan-report.json
+    │   ├── run-report.json
+    │   ├── run-report-companion.json
+    │   ├── doctor-report.json
+    │   ├── coverage-report.json
+    │   ├── metrics.json
+    │   └── config.yaml
+    └── validate-to-junit.sh          # JUnit XML conversion for CI
 ```

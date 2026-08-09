@@ -987,7 +987,7 @@ Write the scan report to disk, write a companion run-results.json (so downstream
 
    **When to skip this step:** If Phase 3 was skipped entirely (coverage disabled AND no tests found), or if Phase 3 fell back to static analysis mode without actually running tests, do not write a companion run report. Only write it when real test execution occurred.
 
-3. **Update TESTING.md** — Read `TESTING.md` at the repo root. Update it with current scan results by filling template placeholders from `references/templates/testing-md.md`:
+4. **Update TESTING.md** — Read `TESTING.md` at the repo root. Update it with current scan results by filling template placeholders from `references/templates/testing-md.md`:
 
    | Placeholder | Value Source |
    |-------------|-------------|
@@ -1001,7 +1001,7 @@ Write the scan report to disk, write a companion run-results.json (so downstream
 
    Preserve any manual additions the user has made outside the placeholder blocks. Only replace content within the clearly marked sections (between `<!-- bestest:start -->` and `<!-- bestest:end -->` comment pairs, or within the template structure).
 
-4. **Update config state** — Write the scan timestamp to `.bestest/config.yaml`:
+5. **Update config state** — Write the scan timestamp to `.bestest/config.yaml`:
 
    ```yaml
    state:
@@ -1010,7 +1010,7 @@ Write the scan report to disk, write a companion run-results.json (so downstream
 
    Read the existing config, update only the `state.last_scan` field, and write back. Preserve all other config fields exactly.
 
-5. **Print console summary** — Display a human-readable summary of the scan results:
+6. **Print console summary** — Display a human-readable summary of the scan results:
 
    ```
    ## bestest scan complete
@@ -1103,9 +1103,17 @@ Write the scan report to disk, write a companion run-results.json (so downstream
    If count > reports.max_retained:
      Delete the (count - max_retained) oldest reports
      Print: "Rotated {N} old scan reports (retention limit: {max_retained})"
+
+   Run reports (run-*.json) are produced by spoke-run, spoke-scan (companion), and
+   spoke-generate (companion). Apply the same retention limit to keep the directory bounded:
+   List all files matching .bestest/reports/run-*.json
+   Sort by filename (oldest first)
+   If count > reports.max_retained:
+     Delete the (count - max_retained) oldest run reports
+     Print: "Rotated {N} old run reports (retention limit: {max_retained})"
    ```
 
-   The rotation only deletes `scan-*.json` files — it never touches `run-*.json`, `coverage-*.json`, `vitest-run.json`, or other report artifacts. The newest report (just written) is never deleted, even if `max_retained` is 1.
+   The rotation deletes `scan-*.json` and `run-*.json` files only — it never touches `coverage-*.json`, `vitest-run.json`, `doctor-*.json`, `fix-*.json`, or other report artifacts. The newest report (just written) is never deleted, even if `max_retained` is 1. Companion run reports written by generate outside of a scan run are rotated on the next scan invocation. Spokes that write run reports without a preceding scan (`spoke-run`) SHOULD also apply this rotation step before writing their new report.
 
 ### Output
 
@@ -1349,8 +1357,11 @@ Follow this protocol on every invocation:
 2. Parse as JSON
 3. If parse fails (corruption):
    a. Log warning: "metrics.json corrupted — recreating with defaults"
-   b. Initialize fresh metrics with schemaVersion "1.0" and default values
-   c. Continue with step 5 (do NOT abort the spoke)
+   b. Backup the corrupt file: `cp .bestest/state/metrics.json .bestest/state/metrics.json.corrupt.$(date +%s)`
+      - Log the backup path so agents can locate it for forensic inspection
+      - This must happen BEFORE recreating defaults to preserve evidence
+   c. Initialize fresh metrics with schemaVersion "1.0" and default values
+   d. Continue with step 5 (do NOT abort the spoke)
 4. Validate schemaVersion — warn if MAJOR differs, proceed if MINOR differs
 5. Merge spoke-specific data:
    - Update lastUpdated to current ISO 8601 timestamp
@@ -1362,7 +1373,6 @@ Follow this protocol on every invocation:
 8. Release lock on .bestest/state/.metrics.lock
    - flock: released automatically when the subshell/process exits
    - mkdir: remove the lock directory with rm -rf
-7. Update config.yaml state.last_metrics with current timestamp
 ```
 
 ### Activity Log Entry
