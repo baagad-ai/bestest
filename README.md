@@ -20,7 +20,7 @@
 
 bestest is an AI-native testing skill that architects your entire testing layer — not just generates a test file and hopes for the best.
 
-It's a **100+ file, ~40K-line specification** that lives inside your AI coding agent and handles strategy, framework selection, test generation, CI pipelines, flaky test management, framework migration, and living documentation. All version-controlled in your repo.
+It's a **120+ file, ~40K-line specification** that lives inside your AI coding agent and handles strategy, framework selection, test generation, CI pipelines, flaky test management, framework migration, and living documentation. All version-controlled in your repo.
 
 ```
 Other tools:  "Write a test for X"  →  a test file (maybe compiles, maybe passes)
@@ -35,7 +35,7 @@ bestest:      Detect stack → Pick framework → Generate → Compile → Run �
 | "What testing framework should I use?" | 7-step decision trees per language, backed by evidence, recorded as ADRs |
 | "Write tests for my codebase" | 7-phase pipeline: generate → compile → run → quality score (0–100) |
 | "My tests are flaky" | Root-cause classification (test bug, source change, env, timing) + targeted fixes |
-| "We need to migrate from Jest to Vitest" | AST-aware migration with `--gradual` safe mode |
+| "We need to migrate from Jest to Vitest" | AST-aware migration with safe rollback (`--gradual` mode for JUnit 4→5) |
 | "No CI pipeline" | Generates GitHub Actions / GitLab CI / Jenkins configs |
 | "Nobody knows our test strategy" | `TESTING.md` — living documentation, auto-updated on every scan |
 
@@ -103,7 +103,7 @@ stack-profile.json
 |---|---|
 | `config` | View and modify `.bestest/config.yaml` settings |
 | `doctor` | 9-dimension health check of test infrastructure |
-| `expand` | Add new test types (unit → integration → e2e → mutation) |
+| `expand` | Add new test types: e2e, api, mutation, contract, chaos, performance |
 | `migrate` | Migrate frameworks: Jest→Vitest, JUnit 4→5, Cypress→Playwright |
 | `ci` | Generate CI pipelines for GitHub Actions, GitLab CI, or Jenkins |
 
@@ -120,7 +120,7 @@ stack-profile.json
 
 ### The Spoke Architecture
 
-bestest uses a **lean orchestrator + spoke** pattern. Only one spoke loads per command, keeping context windows small while supporting 19 commands across 4 languages.
+bestest uses a **lean orchestrator + spoke** pattern. Only one spoke loads per command, keeping context windows small while supporting 16 commands (19 spokes) across 4 languages.
 
 ```
 SKILL.md (orchestrator — routing, principles, reference index)
@@ -139,7 +139,9 @@ SKILL.md (orchestrator — routing, principles, reference index)
 │   ├── spoke-ci.md                   ← /bestest ci
 │   └── ... (19 spokes total)
 └── scripts/
-    └── validate-skill.sh             ← 345 consistency checks
+    ├── validate-skill.sh             ← 347 structural consistency checks
+    ├── validate-contracts.sh         ← 77 golden-fixture contract checks
+    └── bestest-cli.py                ← deterministic helper (detect/config/report/lock/metrics)
 ```
 
 ### The 7-Phase Generation Pipeline
@@ -160,7 +162,7 @@ Every generated test must **compile**, **pass**, and **score ≥ 70** on the qua
 
 ### Detection Engine
 
-bestest detects your stack from **80+ signals** across 12 categories, with confidence scores and evidence arrays:
+bestest detects your stack from **190+ signals** across 14 categories, with confidence scores and evidence arrays:
 
 ```
 Detected: TypeScript (0.94), React (0.88), Vitest (0.72), Vite (0.91)
@@ -199,7 +201,7 @@ All state lives in `.bestest/` inside your repo — version-controlled, auditabl
 │   ├── stack-profile.json      ← Detected stack with confidence scores
 │   └── metrics.json            ← Cross-spoke metrics store
 ├── adrs/
-│   └── 001-vitest-over-jest.md ← Architecture Decision Records
+│   └── ADR-001-test-framework.md ← Architecture Decision Records
 └── reports/
     └── scan-2026-04-26.json    ← Timestamped scan reports
 ```
@@ -216,7 +218,7 @@ All state lives in `.bestest/` inside your repo — version-controlled, auditabl
 
 ## Validation
 
-bestest validates itself. A CI pipeline runs **345 structural checks + 77 golden-fixture contract checks** across multiple domains:
+bestest validates itself. A CI pipeline runs **three suites** — 347 structural consistency checks, 314 integrity checks, and 77 golden-fixture contract checks — across these domains:
 
 - File structure integrity
 - Cross-reference validity (no phantom file references)
@@ -229,7 +231,7 @@ bestest validates itself. A CI pipeline runs **345 structural checks + 77 golden
 
 ## Runtime Model
 
-bestest is a **skill**, not a CLI tool. It's a directory of markdown instructions that AI coding agents (GSD/pi, Claude Code, Cursor, opencode, etc.) load as guidance. When you run `/bestest generate`, the agent reads the corresponding spoke file and follows it step-by-step — running real commands, reading your source, and writing real test files. There is no daemon or binary to install.
+> bestest is a **skill**, not a CLI tool — see the callout under [Why bestest?](#why-bestest) for how it runs inside your agent.
 
 Alongside the prose spec, bestest ships a small **deterministic helper** (`scripts/bestest-cli.py`, stdlib-only Python) that the agent uses for mechanical operations — report selection (with companion-run filtering), config read/write/validate, concurrency locks, and metrics merges. It's optional: if `python3` isn't available, the agent follows the documented manual steps instead. See `references/bestest-cli.md`.
 
